@@ -1,0 +1,273 @@
+/* --- shell ---------------------------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/* The safe-area padding is what makes the app's own background paint into the
+   strip behind the status bar when Android hands us the full screen, instead
+   of leaving a band the system fills with its own guess at our colour. It
+   resolves to 0 when there is no inset, so it costs nothing anywhere else. */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--head-gap);
+  padding: calc(var(--head-top) + env(safe-area-inset-top)) var(--head-x) var(--head-bottom);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The bar holds two things: the creature, and everything made of words. The
+   split exists because the row has two different alignments to satisfy at
+   once and one `align-items` cannot say both — the words sit on a shared
+   baseline with each other (the wordmark's, which the count's small mono caps
+   hang from, exactly as they always have), and that whole group is centred
+   against a drawing more than twice its height. Flattened into one row the
+   baseline group hangs from the top of the 56px band the mascot opens up,
+   which puts the wordmark at the ceiling and the creature's feet at the floor
+   with nothing lining up. */
+.topbar-words {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--s-5);
+}
+
+/* A button's hit box (44) is taller than the words it holds, and in a row
+   aligned on baselines the tallest item sets the row's height — so "this
+   device only" arriving used to shove the words up by two pixels.
+   The negative margin gives the height back and keeps the touch target. */
+.topbar-words > button.sync-state {
+  margin-block: calc(var(--lh-chrome) * 0.5em - var(--hit) * 0.5);
+}
+
+/* Marcellus is an inscriptional Roman — it was drawn for capitals cut into
+   stone, and setting it lowercase wastes the whole face. Wide-tracked caps
+   is what it is for, and the ring on the Å is the best letter in the mark.
+   The negative right margin removes the phantom space that tracking adds
+   after the final R, so the mark optically starts and ends where it looks
+   like it does. */
+.wordmark {
+  font-family: var(--display);
+  font-size: var(--t-read);
+  font-weight: 400;
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-mark);
+  margin-right: calc(var(--track-mark) * -1);
+  text-transform: uppercase;
+}
+
+.count {
+  color: var(--muted);
+  margin-left: auto;
+  /* The count never gives way: the bubble beside it is what narrows. */
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Settings, in the corner opposite the creature (2026-10-12, owner). The
+   board row's own icon controls (.board-burger, .board-search) say how: a
+   muted mark with no box of its own at rest, the one raised step under the
+   finger. A nav-tier mark because the band is the creature's 56px, not a
+   row's 44; the margin gives back the hit box's slack so the mark itself
+   stands on the bar's 16px side margin, as the creature does on the left. */
+.topbar-settings {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  min-height: var(--hit);
+  margin-right: -10px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.topbar-settings:active {
+  color: var(--ink);
+  background: var(--raised);
+}
+
+/* The menu's Settings row is only for a folded header (below), which has no
+   corner to put the cog in. */
+.selpanel-btn.menu-settings {
+  display: none;
+}
+
+/* Search is revealed from the menu, not resident. Open, it takes the exact
+   slot the board tabs sit in (see .board-row below) rather than opening a
+   row of its own above them — a field popping in above the tabs pushed the
+   board row, and the grid under it, down the moment you tapped the icon.
+
+   A field you type into is set at reading size, like the note it will find.
+   It also has to clear 16px, or iOS zooms the whole page on focus. */
+.search {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--shelf-row-h);
+  padding: 0 15px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: var(--t-read);
+  line-height: var(--lh-chrome);
+}
+
+/* The one always-visible text field, and it never takes the signal ring: a
+   field matches :focus-visible on an ordinary tap in every engine, and this
+   box sits flush to three edges, where a ring drawn 2px outside it clips at
+   the viewport and lands on the hairlines it crosses. So, the canvas label's
+   rule — a focused field is a state, not a link: one inset rule of ink, the
+   same for touch and keyboard. `.search:focus` outscores the bare global
+   `:focus-visible`, so the two never stack. (DESIGN.md §3.) */
+.search:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.search::placeholder {
+  color: var(--muted);
+}
+
+/* "Only in this board" — the one-tap scope, on a folder and on the Archive.
+   A cell at the row's left end, bound to the field by a soft hairline the way
+   the burger is bound to the strip, filling the row's height so the row keeps
+   its 44px. It names a board, so it is set as board names are set (the display
+   face, the nav size, capitals, tracked) with the board's own mark in its tint
+   (see the tint rule under the board row). Chrome: muted at rest, and on it
+   *raises* rather than inverting (DESIGN.md §5) — the state is "this is where
+   the search is standing", which is the same fact the raised tab states.
+
+   Capped at two fifths of the row and cut with an ellipsis, so a long folder
+   name on a 360px phone still leaves the field most of the width. Present from
+   the frame the row opens and unchanged by typing, so it never moves the
+   field under the caret. */
+.search-scope {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--shelf-row-h);
+  padding: 0 14px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--rule-soft);
+  border-radius: 0;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: var(--cursor-pointer);
+}
+
+.search-scope .icon {
+  flex: 0 0 auto;
+}
+
+.search-scope-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-scope:active,
+.search-scope[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* Suggestions riding on top of the grid rather than a row that pushes it
+   down and back up as they appear and disappear — an overlay anchored to
+   the board row (see its own position: relative), not a second row in the
+   layout. Same surface and rule as .ctx-menu: a card with a hard border,
+   no shadow. */
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 12;
+  background: var(--card);
+  /* --card is byte-identical to --paper, so without edges of its own this
+     overlay read as a hole — card rules vanishing under it with no panel to
+     blame. Ruled on the three sides the board row's own border-bottom does
+     not already draw. */
+  border-bottom: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+}
+
+/* Shown only before the user has typed anything — the recent/most-repeated
+   terms, tappable back into the field. Convenience, not a feature: no
+   heading, no way to clear one, just fewer keystrokes for a search you have
+   already made before. */
+.search-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 15px;
+}
+
+/* ~25px drawn, a thumb's worth to hit: the hit area is widened invisibly to
+   `--hit` tall (`position` here, the box in `::after`), the way `.check-hit`
+   does it, so the chips keep their size and the row keeps its rhythm.
+   Vertically neighbouring chips overlap by a pixel or two across the 8px gap,
+   which a thumb cannot tell apart. */
+.search-chip {
+  position: relative;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--rule-soft);
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.search-chip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--hit);
+  transform: translateY(-50%);
+}
+
+.search-chip:active {
+  background: var(--invert);
+  color: var(--paper);
+  border-color: var(--invert);
+}
+
+/* The query matches the name of a board you already pinned — offered above
+   the results rather than making you scroll to notice you could just be
+   standing on that board instead. */
+.search-suggest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 15px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--ink);
+  cursor: var(--cursor-pointer);
+  font-size: var(--t-nav);
+}
+
+.search-suggest:active {
+  background: var(--invert);
+  color: var(--paper);
+}
+

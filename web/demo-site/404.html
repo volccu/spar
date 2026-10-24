@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0c0a08" />
+    <title>Not here · spår demo</title>
+    <!-- Its being here is the point: with a 404.html at the root, Cloudflare
+         Pages answers a missing file with a 404 instead of the app's shell
+         under a 200. An old install asking for a chunk a newer release has
+         removed would otherwise store that HTML under the chunk's name, and
+         the service worker never asks again (docs/demo.md). -->
+    <style>
+      body {
+        margin: 0;
+        padding: 56px 16px;
+        background: #0c0a08;
+        color: #948b7d;
+        font: italic 13px/1.6 Georgia, serif;
+        text-align: center;
+      }
+      a {
+        color: #fff8e8;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Nothing at this address. <a href="/">Open spår</a></p>
+  </body>
+</html>

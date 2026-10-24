@@ -1,0 +1,928 @@
+/* --- how a board looks -----------------------------------------------------
+   The sheet where a folder is given a mark and one of the sixteen tints. It sits
+   on the **paper**, unlike every other panel in the app, which invert to
+   `--invert` and set their text in `--paper`. That is forced rather than
+   preferred: the tints are solved against the ground at 5.9:1, and the same
+   tones laid on a bone slab are a pale wash on a pale slab. Same surface and
+   hard rule as `.search-dropdown` and `.ctx-menu` — a card with a border, no
+   shadow, no radius.
+   -------------------------------------------------------------------------- */
+
+.look {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  /* Half the screen at most: the grid of marks scrolls inside it, and the
+     board being dressed stays visible above so the change can be seen landing
+     on the shelf while the sheet is still open. */
+  max-height: var(--look-h);
+  /* And a fixed height, so the sheet does not shrink under the pointer as a search
+     narrows the marks: the field and swatches stay where they were clicked. */
+  height: var(--look-h);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+}
+
+/* The same step, for a folder's Look sheet reached from that drawer. */
+.look-over {
+  z-index: 22;
+}
+
+.look-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+/* The board being dressed, named the way the shelf names it: Marcellus
+   capitals at the nav size, because a board's name is set in the display face
+   and only a board's name is (DESIGN.md §4; review UI-08). */
+.look-name {
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  /* Every name can give way; the ✕ beside it never does. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.look-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: -12px -12px -12px 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.look-close:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* Seventeen swatches — "No colour" and the sixteen — and every one of them is
+   the board's own mark rather than a block of colour. A filled square would be
+   the one thing DESIGN.md refuses outright, and it would be showing something
+   nobody is choosing: what is being chosen is how the mark on the shelf will
+   look.
+
+   Nine columns, two rows: "No colour" and eight tints, then eight tints and
+   one empty cell. Nine 44px cells are 396px, wider than a 390px phone, so the
+   columns give a little (43px at 390, 40 at 360) rather than wrapping a tenth
+   onto its own line — the same arithmetic as the single row of nine this
+   replaced (review UI-21), now with a second row. Left-aligned and capped at
+   the touch size, so a desktop's wide sheet does not stretch them. */
+.look-colors {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, var(--hit)));
+  justify-content: start;
+  gap: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+/* A tint's name, to the right of the swatches, for a pointer only. It sits in the
+   row's empty space, so it adds no height and nothing moves. */
+.look-tint {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .look-tint {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(9 * var(--hit) + var(--s-6));
+    right: var(--s-6);
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    overflow: hidden;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+}
+
+.look-swatch,
+.look-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+/* The swatch is square where there is room; on a phone a column is narrower
+   (43px at 390, 40 at 360 — still the full 44px tall). Its width comes from
+   the grid above, the same way the icon cell's comes from its grid, below. */
+.look-swatch {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Chosen. The chrome's own grammar — one step off the paper, never an ink
+   fill — so the picker marks its selection the same way the board strip marks
+   the board you are on. */
+.look-swatch[aria-pressed="true"],
+.look-icon[aria-pressed="true"] {
+  background: var(--raised);
+}
+
+.look-swatch:active,
+.look-icon:active {
+  background: var(--raised);
+}
+
+.look-filter {
+  padding: 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.look-filter input {
+  width: 100%;
+  padding: 12px 15px;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+}
+
+.look-filter input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.look-filter input::placeholder {
+  color: var(--muted);
+}
+
+/* The set, some 1,850 marks deep (drawn a page at a time, BoardLook.tsx's
+   PAGE), so this is the one thing on the sheet that scrolls.
+   `scrollbar-gutter: stable` for the same reason the grid takes it: the column
+   must not step sideways as the filter shortens the list past the bottom. */
+.look-icons {
+  flex: 1 1 auto;
+  /* Or the grid refuses to shrink inside the column and the sheet grows past
+     its own max-height instead of scrolling — the flexbox default nobody
+     remembers. */
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--hit), 1fr));
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 8px 11px;
+}
+
+.look-icon {
+  width: 100%;
+}
+
+/* Between the suggested marks and the whole set: one soft rule across the
+   grid, with the cells' own breathing room either side of it. */
+.look-break {
+  grid-column: 1 / -1;
+  margin: 6px 0;
+  border-top: 1px solid var(--rule-soft);
+}
+
+/* The marker after the last cell drawn: when it nears the grid's bottom the
+   next page is drawn. A row of nothing, across the grid. */
+.look-more {
+  grid-column: 1 / -1;
+  height: 1px;
+}
+
+.look-wait {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 16px 4px;
+  color: var(--muted);
+}
+
+/* --- the board row --------------------------------------------------------- */
+
+/* Wraps the shelf — the scrolling tab strip on a desktop, the board you are on
+   plus its burger on a phone — and the one fixed control beside it, so the fast
+   way into search never scrolls off with the boards. Positioned so
+   .search-dropdown (the recent-search chips / jump-to-board suggestion) can
+   anchor to its bottom edge and overlay the grid instead of pushing it. */
+.board-row {
+  position: relative;
+  display: flex;
+  border-bottom: 1px solid var(--rule);
+  flex: 0 0 auto;
+  /* One height for every shape the row takes. The strip, the search field
+     and the mode label each fill it rather than each bringing their own
+     padding — see `--shelf-row-h`. Nothing else on screen is allowed to
+     move when search opens (DESIGN.md, the board row). */
+  min-height: var(--shelf-row-h);
+}
+
+/* The phone's board row at the foot (Settings' `boardRow`, 2026-10-11, owner
+   approved; `rowAtFoot` in App.tsx, which also renders it after the grid).
+   ---------------------------------------------------------------------------
+   The same row — the burger, the board you are on, search's mark — standing
+   on the capture bar, where the thumb is. Fixed, at the bar's own measured
+   height (`--capture-h`, written by CaptureBar), so a bar grown by a draft
+   lifts the row with it instead of rising over it; before the first
+   measurement, and with the bar away, it stands where a slim bar's top is.
+
+   Its one rule moves to the edge that faces the grid. The bar's `border-top`
+   already draws the line under it, so the row draws none of its own there:
+   one line on each side, never a double. Its ground is the bar's, because it
+   is the bar's furniture now. While the write field holds the caret the row
+   is `hidden` (App.tsx), and this rule must say so, since `display: flex`
+   outranks the browser's own `[hidden]`. */
+.app[data-board-row="bottom"] .board-row {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--capture-h, calc(var(--bar-h) + env(safe-area-inset-bottom)));
+  background: var(--card);
+  border-bottom: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.app[data-board-row="bottom"] .board-row[hidden] {
+  display: none;
+}
+
+/* Suggestions open upward over the grid, ruled on the three sides the row's
+   own top edge does not already draw. */
+.app[data-board-row="bottom"] .search-dropdown {
+  top: auto;
+  bottom: 100%;
+  border-top: 1px solid var(--rule);
+  border-bottom: 0;
+}
+
+/* The bar's one line stands on the row rather than under it: anchored to the
+   bar's top edge it would cover the burger and the board's name. Only while
+   the row is there — with the row hidden the line is back on the bar. The
+   row is its 44px plus the one rule on its top edge. */
+.app[data-board-row="bottom"] .board-row:not([hidden]) ~ .capture .capture-line {
+  bottom: calc(100% + var(--shelf-row-h) + 1px);
+}
+
+/* The grid's foot keeps clear of the row as well as the bar, and so does a
+   card the arrows walk to. */
+.app[data-board-row="bottom"] .scroll {
+  padding-bottom: calc(var(--bar-h) + var(--shelf-row-h) + 28px);
+  scroll-padding-bottom: calc(
+    var(--bar-h) + var(--shelf-row-h) + env(safe-area-inset-bottom) + 8px
+  );
+}
+
+/* A board's mark takes its hue, wherever a board is named.
+   ---------------------------------------------------------------------------
+   `--board-tint` is set inline on the tab, the phone's header row, the drawer
+   row and the picker's own cells; unset, `currentColor` is what the mark
+   inherited before any of this existed, so an uncoloured board is byte for
+   byte what it always was. The tint is `--muted`'s own brightness (see the
+   token block), so the mark does not get louder when it gets a hue — which is
+   what lets this exist at all in a design that has no colour. */
+.board-tab .icon,
+.board-current .icon,
+.search-scope .icon,
+.shelf-row .icon,
+.sorter-dest .icon,
+.selpanel-board .icon,
+.look-swatch .icon,
+.look-icon .icon {
+  color: var(--board-tint, currentColor);
+}
+
+/* The burger is the app's control, not the board's, so it never takes the
+   board's hue — only the mark for the board itself does. Same reason the eight
+   automatic boards cannot be coloured at all. */
+.board-current .icon:first-child {
+  color: currentColor;
+}
+
+/* The strip itself: every board in one row, on a window wide enough to hold
+   them. It scrolls sideways when there are more folders than fit, and fades at
+   whichever edge still has tabs past it. */
+.boards {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  border-bottom: 0;
+  scrollbar-width: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  /* A drag settles on a tab rather than stopping mid-word. "proximity", not
+     "mandatory" — a fast flick should still be free to sail past several
+     tabs; this only pulls a slow, already-stopping scroll the rest of the
+     way. */
+  scroll-snap-type: x proximity;
+  /* Fades open at whichever edge still has tabs past it, closed at the one
+     that doesn't — set on the two attributes below, written by App.tsx's
+     `updateBoardsFade` (scroll position isn't something CSS alone can read).
+     A mask rather than a gradient overlay: it reveals whatever the row is
+     sitting on without this rule needing to name that colour, and it fades
+     the tabs' own ink along with their ground, which a painted-on overlay
+     over dark text would not. */
+  --fade-l: 0px;
+  --fade-r: 0px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--fade-l),
+    black calc(100% - var(--fade-r)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--fade-l),
+    black calc(100% - var(--fade-r)),
+    transparent
+  );
+}
+
+/* The tabs, and only the tabs (review QA-02): a row inside the scroller, so
+   the New board control can scroll along beside them without being a member
+   of the tablist. It lays its tabs out exactly as the scroller used to. */
+.boards-tabs {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.boards[data-fade-left="true"] {
+  --fade-l: 28px;
+}
+
+.boards[data-fade-right="true"] {
+  --fade-r: 28px;
+}
+
+.boards::-webkit-scrollbar {
+  display: none;
+}
+
+/* Boards are named places, so they are set in the display face. Marcellus is
+   an inscriptional Roman — it is built for spaced capitals and looks its best
+   here, at the one spot in the app that names things. */
+.board-tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  /* 6 and 12, not 8 and 16 (review UX-04): at 1440px five folders already
+     pushed Links, Files and All off the end of the strip. Every pixel taken
+     here is taken eleven times over, and the tab is still a thumb's height
+     and a word's width. */
+  gap: 6px;
+  min-height: var(--shelf-row-h);
+  padding: 0 10px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--rule-soft);
+  /* Both for the lamp: something for its pool to be measured against, and a
+     group for it to blend inside rather than reaching down the strip. */
+  position: relative;
+  isolation: isolate;
+  cursor: var(--cursor-pointer);
+  color: var(--muted);
+  white-space: nowrap;
+  scroll-snap-align: start;
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-tab);
+  text-transform: uppercase;
+}
+
+/* A board's name on the strip, cut at about sixteen characters (review
+   UI-B-05). BOARD_NAME_MAX allows forty, and one such name made a 442px tab
+   that pushed Archive, the lenses and All past the strip's one-click reach.
+   The whole name is the tab's hover title. Padding moves the clip edge out
+   past the ring of an Å, as `.selpanel-label` does; the matching negative
+   margin gives the tab its height back. */
+.board-tab-name {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-block: 3px;
+  margin-block: -3px;
+}
+
+/* Short of room, the app's own boards stand as their mark and their count
+   (review UX-08, 2026-10-13; `fitBoards` in lib/useStripOverflow.ts sets the
+   attribute only when the strip would otherwise run past its edge). The name
+   stays in the tab for a screen reader, and the tab's `title` is the
+   tooltip. A board the user made always keeps its name. */
+.boards[data-compact="true"] .board-tab[data-lens] .board-tab-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  max-width: none;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* The board you are on. Full ink, and the tab is *lit* — the same pool of
+   light on the same paper grain the write box gets, held still in the middle
+   of the tab because a tab has no caret to follow. Two changes read together,
+   which is unmistakable without putting a bright slab across the top of the
+   screen.
+
+   It was a flat `--raised` fill until now, and the fill was the honest half of
+   the signal for a year. What the lamp buys over it is that a slab is a shape
+   with an edge — one more rectangle on a screen already made of them — while a
+   pool has no edge at all, so the tab reads as the one the light is on rather
+   than the one wearing a box. DESIGN.md §2c is the licence and names this
+   surface; the write box's own note holds the mechanism.
+
+   --lamp-lift is 13%: the wash at the centre of the pool lands a shade under
+   where --raised sat (which is --invert at about 16% over the paper), because
+   the grain and the muted → ink step are both carrying part of the load now.
+   Turn this number, not the film, to change only the boards.
+
+   The pool is sized in percentages so one rule fits every width of tab: 62% of
+   the width means it has faded most of the way out by the tab's own edges, and
+   130% of the height means it does *not* fade at the top and bottom, where a
+   visible arc inside a 44px row would read as a shape rather than as light.
+
+   A 3px rail under the selected tab was tried here and taken out again. It
+   worked, and it was still one thing too many: the fill and the ink already
+   say it, and a third signal on the least ambiguous piece of state in the app
+   is furniture. The ramp is the design; nothing gets added to it. */
+.board-tab[aria-selected="true"] {
+  color: var(--ink);
+}
+
+.board-tab[aria-selected="true"]::before {
+  /* 13%, 62% wide, centred — the values the comment above describes and the
+     trash tab and the drawer row carry. This rule read 5%, a pool larger
+     than the tab, anchored at its bottom-right corner, from 2026-09-01 to
+     2026-09-06: the change rode in with the editor-lamp commit (fdea408),
+     unmentioned, and left the board you are on dimmer than the trash tab
+     beside it. Every deliberate hand-turn of a lamp here got words
+     (c3628cf); this one had none. `styles.test.ts` now holds the three to
+     one lift. */
+  --lamp-lift: 13%;
+  --lamp-pool: 62% 130%;
+  --lamp-x: 50%;
+  --lamp-y: 50%;
+  /* Behind the mark and the name, in front of the tab's own ground. */
+  z-index: -1;
+}
+
+/* The "+" tab — same shape as every other tab, so making a board costs one
+   tap in the place boards already live, never a menu dive. */
+.board-tab-add {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* An overflowing strip scrolled to its end would otherwise stand its last
+   tab's soft rule against the count cell's own edge, a 2px double. */
+.boards[data-overflow="true"] > :last-child {
+  border-right: 0;
+}
+
+/* How many boards are past the strip's right edge, and the click that brings
+   them into view (App.tsx, review UX-04). Without it the strip hid Links,
+   Files and All behind a fade over an empty slot, and said nothing. The
+   machine face for the number, the step mark beside it, the edge rule the
+   trash tab takes because this too stands at the end of the strip rather
+   than inside it. Only there while something does not fit. */
+.board-more {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+  white-space: nowrap;
+}
+
+.board-more:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* The field it opens into, in the same slot rather than a popover elsewhere —
+   the board it's about to name is going to sit right here. */
+.board-tab-new {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--shelf-row-h);
+  border-right: 1px solid var(--rule-soft);
+  padding: 0 14px;
+}
+
+.board-tab-new input {
+  width: 14ch;
+}
+
+/* Trash, outside the scroller entirely. Inside `.boards` it clips off the
+   right edge the moment there are enough boards to overflow the strip, and it
+   is the one destination that may never scroll out of reach — so it stands
+   beside search instead, as a mark and a count with no name (the mark is
+   unambiguous and the row is already the narrowest thing in the bar). The
+   leading rule is --rule rather than --rule-soft: this is the edge of the
+   strip, not a division inside it. */
+.board-trash {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--rule);
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+  white-space: nowrap;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Trash is a destination like any other, so being on it looks like being on
+   any other — the same lamp, one size down for a tab that is a mark and a
+   count with no name in it. */
+.board-trash[aria-selected="true"] {
+  color: var(--ink);
+}
+
+.board-trash[aria-selected="true"]::before {
+  --lamp-lift: 13%;
+  --lamp-pool: 72% 130%;
+  --lamp-x: 50%;
+  --lamp-y: 50%;
+  z-index: -1;
+}
+
+/* The whole left side of the row is one control on a phone: the burger, the
+   board's own mark, its name and its count. One question ("which board, and how
+   do I get to another one"), so one target, and a fat one — a 40px mark beside
+   a word you cannot tap is a control with a dead half.
+
+   No fill at rest. In the strip the board you are on is raised *against the
+   others*; alone in a row it has nothing to contrast with, and a raised slab
+   across the top of the screen for a fact nothing disputes is exactly the
+   furniture the ramp is meant to prevent. Full ink alone says it. */
+.board-current {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--shelf-row-h);
+  padding: 0 16px;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  cursor: var(--cursor-pointer);
+  text-align: left;
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+/* Chrome raises, it never inverts to ink — pressed and open are the same one
+   step off the paper, with the mark itself going solid while the drawer is open
+   (see IconBoards). */
+.board-current:active,
+.board-current[aria-expanded="true"] {
+  background: var(--raised);
+}
+
+.board-current-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A mode's own name, in the slot the shelf gives up while it runs.
+   ---------------------------------------------------------------------------
+   Search fills these forty pixels with a field; the Reminders mode has nothing
+   to type into, so it fills them with the one thing the screen would otherwise
+   not say out loud — which list this is. Set exactly as .board-current sets a
+   board's name (the display face, the nav size, uppercase and tracked), because
+   it is the same kind of fact standing in the same place, and it is not a
+   control: no cursor, no pressed state, nothing to tap. The way out is the mark
+   at the end of the row.
+
+   No `min-height` of its own: .board-row is pinned at 44px, which is what keeps
+   the grid from moving a pixel as a mode opens and closes. */
+.board-mode {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--shelf-row-h);
+  padding: 0 16px;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The desktop's burger: the first mark in the board row, and the same drawer
+   the phone opens from its own whole left side. Search's box mirrored to the
+   other end of the row — the same width, the same muted mark, the same soft
+   hairline on the side facing the strip — so the row is bracketed by its two
+   controls and the shelf lies between them. Muted at rest like search, not
+   full ink like the phone's row: on a desktop the raised tab says which board
+   you are on, and this mark only opens the drawer. Open, it raises the one
+   step chrome takes (`.board-current`'s own rule), with the mark going solid
+   (see IconBoards). */
+.board-burger {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  min-height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--rule-soft);
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.board-burger:active,
+.board-burger[aria-expanded="true"] {
+  color: var(--ink);
+  background: var(--raised);
+}
+
+/* The fast way into search, beside the shelf it never leaves — and, once open,
+   the same button that clears or closes it (see the input's sibling in
+   board-row). A fixed-width icon control riding the edge of a row, the same
+   shape .search-close used to be before search moved into this row. */
+.board-search {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  min-height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--rule-soft);
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+/* Chrome raises, it never inverts to ink — pressed, this used to flash a
+   solid --invert block, the brightest frame in the whole open-search
+   sequence, for the least ambiguous tap in it. Same grammar as its
+   neighbour .board-current: one step off the paper, the mark going to
+   full ink beside it. */
+.board-search:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* --- a shortcut, drawn --------------------------------------------------------
+   A key name is machine data, so it speaks in the machine voice at the data
+   size, exactly like a count or a stamp.
+
+   Each key is its own cap (2026-10-08, owner approved): "Ctrl" and "K" are two
+   caps with a small gap between them, never one box with a space in it. A cap
+   is 18px tall and at least 18px wide, so a single letter is a square; the
+   glyphs are centred and untracked (tracking spreads a three-letter word in a
+   small box and is what made the old "CTRL E" look off). The fill is one step
+   up the ramp (--rule-faint), the edge is --rule, and the corner is --r-key,
+   the one radius the system has. Never a shadow: a cap reads as a cap by its
+   edge and its size, not by pretending to stand off the page.
+
+   Drawn only where the key exists — `Hotkey` asks `(hover: hover) and
+   (pointer: fine)` before rendering anything, so a phone never sees a hint
+   naming a modifier it has no key for.
+
+   `.kbd` is the group (it is what the placements below position); `.kbd-cap`
+   is one key. */
+.kbd {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  vertical-align: middle;
+  white-space: nowrap;
+  /* It labels, it never catches: the field underneath must stay the thing a
+     click lands on. */
+  pointer-events: none;
+}
+
+.kbd-cap {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  /* One pixel of top padding: a mono capital sits a hair above the middle of
+     its line box, and this lands it on the middle of the cap. */
+  padding: 1px 5px 0;
+  font-size: var(--t-data);
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  background: var(--rule-faint);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-key);
+}
+
+/* In the write box it floats over the field's own right edge rather than
+   taking a column of it, and it is drawn only while the field is empty
+   (CaptureBar), so it never sits on top of anything typed. */
+.capture-field .kbd {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Open search does the same thing, for the same reason, and it took a bug to
+   notice it wasn't.
+   ---------------------------------------------------------------------------
+   The hint is an ordinary sibling of the field in the markup, and in flow it
+   was ~60px of the row while the query was empty and nothing at all the moment
+   a character was typed — so the field grew under the caret on the first
+   keystroke and shrank again when the query was cleared. That is the one thing
+   the board row is not allowed to do: it holds `min-height: 44px` and a
+   comment saying nothing on screen may move when search opens, and then it
+   moved the field the user was typing into.
+
+   So the hint comes out of flow and hangs off `.board-row`, which is already
+   `position: relative` for the suggestions overlay. `right` clears the 46px
+   search/clear button that rides the row's own edge, plus the 10px the write
+   box insets its hint by, so the two hints sit at the same distance from the
+   control they belong to and this one never lands on the mark beside it. */
+.board-row > .kbd {
+  position: absolute;
+  right: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* And the field reserves the room, whether or not the hint is showing — the
+   capture bar's rule, said in the other unit because this field's own padding
+   is where it has to be said.
+   ---------------------------------------------------------------------------
+   76 = 10 (the hint's inset from the field's right edge) + 59 (the caps:
+   "Ctrl" is four mono characters at --t-data untracked, plus 5px of padding
+   each side and its hairline, then a 4px gap and the 18px "K" cap) + 7 of
+   clear space. "Ctrl K" is the widest the label gets; a Mac draws "⌘" "K" and
+   simply leaves more room.
+
+   Gated on the same question `Hotkey` asks before it draws anything at all
+   (`KEYBOARD_QUERY` in lib/hotkeys.ts): a device with no Ctrl key is never
+   shown a hint naming one, and reserving a fifth of a phone's search field for
+   a box that will never be drawn there is furniture. Move that query and move
+   this one. */
+@media (hover: hover) and (pointer: fine) {
+  .board-row > .search {
+    padding-right: 76px;
+  }
+}
+
+/* The search count, on a desktop, where the hint was (review 2026-10-01,
+   UI-30): the same hang off the row's right end as `.board-row > .kbd`, so it
+   sits beside the words being typed rather than a screen's width away in the
+   header. Machine data, in `.mono`'s own voice and `--muted`, with no box —
+   it is a fact, not a key. The field reserves its width while it is drawn:
+   10 inset + about 72 for "241 FOUND" + clear space. */
+.board-row > .search-count {
+  position: absolute;
+  right: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.board-row > .search[data-counted] {
+  padding-right: 96px;
+}
+
+/* Inside a panel the key box takes the row's right edge, like every other
+   suffix here: `.selpanel-btn` is a flex row with a 10px gap, and the counts
+   beside the old-notes and Trash rows are pushed out to that edge by
+   `.selpanel-n`'s own auto margin. Without the same margin the key box floated
+   one gap after the word "Search" while the two counts above it lined up down
+   the panel's edge — three row suffixes, two of them in a column and one
+   adrift. The tones are `.kbd-cap`'s own: the panel is drawn on the ground now,
+   so `--muted` on a `--rule-faint` cap is right here as it is everywhere else —
+   and on a pressed (inverted) row the cap stays a dark cap on the light row,
+   which is the legible way round. */
+.selpanel .kbd {
+  margin-left: auto;
+}
+
+/* A count is data, not a name: the machine face, untracked, so it sits quietly
+   beside the wide-set capitals instead of competing with them. One rule for all
+   three places a board is named — the strip, the phone's row, the drawer.
+   *
+   * **The quiet comes from the face and the size, and never from opacity.**
+   * This carried `opacity: 0.5`, which is not a step along the ramp — it is a
+   * tenth tone, mixed at paint time out of `--muted` and the ground, and one
+   * the "no colour outside the token block" check cannot see because no hex is
+   * written. What it computed to was `#504a42` on the ground: **2.26:1**,
+   * against the 4.5 floor DESIGN.md verifies `--muted` at for this very row
+   * ("footers, board names", 5.88). Every board you are not standing on had
+   * its count at that ratio, at 10.5px, which on the phone's drawer is the
+   * whole shelf. The mono face at `--t-data` beside 12px tracked capitals is
+   * already two steps of distinction; the third was buying nothing and cost
+   * the number.
+   *
+   * `--muted` outright rather than the row's inherited tone, because that is
+   * what a step along the ramp actually is: on the board you are standing on
+   * the name goes to `--ink` and the count stays one step under it, which is
+   * the quiet the opacity was reaching for and the ramp already had. */
+.board-tab .tab-n,
+.board-trash .tab-n,
+.board-current .tab-n,
+.shelf-row .tab-n {
+  font-family: var(--mono);
+  font-size: var(--t-data);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  margin-left: 8px;
+}
+
+/* In the strip every tab after a count stands on that count's width, so a
+   board going from 9 notes to 10 shoved the rest of the shelf 6px sideways on
+   a capture. Two figures are reserved, not the three this held until
+   2026-10-01 (review UX-04): the third cost every tab a figure's width for a
+   crossing from 99 to 100 that a board makes once, and the strip ran out of
+   room with five folders. The drawer needs no reserve, because its count
+   sits at the row's far end and a wider one only takes room from the name's
+   ellipsis. */
+.board-tab .tab-n,
+.board-trash .tab-n {
+  display: inline-block;
+  min-width: 2ch;
+}
+
+/* The name's own tracking already leaves air after its last capital, so the
+   count stands a little closer in the strip than the shared 8px. */
+.board-tab .tab-n {
+  margin-left: 2px;
+}
+
+/* The film counter (components/Count.tsx; joy review #1, 2026-10-14): a digit
+   that changes turns inside a one-digit window. The window is a clip, never a
+   scale, and the new digit is the one in flow, so the window is exactly the
+   height and width the digit has at rest (a mono face is one ch wide) and
+   nothing beside it moves. The old digit is pinned over it for the length of
+   the move and is gone, with the whole structure, when it ends. */
+.roll-d {
+  position: relative;
+  display: inline-block;
+  clip-path: inset(0);
+}
+
+.roll-old {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+

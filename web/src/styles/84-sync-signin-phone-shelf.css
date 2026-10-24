@@ -1,0 +1,876 @@
+/* --- sync state ----------------------------------------------------------- */
+
+/* Present to a screen reader, absent from the page. The header's mascot is a
+   picture and is marked as one, so the live region beside it is what actually
+   reports a sync starting, finishing, or the connection going. It has to stay
+   in the layout to be announced at all — `display: none` and `visibility:
+   hidden` both take an element out of the accessibility tree — so it is
+   clipped to nothing instead, which is the one place in this stylesheet where
+   something is deliberately drawn at 1px and not seen. `.offscreen` is the
+   same box under the name the file inputs use: an input cannot be
+   display:none and still be opened by script in every browser, so it is put
+   where nothing can see or reach it. One declaration; they were two. */
+.offscreen,
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sync-state {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+}
+
+/* Signed in, the sync state is a `<span>` that reports and does nothing, so it
+   takes no pointer — a hand cursor over something that cannot be pressed is the
+   same lie the tap-to-sign-out affordance was. Signed out it is a real button
+   ("this device only", which offers sign-in) and keeps it. */
+button.sync-state {
+  min-height: var(--hit);
+  cursor: var(--cursor-pointer);
+}
+
+/* The header's quiet notice ("This device only", the demo's "Your notes stay
+   in this browser") is a button that opens sign-in or About: a control, and a
+   sentence, so it is set in words — never the machine face's tracked capitals
+   (DESIGN.md §4, §11; audit 2026-10-24, UX-007). */
+.quiet-notice {
+  font-family: var(--body);
+  font-size: var(--t-text);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* A failure is an error, and an error is full ink beside the 3px ink rule
+   (DESIGN.md §3, §6) — it was the one error in the app drawn muted, which made
+   the thing most worth noticing in the header the quietest thing in it. */
+.sync-state[data-state="error"] {
+  padding-left: 6px;
+  border-left: 3px solid var(--ink);
+  color: var(--ink);
+}
+
+/* --- the sync mark ---------------------------------------------------------
+   Two nodes: this device and the other one. At rest they sit exactly on top
+   of each other — that is what synced means, two copies of the same thing in
+   the same place. While syncing they part, the stream stretches out of the
+   centre between them, the nodes jelly-pulse, and they snap back together.
+   -------------------------------------------------------------------------- */
+
+.syncmark {
+  width: 22px;
+  height: 11px;
+  overflow: visible;
+  color: var(--muted);
+}
+
+.syncmark-node {
+  fill: currentColor;
+  transform-origin: center;
+}
+
+.syncmark-stream {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 0.75 2.25;
+  transform-origin: center;
+  opacity: 0;
+}
+
+/* At rest the two nodes are one shape in the middle, stream collapsed. */
+.mark-state[data-state="idle"] .syncmark-a,
+.mark-state[data-state="idle"] .syncmark-b {
+  transform: translateX(0);
+}
+
+/* One turn of this is MIN_WORKING_MS in useSync.ts. Keep the two in step, or
+   a fast sync cuts the mark off mid-gesture. */
+.mark-state[data-state="working"] .syncmark-a {
+  animation: sync-part-a 1.4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mark-state[data-state="working"] .syncmark-b {
+  animation: sync-part-b 1.4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mark-state[data-state="working"] .syncmark-stream {
+  animation:
+    sync-stretch 1.4s infinite cubic-bezier(0.4, 0, 0.2, 1),
+    sync-flow 0.8s infinite linear;
+}
+
+.mark-state[data-state="working"] .jelly-pulse-l {
+  animation: sync-jelly-l 1.4s infinite ease-in-out;
+}
+
+.mark-state[data-state="working"] .jelly-pulse-r {
+  animation: sync-jelly-r 1.4s infinite ease-in-out;
+}
+
+@keyframes sync-part-a {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  30%,
+  70% {
+    transform: translateX(-6px);
+  }
+  85%,
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes sync-part-b {
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+  30%,
+  70% {
+    transform: translateX(6px);
+  }
+  85%,
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* The stream grows out of the centre and is swallowed back by it. */
+@keyframes sync-stretch {
+  0%,
+  15% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  30%,
+  65% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+  }
+  80%,
+  100% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+
+/* The nodes squash as they leave and as they re-enter, and pulse while they
+   are apart — the elastic snap. */
+@keyframes sync-jelly-l {
+  0%,
+  15% {
+    transform: scale(1, 1);
+  }
+  22% {
+    transform: scale(1.3, 0.7) translateX(1px);
+  }
+  30% {
+    transform: scale(1, 1);
+  }
+  40% {
+    transform: scale(1.15, 1.15);
+  }
+  50% {
+    transform: scale(0.9, 0.9);
+  }
+  60% {
+    transform: scale(1.15, 1.15);
+  }
+  70% {
+    transform: scale(1, 1);
+  }
+  77% {
+    transform: scale(1.3, 0.7) translateX(-1px);
+  }
+  85%,
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes sync-jelly-r {
+  0%,
+  15% {
+    transform: scale(1, 1);
+  }
+  22% {
+    transform: scale(1.3, 0.7) translateX(-1px);
+  }
+  30% {
+    transform: scale(1, 1);
+  }
+  40% {
+    transform: scale(1.15, 1.15);
+  }
+  50% {
+    transform: scale(0.9, 0.9);
+  }
+  60% {
+    transform: scale(1.15, 1.15);
+  }
+  70% {
+    transform: scale(1, 1);
+  }
+  77% {
+    transform: scale(1.3, 0.7) translateX(1px);
+  }
+  85%,
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes sync-flow {
+  to {
+    stroke-dashoffset: -3;
+  }
+}
+
+/* Reduced motion: hold the parted state instead of animating it. */
+@media (prefers-reduced-motion: reduce) {
+  .mark-state[data-state="working"] .syncmark-a,
+  .mark-state[data-state="working"] .syncmark-b,
+  .mark-state[data-state="working"] .syncmark-stream,
+  .mark-state[data-state="working"] .jelly-pulse-l,
+  .mark-state[data-state="working"] .jelly-pulse-r {
+    animation: none;
+  }
+  .mark-state[data-state="working"] .syncmark-a {
+    transform: translateX(-6px);
+  }
+  .mark-state[data-state="working"] .syncmark-b {
+    transform: translateX(6px);
+  }
+  .mark-state[data-state="working"] .syncmark-stream {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.mark-state[data-state="error"],
+.mark-state[data-state="offline"] {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* --- spinner ---------------------------------------------------------------
+   The one loading mark in the app — see the file comment in Spinner.tsx for
+   what was cut from the design it was adapted from and why. `currentColor`
+   throughout, same as `.syncmark`: coloured by whoever places it.
+   -------------------------------------------------------------------------- */
+
+.spinner {
+  color: var(--ink);
+}
+
+/* Centers a spinner over the word announcing it — the same `.empty` box
+   every other "nothing to show yet" state uses, just with a mark above the
+   text instead of only the text. */
+.empty-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.spinner-flip {
+  transform-origin: 50px 50px;
+  animation: spinner-rotate 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.spinner-sand {
+  fill: currentColor;
+}
+
+.spinner-sand-top {
+  transform-origin: 50px 50px;
+  animation: spinner-drain-top 3.5s linear infinite;
+}
+
+.spinner-sand-bottom {
+  transform-origin: 50px 85px;
+  animation: spinner-fill-bottom 3.5s linear infinite;
+}
+
+.spinner-stream {
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+  transform-origin: 50px 50px;
+  animation: spinner-flow 3.5s linear infinite;
+}
+
+.spinner-glass {
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+@keyframes spinner-rotate {
+  0%, 85% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes spinner-drain-top {
+  0%, 10% {
+    transform: scaleY(1);
+  }
+  75%, 100% {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes spinner-fill-bottom {
+  0%, 10% {
+    transform: scaleY(0);
+  }
+  75%, 100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes spinner-flow {
+  0%, 10% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  15% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  70% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  75%, 100% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+}
+
+/* Reduced motion: hold a half-drained glass instead of turning it — the
+   same "freeze on a representative pose" rule .syncmark's own reduced-motion
+   block follows. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner-flip,
+  .spinner-sand-top,
+  .spinner-sand-bottom,
+  .spinner-stream {
+    animation: none;
+  }
+  .spinner-sand-top,
+  .spinner-sand-bottom {
+    transform: scaleY(0.5);
+  }
+  .spinner-stream {
+    opacity: 0;
+  }
+}
+
+/* --- sign in -------------------------------------------------------------- */
+
+.signin {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.signin-box {
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--rule);
+  background: var(--card);
+  padding: 30px 26px 22px;
+}
+
+.signin-mark {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: var(--t-mark);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-mark);
+  margin: 0 0 24px;
+  text-transform: uppercase;
+}
+
+.signin-lead {
+  margin: 0 0 20px;
+  font-size: var(--t-read);
+  line-height: var(--lh-read);
+  text-wrap: pretty;
+}
+
+.signin-form {
+  display: flex;
+  gap: 0;
+  margin-bottom: 10px;
+}
+
+.signin-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 11px 13px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-right: 0;
+  border-radius: 0;
+  font-family: var(--body);
+  font-size: var(--t-read);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* A field's focus is a state, not a link, so it is drawn inside the box in ink
+   — the rule DESIGN.md §3 states and `.search` already follows. Left alone,
+   these matched the bare global `:focus-visible` and took the 2px `--signal`
+   ring: the brightest tone on the ramp, which means a live address and nothing
+   else, drawn around a text box on the first screen a new device ever shows —
+   and drawn on an ordinary tap, because every engine treats a field as
+   expecting the keyboard. */
+.signin-input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.signin-go {
+  background: var(--invert);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.signin-note {
+  margin: 0;
+  font-size: var(--t-text);
+  font-style: italic;
+  line-height: var(--lh-read);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+/* An error is not a colour, and in this app nothing is. This carried its 3px
+   rule in --signal, which is now reserved entirely for a live address — so it
+   takes the same 3px in ink instead. Full-ink text beside a heavy ink rule is
+   the app's existing way of saying "look here". */
+.signin-error {
+  margin: 14px 0 0;
+  color: var(--ink);
+  border-left: 3px solid var(--ink);
+  padding-left: 10px;
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* The whole-screen failure (`Stopped` in ErrorBoundary.tsx): the sign-in box,
+   the wordmark, the error sentence at reading size because it is the only thing
+   on the screen, and Reload under it. */
+.stopped-error {
+  margin-top: 0;
+  font-size: var(--t-read);
+}
+
+.stopped-reload {
+  min-height: var(--hit);
+  margin-top: 22px;
+  color: var(--ink);
+}
+
+.stopped-reload:active {
+  background: var(--raised);
+}
+
+/* `HeldWork`: the same box, with its three answers stacked in the order they
+   are safe — the quiet underlined one last, because it is the one that loses
+   something. */
+.held-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.held-actions .stopped-reload {
+  margin-top: 12px;
+}
+
+.signin-skip {
+  display: inline-flex;
+  align-items: center;
+  /* 12px of underlined text was the whole target. The box is a thumb's worth
+     now; the margin gives back the 16px the box grew above the words, so
+     they sit where they did. */
+  min-height: var(--hit);
+  margin-top: 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: var(--cursor-pointer);
+}
+
+/* The spår server's form (`PasswordSignIn`): the same box and the same fields,
+   stacked — an address and a password do not share one row the way an address
+   and Send link do. Each field gives up its lower edge so two fields meet on one
+   hairline, never two, and the last one meets the button's. */
+.signin-stack {
+  flex-direction: column;
+}
+
+.signin-stack .signin-input {
+  border-right: 1px solid var(--rule);
+  border-bottom: 0;
+}
+
+.signin-stack .signin-go {
+  min-height: var(--hit);
+}
+
+/* A phone's box is 390px less gutters: the address and Send link shared one
+   row, the field got 213px, a 26-character address needs 276, and the button
+   set on two lines (review UI-B-08, 2026-10-05). Below 700px the button stands
+   under the field, full width, a thumb tall, the field keeping its whole box
+   and meeting the button on one hairline — the stack the password form uses. */
+@media (max-width: 699px) {
+  .signin-form:not(.signin-stack) {
+    flex-direction: column;
+  }
+
+  .signin-form:not(.signin-stack) .signin-input {
+    border-right: 1px solid var(--rule);
+    border-bottom: 0;
+  }
+
+  .signin-form:not(.signin-stack) .signin-go {
+    min-height: var(--hit);
+    width: 100%;
+    white-space: nowrap;
+  }
+}
+
+/* Its two ways out stand one above the other, never side by side. */
+.signin-ways {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Reduced motion is a complete opt-out, not merely a shorter version of the
+   app's transitions. Components that use the Web Animations API already check
+   the same preference in lib/motion.ts. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  .vanish-card {
+    opacity: 0;
+  }
+
+  .vanish-mark {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+}
+
+/* --- the board shelf, on a phone -------------------------------------------
+   Sideways is the wrong axis for a 390px screen. The tab strip works on a
+   desktop, where it is one row of a wide window and the whole shelf is visible
+   at once; on a phone the same row holds three tabs and hides the rest behind
+   a sideways scroll with no visible end, so the board you want is off the edge
+   and finding it is a drag with no landmarks. So on a phone the shelf stands
+   up: a burger, the board you are on, and the rest of them in a drawer.
+
+   Two things this must not disturb, both of them rules from web/CLAUDE.md.
+   Search still opens *in this row*, taking the shelf's own slot at the same
+   height — so the row's height cannot change, which is why .board-current is
+   the same box as .board-tab down to the padding and the mark tier. And a
+   horizontal swipe still pages the deck; the drawer is a second way to the
+   same `goToBoard`, never a replacement for the shelf being a shelf.
+
+   The structure branch is made in JS (lib/breakpoint.ts), not by hiding one of
+   two copies here — the breakpoint elsewhere in this file and PHONE_MAX have to
+   stay the same number, and breakpoint.test.ts checks that they do.
+   -------------------------------------------------------------------------- */
+
+/* Down the left edge, because that is the edge the burger that opens
+   it sits on, and a panel that opens away from its own control is a panel you
+   have to look for. Paper and one rule down its right side. Nothing else — this
+   system has no scrim under a panel and no shadow to lift one off the page, so
+   the rule is the whole edge. */
+.shelf {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 15;
+  width: min(78vw, 300px);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  /* A new board that takes the shelf past the screen's height would otherwise
+     narrow every row by a scrollbar and walk the counts left. */
+  scrollbar-gutter: stable;
+  /* It covers the header, so it has to pay the insets the header pays — and
+     the floor's too wherever it still reaches the floor (over an open note,
+     under a Look sheet; see below for the board, where it stops on the bar). Without them the
+     Inbox row, which is the row you land on, sat under the status bar, and the
+     New board row at the foot of a full shelf sat under the gesture bar. */
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  overscroll-behavior: contain;
+  background: var(--paper);
+  border-right: 1px solid var(--rule);
+}
+
+/* Over a board it stops on the capture bar, and so does the scrim beside it:
+   a note can be written with the drawer open (SPEC.md §6), and a drawer to the
+   floor covered the whole write field on a phone (audit 2026-10-24, UX-004).
+   `--capture-h` is the bar's measured height, gesture inset included, so the
+   foot pays no inset of its own here. Over an open note there is no bar to
+   keep, and under a folder's Look sheet the sheet takes the foot, so those two
+   still reach the floor. */
+.shelf:not(.shelf-over):not([data-dressing]),
+.menu-dismiss.shelf-dismiss {
+  bottom: var(--capture-h, calc(var(--bar-h) + env(safe-area-inset-bottom)));
+}
+
+.shelf:not(.shelf-over):not([data-dressing]) {
+  padding-bottom: 0;
+}
+
+.menu-dismiss.shelf-dismiss {
+  height: auto;
+}
+
+/* Opened from the burger inside an open note, the drawer stands over the note
+   rather than the board — the step `.selpanel-over` takes for the note's own
+   panels, with its scrim on `.menu-dismiss-over` one below. */
+.shelf-over {
+  z-index: 22;
+}
+
+/* A folder's Look sheet is up over the drawer. The sheet takes the foot of the
+   screen, and on a phone that is exactly where the rows stand (UX-17) — so it
+   covered the row it was dressing and left the empty top of the drawer showing
+   above it. The drawer makes the sheet's height of room under its rows
+   instead, so they stand above the sheet, and `scroll-padding` makes the
+   sheet's band count as out of view when `Shelf` brings the dressed row up:
+   the change is seen landing on the shelf, which is what the sheet is half a
+   screen for (review 2026-10-01 follow-up). */
+.shelf[data-dressing] {
+  padding-bottom: calc(var(--look-h) + env(safe-area-inset-bottom));
+  scroll-padding-bottom: var(--look-h);
+}
+
+.shelf-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* On a phone the shelf stands at the foot of the drawer, not the top
+   (review UX-17). It hung from the status bar with the lower half of the
+   screen empty, so the Inbox and the folders — the rows reached for most —
+   were the ones a thumb reaches worst, while every other panel in the app
+   opens from the bottom. An auto margin rather than `justify-content: end`,
+   for the reason the empty board gives: it goes to zero when the shelf is
+   taller than the screen, so a long shelf still starts at the top and scrolls,
+   where alignment would push its first rows out of reach above it. Order is
+   unchanged — Inbox first, New board last — so the arrow keys, a carry and
+   the strip all still read the shelf the same way round. A desktop keeps it
+   under the burger it opened from. */
+@media (max-width: 699px) {
+  .shelf-list {
+    margin-top: auto;
+    /* Standing off the top now, the Inbox row needs the edge the status bar
+       used to give it. */
+    border-top: 1px solid var(--rule-soft);
+  }
+}
+
+/* A row a thumb can hit — the same ~44px every panel row in the app is, and the
+   same height the tab it stands in for already had. Its mark, its name, its
+   count, and nothing else: a preview of the notes inside each board was tried
+   here and taken out again, because what you are looking for on this screen is
+   a name, and every line that is not a name is a line to read past. The name
+   takes the slack so the counts line up down the right-hand edge, which is the
+   whole advantage of reading a shelf as a column. */
+.shelf-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--hit);
+  padding: 12px 16px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+  text-align: left;
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  position: relative;
+  isolation: isolate;
+}
+
+/* The board you are on, said exactly the way the strip says it — the drawer is
+   the strip stood up, so being on a board cannot look like two different
+   things depending on how wide the window is. The lamp, and the text muted →
+   full ink at the same time. */
+.shelf-row[aria-selected="true"] {
+  color: var(--ink);
+}
+
+.shelf-row[aria-selected="true"]::before {
+  --lamp-lift: 13%;
+  /* A drawer row is the full width of the drawer and its content is all at the
+     left end — the mark, then the name — so the light sits over that rather
+     than in the middle of the gap before the count. */
+  --lamp-pool: 46% 150%;
+  --lamp-x: 26%;
+  --lamp-y: 50%;
+  z-index: -1;
+}
+
+/* Pressing is not being: a press is a moment and takes the chrome's one flat
+   step off the paper, the way every other pressed control here does. */
+.shelf-row:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* The user's places, then the app's own boards — the drawer's one hairline.
+   The strip drew it too until 2026-10-12 (owner), when it went and the lifted
+   band below was left to mark where the run begins. `isBuiltIn` in
+   lib/boards.ts decides where the line falls here and where the band starts on
+   both shelves, so there is one definition of which side a board is on.
+
+   Every row here already carries a rule under it, so this is not another line
+   in the stack: it is that line at the weight a real edge takes (--rule rather
+   than --rule-soft), pulled up over the soft one by its own height so exactly
+   one hairline is drawn. No band of empty ground under it any more (2026-10-12,
+   owner: "looks off"): the lens run's own lifted ground starts right at the
+   line, and that change of ground is the division the eye reads — the band
+   that review UX-16 added before the lens ground existed only read as a gap. */
+.shelf-split {
+  flex: 0 0 auto;
+  height: 1px;
+  margin-top: -1px;
+  position: relative;
+  background: var(--rule);
+}
+
+/* The app's own boards stand on one slightly lifted ground (DESIGN.md §2,
+   `--lens-ground`; 2026-10-08, owner approved) — Inspiration, Todos, Links,
+   Files and All, and Trash, which closes the run on the strip and the drawer
+   alike. The tabs and rows are marked `data-lens` (App.tsx, Shelf.tsx:
+   `isBuiltIn`, plus Trash), and their
+   own hairlines run on across the band, so it reads as one run and not as a
+   box per tab. In the drawer the run starts straight under the divider.
+
+   `:where()` on purpose: the band is specificity zero, so a press
+   (`:active`) and a carried tab (`[data-lifted]`) — each of which sets its own
+   background — win without being told to, and the selected lamp paints over
+   it. Only the resting fill is the band's to say. */
+:where(.board-tab, .board-trash, .shelf-row)[data-lens="true"] {
+  background: var(--lens-ground);
+}
+
+.shelf-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Making a board still costs one tap and a name, in the place the boards
+   already are — the field opens where the new one is about to sit. It is a row
+   you type into rather than one you press, so it says so. */
+.shelf-row-new {
+  cursor: var(--cursor-text);
+}
+
+.shelf-row-new input {
+  flex: 1 1 auto;
+}
+
+/* The three new-board fields — the strip's +, the drawer's, Tidy up's "New
+   folder…" — are Rename's field (review UI-A-04): the reading face at the
+   reading size (`.field-words`; Tidy up's says it here, its markup has no
+   class), the thin ink frame drawn inside while typing (DESIGN.md §3), and
+   the placeholder in the quiet grey. They were 12px tracked capitals with no
+   sign the field was live, so a folder's name was typed as KÖK OCH ÅRSPLAN. */
+.board-tab-new input,
+.shelf-row-new input,
+.sorter-dest-new input {
+  min-width: 0;
+  padding: 4px 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+}
+
+.sorter-dest-new input {
+  flex: 1 1 auto;
+  font-family: var(--body);
+  font-size: var(--t-read);
+  line-height: var(--lh-chrome);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.board-tab-new input:focus,
+.shelf-row-new input:focus,
+.sorter-dest-new input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.board-tab-new input::placeholder,
+.shelf-row-new input::placeholder,
+.sorter-dest-new input::placeholder,
+.field-words::placeholder {
+  color: var(--muted);
+}
+

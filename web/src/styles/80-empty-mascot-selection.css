@@ -1,0 +1,932 @@
+/* --- empty / loading ------------------------------------------------------ */
+
+/* An empty board is named like a place, then explained in an aside. Italic
+   for the explanation, the same way a caption sits under a plate. */
+.empty {
+  padding: 56px 16px;
+  text-align: center;
+  color: var(--muted);
+  max-width: 30ch;
+  margin: 0 auto;
+  font-size: var(--t-text);
+  font-style: italic;
+  line-height: var(--lh-read);
+  text-wrap: pretty;
+}
+
+/* "Loading" is machine data, not prose, and keeps the machine face. */
+.empty.mono {
+  font-style: normal;
+  font-size: var(--t-data);
+}
+
+/* An empty board stands in the middle of the room it has, not at the top of
+   it (2026-09-29, the owner's ask). The drawing, the name and the line under
+   it were hung from the board strip with the rest of the screen dark below
+   them, which read as a page that had not finished loading rather than as a
+   place with nothing in it yet.
+
+   Centred with auto margins inside a column that is at least as tall as the
+   scroller's own box, and never with `justify-content: center` — the
+   difference is the whole point on a short screen. Auto margins go to zero
+   when the content is taller than the room, so a phone on its side, or one
+   with the keyboard up, gets the state top-aligned and scrollable; centring
+   by alignment would push the top of it out past the strip where nothing can
+   scroll to it. The scroller's bottom padding already keeps the capture bar
+   clear, so the middle found here is the middle of what can be seen.
+
+   The loading spinner stands in the same box, and is centred by the same
+   rule: both are the board with nothing to show yet. */
+/* The board sits in its tab panel inside the <main> (review QA-02), so the
+   column runs through both: the scroller, the panel, the deck. */
+.scroll:has(> .board-panel > .deck > .empty) {
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll:has(> .board-panel > .deck > .empty) > .board-panel {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.board-panel:has(> .deck > .empty) > .deck {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.deck > .empty {
+  margin: auto;
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+.empty strong {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 10px;
+  font-family: var(--display);
+  font-style: normal;
+  font-weight: 400;
+  font-size: var(--t-name);
+  line-height: var(--lh-chrome);
+  letter-spacing: 0.01em;
+  /* A board's name can be one 40-letter word: it breaks rather than widen
+     the board past a phone's edge. */
+  overflow-wrap: anywhere;
+}
+
+/* --- mascot ----------------------------------------------------------------
+   The little machine. It lives in the header, where it is the app's sync
+   state made into a creature, and above an empty board, where it is asleep.
+
+   Everything it *does* — the drawing, the four states, the walk cycle, the
+   crossfade between faces, the startle when it is poked — is inside
+   components/mascot-element.ts, in a shadow root, which is the only way an
+   animation survives a React app that re-renders around it. Nothing here can
+   reach in there, and nothing needs to: the three custom properties below
+   inherit straight through the shadow boundary, which is the whole theming
+   surface the element exposes.
+
+   Three tones and no fourth, the same three the drawing has always taken. The
+   shell is `--muted`, the same tone as the line of explanation under the
+   empty board, so it sits at the weight of an aside. The screen is `--raised`
+   — the app's "chrome, engaged" step, which is what a screen with almost
+   nothing on it looks like in a dark room. What is drawn *on* the screen is
+   `--ink`, so the one lit part of the drawing is the part the little machine
+   would be showing you if you had written anything.
+
+   The design it was drawn in themed the screen with a terracotta accent. That
+   is a hue, and DESIGN.md is absolute that this app has none; the mechanism
+   was kept and the value was not. See the element's own file comment.
+   -------------------------------------------------------------------------- */
+
+spar-mascot,
+.speech {
+  --mascot-line: var(--muted);
+  --mascot-screen: var(--raised);
+  --mascot-face: var(--ink);
+}
+
+/* --- what the creature says (components/Speech.tsx) -----------------------
+   One sentence in a bubble beside the header's creature, where the wordmark
+   stood, with at most one verb (2026-10-16, owner approved). The bubble is
+   part of the drawing: the creature's own two tones, its 3-unit line, its
+   boil (`#speech-boil`, a copy of the shadow root's numbers), and curves that
+   are the drawing's, not a radius on a box. The words are the app's: the
+   reading face at --t-text, flat, still, at full ink. The verb is a control
+   like every other — the reading face, sentence case, bolder than the words. */
+.speech {
+  position: relative;
+  align-self: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  min-height: calc(var(--hit) + var(--s-3));
+}
+
+/* The tail is inside the bubble's own box, standing out to the left of the
+   body towards the creature; the box reaches back over the row's gap so its
+   point stops just short of the creature's shell. */
+.speech[data-tail] {
+  padding-left: 10px;
+  margin-left: calc(var(--s-4) * -1);
+}
+
+.speech-shape {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.speech-edge {
+  fill: var(--mascot-screen);
+  stroke: var(--mascot-line);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+/* The undo window, drawn on over the outline in ink from the top-left corner,
+   clockwise. Linear: a clock, not a move (the same as `.undo-clock rect`). */
+.speech-clock {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: speech-draw var(--undo-ms, 8000ms) linear forwards;
+}
+
+@keyframes speech-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* A countdown that does not count would say a full window is left, forever;
+   under reduced motion it is not drawn. The offer still expires on its own. */
+@media (prefers-reduced-motion: reduce) {
+  .speech-clock {
+    display: none;
+  }
+}
+
+.speech-words {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: var(--s-3) var(--s-5) var(--s-3) var(--s-6);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-item);
+  color: var(--ink);
+  /* Two lines at most, so the header band never grows: a long folder name
+     gives way, the verb beside it never does. */
+  overflow-wrap: anywhere;
+}
+
+.speech-words > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* A fact the eye should catch first (a weather line's temperature and
+   condition): the bold cut, and nothing else — no tone, no hue. */
+.speech-words b {
+  font-weight: 700;
+}
+
+/* Busy: the closing dots count . .. ... .. and round again (2026-10-23). Each
+   dot is always in the line, only shown or not, so the bubble never changes
+   width; one loop of four even beats, stepped rather than faded, like a
+   counter rather than a glow. */
+.speech-dots > span:nth-child(2) {
+  animation: speech-dot-2 1.2s step-end infinite;
+}
+
+.speech-dots > span:nth-child(3) {
+  animation: speech-dot-3 1.2s step-end infinite;
+}
+
+@keyframes speech-dot-2 {
+  0% {
+    opacity: 0;
+  }
+  25%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes speech-dot-3 {
+  0%,
+  25% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  75%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Under reduced motion the dots stand still, all three. */
+@media (prefers-reduced-motion: reduce) {
+  .speech-dots > span {
+    animation: none;
+  }
+}
+
+.speech-act {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: var(--hit);
+  min-height: var(--hit);
+  margin: 3px 3px 3px 0;
+  padding: 0 var(--s-5);
+  border: 0;
+  border-left: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  font-weight: 700;
+  cursor: var(--cursor-pointer);
+}
+
+/* The button's own box runs square into the bubble's curved, boiling line, so
+   a state painted on the box draws a rectangle over the outline. Hover and press
+   are drawn on the word instead, and the focus ring well inside the line. The
+   word's padding is given back by a negative margin, so nothing moves. */
+.speech-verb {
+  padding: var(--s-1) var(--s-3);
+  margin: calc(var(--s-1) * -1) calc(var(--s-3) * -1);
+}
+
+.speech-act:focus-visible {
+  outline-offset: calc(var(--s-4) * -1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .speech-act:hover .speech-verb {
+    background: var(--rule);
+  }
+}
+
+.speech-act:active .speech-verb {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+.speech-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* The creature is drawn inside a square box it does not fill. Its shell spans
+   20–80 of a 100-unit viewBox and the stroke adds 2.75 either side, so at 56px
+   there is 9.7px of clear space down each side. Left alone that space is real
+   layout: the drawing looks inset by 25px from a page margin of 15, and sits
+   a gap-and-a-half away from its own name. The two margins give it back at
+   --mascot-trim (10, the whole-pixel round of 9.7), so the shell stands on the
+   16px side margin and is one 16px word-space from the name — the same
+   distance on both sides. They are optical, not structural: the box is still
+   56 and nothing else in the bar moves. */
+.topbar spar-mascot {
+  margin-left: calc(var(--mascot-trim) * -1);
+  margin-right: calc(var(--mascot-trim) * -1);
+}
+
+.empty spar-mascot,
+.empty-mascot-gap {
+  display: block;
+  margin: 0 auto 20px;
+}
+
+/* The creature's place on an empty board, kept while it has gone up to the
+   header to say something, so the words under it do not move. */
+.empty-mascot-gap {
+  width: var(--mascot-box);
+  height: var(--mascot-box);
+}
+
+/* On a short screen the header band folds away (review UI-B-06). A phone on
+   its side, a 200% zoom or a small laptop left the board shorter than one
+   card under 188px of header and board row, so footers and stamps never
+   showed. The 80px band goes. The creature is the
+   sync display and must not vanish, so the same element — never a second one,
+   its animations keep running — rides at the left end of the board row, which
+   makes room for it. The few words the header carried that a person has to be
+   able to read (the selection count, and what the creature says) stand as a
+   small plate under the row instead of in a band of their own. Only short
+   screens: a tall one keeps the header it has. */
+@media (max-height: 500px) {
+  .app {
+    position: relative;
+  }
+
+  .topbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    width: var(--shelf-row-h);
+    height: var(--shelf-row-h);
+    align-items: flex-start;
+    padding: 0;
+    border-bottom: 0;
+    pointer-events: none;
+  }
+
+  .topbar spar-mascot {
+    pointer-events: auto;
+    /* Drawn at three quarters, the creature's ink (the antenna to the feet) is
+       32px tall and 28 wide, which is what centres it in the 44px cell: the
+       box hangs from the cell's top edge and the drawing's own clear space
+       does the rest. The one pixel of margin is the hairline under the row. */
+    margin: 1px 0 0;
+    transform: scale(0.75);
+    transform-origin: top left;
+    flex: none;
+    width: var(--mascot-box);
+    height: var(--mascot-box);
+  }
+
+  .topbar-words {
+    position: absolute;
+    top: var(--shelf-row-h);
+    left: 0;
+    width: max-content;
+    max-width: 100vw;
+    pointer-events: auto;
+  }
+
+  .topbar-words > .sync-state {
+    display: none;
+  }
+
+  /* Under the row there is no creature beside the words to point at, so the
+     bubble is drawn with no tail (`Speech`'s `tail`, false on a short screen). */
+
+  /* No band, so no corner for the cog: Settings goes back to being the
+     menu's first row while the header is folded. */
+  .topbar-settings {
+    display: none;
+  }
+
+  .selpanel-btn.menu-settings {
+    display: flex;
+  }
+
+  .board-row {
+    padding-left: var(--shelf-row-h);
+  }
+}
+
+/* --- selection ------------------------------------------------------------
+   Selection inverts the card rather than adding a badge: at a glance you see
+   the shape of what you picked, which matters when merging is the next move.
+   -------------------------------------------------------------------------- */
+
+/* Selection inverts the card. A *press* does not, any more: the invert was
+   also on `:active`, so every ordinary tap flashed the card white on the way
+   into the note, and on a phone a scroll that starts on a card holds the flash
+   for as long as the finger is down. A card is not a button — the tap opens
+   the note, which is feedback enough — so the invert now means one thing only,
+   "this one is picked", and nothing happens under the finger. */
+.card[data-selected="true"] {
+  background: var(--invert);
+  color: var(--paper);
+  border-color: var(--invert);
+  /* The cut fade paints over its text in the surface's own colour, so a card
+     that inverts has to hand it the new surface — otherwise a cut card, the
+     instant it is selected, shows a patch of its old --card colour sitting on
+     top of the new --invert fill, which is a visible seam where the fade used
+     to be alpha and would have simply survived the swap for free. */
+  --cut-bg: var(--invert);
+}
+
+/* A picked card is filled with --invert, which is the colour the keyboard ring
+   is drawn in, so the ring vanished on exactly the cards a keyboard was about
+   to act on. On the fill it is drawn in --paper, inside the edge. */
+.card[data-selected="true"]:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: -3px;
+}
+
+/* 0.9, not the 0.85 this used to carry. The fill underneath is dimmer than it
+   was, so the same transparency was costing real legibility rather than just
+   taking the edge off — a note you have selected is still a note you have to
+   be able to read. */
+.card[data-selected="true"] .card-body,
+.card[data-selected="true"] .card-foot {
+  color: var(--paper);
+  opacity: 0.9;
+}
+
+.card[data-selected="true"] .card-foot {
+  border-top-color: var(--paper);
+}
+
+.card[data-selected="true"] .cut-mass,
+.card[data-selected="true"] .card-link {
+  color: var(--paper);
+  opacity: 1;
+}
+
+/* A held card can be carried onto another one to merge the pair. The source
+   recedes and the destination gets one quiet raised surface, without moving
+   either card or opening a gap in the ruled grid. */
+.card[data-merge-dragging="true"] {
+  opacity: 0.42;
+  cursor: var(--cursor-grabbing);
+}
+
+.card[data-merge-target="true"] {
+  background: var(--raised);
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+  z-index: 3;
+}
+
+/* A board in the shelf that a carried note would land in if let go now
+   (lib/shelfDrop.ts) — the merge target's own mark, on a tab or a row. */
+.board-tab[data-drop-target="true"],
+.board-trash[data-drop-target="true"],
+.shelf-row[data-drop-target="true"] {
+  background: var(--raised);
+  color: var(--ink);
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+/* One that would refuse it, for as long as it is carried: a lens, or the
+   board it is already in. The disabled tone, as a control that cannot be
+   pressed takes it. */
+.board-tab[data-refuses="true"],
+.board-trash[data-refuses="true"],
+.shelf-row[data-refuses="true"] {
+  color: var(--rule);
+}
+
+.idea-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.card[data-selected="true"] .idea-mark {
+  color: var(--paper);
+}
+
+/* The flag is ink on paper, so it has to flip with the card. The footer's
+   other marks already inherit the flip — this one only needs saying because it
+   opted out of `--muted` to stay visible at all. */
+.card[data-selected="true"] .card-priority,
+.card[data-selected="true"] .card-todo {
+  color: var(--paper);
+}
+
+/* Everything else a card draws goes dark with the slab too (review UI-01).
+   The rules above only named the body and the footer, so the parts of a face
+   with a tone of their own were left at it: a name row at --ink (1.41:1 on the
+   slab), a ticked item and a tag line at --muted (1.64:1), a list of links,
+   a file's name — near-invisible on exactly the cards just picked. And the two
+   boxes a face can hold, an idea's snapshot and a link's preview, kept their
+   dark fill and stood as black holes in the bone. They give up the fill and
+   draw in --paper outlines instead: the slab is the surface now, and anything
+   on it is darker than it (DESIGN.md §5). A photograph stays a photograph. */
+.card[data-selected="true"]
+  :is(
+    .card-idea-name,
+    .check-list,
+    .check-item[data-done="true"],
+    .card-item[data-done="true"],
+    .card-line[data-tag="true"],
+    .card-link-list,
+    .card-link-name,
+    .card-link-site,
+    .card-link-more,
+    .card-file,
+    .card-file .icon,
+    .card-file-kind,
+    .card-file-name,
+    .link-preview,
+    .link-preview-thumb,
+    .link-preview-domain,
+    .link-preview-title,
+    .link-preview-url
+  ) {
+  color: var(--paper);
+}
+
+/* A line of code is the same kind of box: its --rule-faint strip stood as a
+   near-black band under --paper words, about 1.2:1 (audit 2026-10-24, UX-001). */
+.card[data-selected="true"]
+  :is(.idea-snapshot, .link-preview, .link-preview-thumb, .card-file-tile, .card-line[data-code="true"]) {
+  background: transparent;
+}
+
+.card[data-selected="true"] :is(.link-preview, .card-file-kind) {
+  border-color: var(--paper);
+}
+
+.card[data-selected="true"] .link-preview-thumb {
+  border-right-color: var(--on-ink-rule);
+}
+
+.card[data-selected="true"] :is(.idea-snapshot-note, .idea-snapshot-image) {
+  fill: transparent;
+  stroke: var(--paper);
+}
+
+.card[data-selected="true"] :is(.idea-snapshot-line, .idea-snapshot-priority) {
+  fill: var(--paper);
+}
+
+.card-tick {
+  font-weight: 700;
+}
+
+/* Anchored where the thumb already is, not at the far top of the screen. The
+   actions stack, and they are ordered by distance from the hand: Merge sits
+   at the bottom because it is why multi-select exists, Cancel sits at the top
+   because a stray tap on it throws the whole selection away.
+
+   Drawn on the ground with a hard edge, the same surface as `.ctx-menu` and
+   `.search-dropdown` — not inverted. It was a `--invert` slab with its rows in
+   `--paper` from the day the app went dark, and on a phone that is a 200px
+   block of bone standing up out of a black screen: the brightest thing in
+   sight, and the rows on it *harder* to read for it, because the eye adapts
+   to the slab and the dark type on it goes flat. The owner said so in as many
+   words (2026-09-16). A panel is furniture — a list of verbs — and furniture
+   raises rather than inverts (DESIGN.md §5), so it goes the way the board tabs
+   went: the ground, an edge, ink, and `--raised` under the pointer. The one
+   bright thing in the corner is now the burger that opened it, which still
+   inverts to say the selection is on. */
+/* The selection panel takes focus itself when it opens (`SelectionBar`), so
+   the arrows can walk its rows without a row being pre-chosen. The panel is
+   already the one thing on screen asking for the keyboard; a ring around the
+   whole of it says nothing a ring on the row it walks to does not. */
+.selpanel[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+
+.selpanel {
+  position: fixed;
+  bottom: calc(var(--bar-h) + env(safe-area-inset-bottom));
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  min-width: 196px;
+  /* It is anchored `right: 0` and has no width of its own, and its rows are
+     `nowrap` — so the board chooser, whose rows are folder names of up to
+     `BOARD_NAME_MAX`, grew *leftwards* until it ran off the left edge of the
+     screen. What that loses is the far side of every row: the folder marks and
+     the first characters of the names, with no scroll to reach them, because
+     the overflow is past the viewport rather than inside a box. Forty tracked
+     mono characters plus the row's own furniture is ~390px, which is a Pixel
+     exactly and a 360px phone not at all.
+     Stated as the screen's own width rather than as a chosen size: nothing
+     here is picking how wide the panel should be, only refusing to be wider
+     than the thing it is drawn on. A name too long for what is left ends in an
+     ellipsis, the answer `.canvas-title` and `.lightbox-name` already give. */
+  max-width: 100vw;
+  /* And never taller than what can be seen above the floor it stands on. A
+     phone held sideways, or a desktop at 200%, stood the Move chooser 142px
+     above the top of the screen with Cancel the first row lost (review
+     QA-03). `--visible-h` is the glass the keyboard leaves, where a surface
+     writes it (the capture bar, the open note); `100dvh` everywhere else. A
+     panel too tall for that scrolls inside itself. */
+  max-height: calc(var(--visible-h, 100dvh) - var(--bar-h) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+
+/* The one child of a panel row that may give up width. The mark says which
+   board and the count says how much, and neither of those survives being
+   squeezed — a name does, and reads perfectly well cut short. (The phone's
+   selection strip drops every label span outright, one rule below; it matches
+   on `> span` and so is untouched by this one naming a class.) */
+.selpanel-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Room above the capitals for what rises past the line box. The ellipsis
+     needs `overflow: hidden`, and that clips at the padding edge — on a 1.1
+     line box the ring of a capital Å stood above it and was sliced off, so
+     "About spår" read "ABOUT SPĂR" and a folder called Årsplan lost its ring
+     in every chooser (review UI-03). Padding moves the clip edge out; the
+     matching negative margin gives the row back its height, so nothing else
+     in the panel moves. Ä and Ö never reached the edge; Å does. */
+  padding-block: 3px;
+  margin-block: -3px;
+}
+
+/* A row that names a board — a folder, the Inbox, Links — in the board
+   chooser: the name in the shelf's own voice, Marcellus capitals at the nav
+   size, because board names are set in the display face and only board names
+   are (DESIGN.md §4). It was the machine face here, so the same folder looked
+   like a different thing in the chooser than on the shelf it was chosen from
+   (review UI-08). The count stays mono: it is data. */
+.selpanel-board .selpanel-label {
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  letter-spacing: var(--track-caps);
+  /* Tracked, so capitals: the sentence-case pass on panel rows (2026-10-13)
+     took the transform off and left the tracking (audit 2026-10-24, UX-005). */
+  text-transform: uppercase;
+}
+
+/* The area outside an open panel is itself the close action. It sits below the
+   panel, so tapping the panel still reaches its rows and tapping anywhere else
+   dismisses without activating the content underneath. */
+.menu-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 14;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: transparent;
+  cursor: var(--cursor-default);
+}
+
+.menu-dismiss-over {
+  z-index: 21;
+}
+
+/* Right-hand corner: the side the thumb is already on, and the side the
+   button that opened the panel is on. */
+.selpanel-right {
+  right: 0;
+}
+
+/* A folder's menu is no wider than a drawer row (review UI-B-05): a
+   40-character name grew it to 618px on a desktop. The name in its head ends
+   in an ellipsis, whole on hover. */
+.selpanel-menu {
+  max-width: min(78vw, 300px);
+}
+
+/* A folder's menu opened from the desktop strip hangs under the tab it is
+   about (review UI-15): the pointer is at the tab, and the corner is a phone's
+   answer to where the thumb is. `top` and `left` are set inline from the tab;
+   this only lets go of the floor the other panels stand on. */
+.selpanel-under {
+  bottom: auto;
+  /* `--panel-top` is the anchor's own top, set inline with it, so a panel
+     hung low on a short window still ends at the foot of the glass. */
+  max-height: calc(var(--visible-h, 100dvh) - var(--panel-top, 0px));
+}
+
+/* Hung under a mark inside the open note (the reminder panel, review
+   UI-A-03): it takes `.selpanel-over`'s step above the sheet, and lets go of
+   that class's floor the way `.selpanel-under` lets go of the bar's. */
+.selpanel-under.selpanel-over {
+  bottom: auto;
+  max-height: calc(var(--visible-h, 100dvh) - var(--panel-top, 0px));
+}
+
+/* The board a menu is about, named on the panel's first line in the face
+   every board name is set in. Gives up width before the cross does. */
+.selpanel-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-block: 3px;
+  margin-block: -3px;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+/* The insert panel belongs to an open note, which sits above the grid — so it
+   has to sit above that. It also anchors to the floor of the screen rather
+   than above the capture bar, because inside a note there isn't one. */
+.selpanel-over {
+  z-index: 22;
+  bottom: env(safe-area-inset-bottom);
+  max-height: calc(var(--visible-h, 100dvh) - env(safe-area-inset-bottom));
+}
+
+.selpanel-n {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--t-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The panel's first line: the count, and Cancel as a cross at its end. One
+   line where there were two (a count, then a Cancel row) — the rule under it
+   is `--rule`, the edge weight, and marks it as the line about the selection
+   rather than a row that acts on it. */
+.selpanel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 18px;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* A count is data: the next tone down, never a fraction of the one above. */
+.selpanel-count {
+  padding: 12px 0 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* A thumb's worth, on the line's own right edge. Full ink: it is the one
+   control on the line and the way out, and must not read as a dim aside. */
+.selpanel-x {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--hit);
+  min-height: var(--hit);
+  margin-left: auto;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  border-radius: 0;
+  cursor: var(--cursor-pointer);
+}
+
+.selpanel-x:hover {
+  background: var(--raised);
+}
+
+.selpanel-x:active {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+/* The hairline where the rows stop leaving a note where it is: past it, Delete,
+   Archive and Move each change where a note *is*. `--rule`, the same weight as
+   the head's rule and heavier than the soft rule between rows — the shelf
+   draws its one line between places and lenses the same way. */
+/* Stated on the row's own class too, so it outranks `.selpanel-btn`'s
+   border-top shorthand below whatever order the two are written in. Written
+   alone it came first at equal weight and lost, and the heavier line never
+   drew (review UI-B-10; `styles.test.ts` holds it). */
+.selpanel-btn.selpanel-split {
+  border-top-color: var(--rule);
+}
+
+/* 16px of padding on a 12px line box gives a ~44px row — a thumb's worth. The
+   type stays at the machine size, because the row is what you aim at, not the
+   glyph, and growing the text would have meant a seventh size in the scale. */
+.selpanel-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  border-radius: 0;
+  text-align: left;
+  white-space: nowrap;
+  cursor: var(--cursor-pointer);
+}
+
+.selpanel-btn:first-of-type {
+  border-top: 0;
+}
+
+/* Under the pointer a row raises, the way a board tab does: it is furniture. */
+.selpanel-btn:hover:not(:disabled) {
+  background: var(--raised);
+}
+
+/* Pressed inverts, the same flip every other control makes — and the only
+   moment anything on this panel is light. */
+.selpanel-btn:active:not(:disabled) {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+/* A row nobody may press steps down from ink to --muted, a tone the ramp has
+   (UI-18) — never a fraction of ink, which is a tone it does not. */
+.selpanel-btn:disabled {
+  color: var(--muted);
+  cursor: var(--cursor-default);
+}
+
+/* Why a typed folder name was refused — the Move chooser's one non-button,
+   non-input row. Same padding as a row, a tone down from the rows, because it
+   explains rather than acts. */
+.selpanel-hint {
+  padding: 0 18px 12px;
+  color: var(--muted);
+  font-size: var(--t-data);
+}
+
+/* The Move chooser's folders: every one, in shelf order, scrolling inside
+   this region rather than hidden past the sixth behind "type to find" (owner
+   approved 2026-10-05, review UX-A-06). About six and a half rows tall, so
+   the half row says there is more; and it is the first thing in the panel to
+   give up height when the glass is short (`min-height: 0`), so Cancel and the
+   field stay on screen. Its own top rule stands in for the first row's, which
+   `:first-of-type` takes away inside the region. */
+.selpanel-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: calc(6.5 * (var(--hit) + 1px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--rule-soft);
+}
+
+/* With a mouse there is room to stand far taller (owner, 2026-10-19): about
+   fourteen and a half rows, still giving up height first on a short window. */
+@media (hover: hover) and (pointer: fine) {
+  .selpanel-scroll {
+    max-height: calc(14.5 * (var(--hit) + 1px));
+  }
+}
+
+/* The reminder panel's first line once a time is set: the time itself, as a
+   clock reads it ("Set for Thu 09:00"). A fact, not a row, so it is the hint's
+   size; in ink, because it is the answer the rows under it would change. */
+.selpanel-set {
+  padding-top: 12px;
+  color: var(--ink);
+}
+
+/* A row that is a setting rather than the thing the panel is for — the
+   reminder panel's "notify on this device", which sits last — at the hint's
+   own quiet, the way the Sorter's Skip is muted beside its destinations. Full
+   ink under the pointer, so it is still plainly a row. */
+.selpanel-quiet {
+  color: var(--muted);
+}
+
+.selpanel-quiet:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+/* A sentence of advice — something the reader is asked to act on or know —
+   is not a machine string (DESIGN.md §11, review CD-05): the reminder panel's
+   "Notifications are blocked…", the trash's "1 note leaves the trash within
+   3 days", About's storage line, the open note's "not on this device". It is
+   set the way the empty board's line is: the reading face, italic, sentence
+   case, a step down to `--muted`. Capitals stay for labels, counts and states.
+   Late in the file and stated whole, so it wins over the mono row it sits in
+   (`.selpanel-hint`'s size, `.sheet-verbs`'s face) at equal weight. */
+.advice {
+  font-family: var(--body);
+  font-size: var(--t-text);
+  font-style: italic;
+  line-height: var(--lh-read);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--muted);
+}
+
+/* The panel's hint, as a sentence: a paragraph's margin is not the row's. */
+p.selpanel-hint {
+  margin: 0;
+  padding-top: 10px;
+  max-width: 30ch;
+}
+
+/* The reminder panel's Custom row, lined up with the rows above it: its label
+   starts in their label column, a mark's width and the rows' gap in from the
+   edge (review UI-A-07). */
+.selpanel-row-label {
+  flex: 0 0 auto;
+  margin-left: calc(var(--icon-inline) + 10px);
+}
+

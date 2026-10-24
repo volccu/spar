@@ -1,0 +1,586 @@
+/* --- dialogs ---------------------------------------------------------------
+   Browser prompts are not part of the app's language: they ignore the paper,
+   the type, and the hard rules. These dialogs block the screen only when a
+   decision is required, and destructive ones cannot be dismissed by accident.
+   -------------------------------------------------------------------------- */
+
+/* The scrim was 0.38 black, which was tuned against a light ground and does
+   almost nothing over a near-black one — the app behind a dialog stayed
+   perfectly legible, so the dialog did not read as blocking anything. Black on
+   black needs the extra depth to register at all. */
+.dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--scrim);
+}
+
+.dialog {
+  width: min(100%, 420px);
+  padding: 22px 22px 18px;
+  background: var(--card);
+  color: var(--ink);
+  /* The edge of a thing is `--rule` (DESIGN.md §6 names dialog borders by
+     name); a full-ink frame made the box louder than the question in it. */
+  border: 1px solid var(--rule);
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+}
+
+.dialog-mark {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 20px;
+  color: var(--ink);
+}
+
+.dialog h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  /* A board's name is one word up to 40 letters long: it breaks, rather than
+     pushing the dialog's ✕ off a phone's edge. */
+  overflow-wrap: anywhere;
+  font-family: var(--display);
+  font-size: var(--t-name);
+  font-weight: 400;
+  line-height: var(--lh-chrome);
+}
+
+/* A thumb's worth, with the extra height given back through the margin so the
+   28px head row does not grow — the same shape `.meta-verb` and `.meta-stamp`
+   take. It was 40 while the dialog's own buttons already read `--hit`, and it
+   is the ✕ on a panel that asks before it destroys something. */
+.dialog-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: -8px -10px -8px 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  cursor: var(--cursor-pointer);
+}
+
+.dialog-close:active {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+.dialog-message {
+  margin: 20px 0 24px;
+  font-size: var(--t-read);
+  line-height: var(--lh-read);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* A dialog's buttons are the panel rows' height, not a form's. "Delete" and
+   "Keep it" at 32px tall were the two most consequential controls in the app
+   at three quarters of a thumb. */
+.dialog-actions .btn {
+  min-height: var(--hit);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.dialog-confirm {
+  background: var(--invert);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.dialog-confirm:active {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+@media (max-width: 699px) {
+  .dialog-scrim {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .dialog {
+    width: 100%;
+    padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+  }
+}
+
+/* --- the format row --------------------------------------------------------
+   Four marks on one row inside the insert panel. They act on text that is
+   already written, which makes them a different question from the rows below,
+   and four rows of their own would have taken this panel to nine on a phone.
+
+   Each is still a ~44px target — the row keeps the panel's own row height and
+   the three split its width, which on the panel's 196px minimum leaves 65px
+   apiece. They are letters rather than drawings because no icon set has a word
+   for bold that is not the letter B.
+   -------------------------------------------------------------------------- */
+.fmtrow {
+  display: flex;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.fmtbtn {
+  flex: 1 1 0;
+  min-height: var(--hit);
+  padding: 12px 0;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  border-left: 1px solid var(--rule-soft);
+  border-radius: 0;
+  cursor: var(--cursor-pointer);
+}
+
+.fmtbtn:first-child {
+  border-left: 0;
+}
+
+.fmtbtn:hover {
+  background: var(--raised);
+}
+
+.fmtbtn:active {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+/* Each mark set the way the thing it does looks. A control that says "bold" in
+   a light weight is asking you to read it rather than recognise it. */
+.fmtbtn[data-mark="B"] {
+  font-weight: 700;
+}
+
+.fmtbtn[data-mark="I"] {
+  font-style: italic;
+}
+
+/* --- the card you just came back to ----------------------------------------
+   A note that was just written, or just closed, draws its own border once:
+   two strokes leaving the top-left corner together — one along the top and
+   down the right, one down the left and along the bottom — meeting again at
+   the bottom-right. Then the whole figure fades.
+
+   It exists because the grid is a wall of near-identical tiles and you have
+   just arrived back at it from somewhere else. Closing a note used to return
+   you to a static screen with no answer to "which one was I in". This is the
+   answer, and it costs a third of a second and no layout.
+
+   Four elements rather than a drawn path, because a scaled 1px line is the
+   cheapest thing a browser can animate and the corners have to be exact — the
+   card has no radius, so two rectangles meeting is the real geometry.
+   -------------------------------------------------------------------------- */
+
+.trace {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  animation: trace-fade 260ms var(--ease-exit) 320ms both;
+}
+
+.trace > span {
+  position: absolute;
+  background: var(--ink);
+  animation-duration: 130ms;
+  /* The stroke draws itself on, so it arrives: ENTER, like everything else
+     that arrives. It was linear until the rule against constant rates was
+     stated outright — styles.test.ts had it listed as an open design
+     question, and this is the answer. */
+  animation-timing-function: var(--ease-enter);
+  animation-fill-mode: both;
+}
+
+/* Top, left to right. */
+.trace > span:nth-child(1) {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform-origin: 0 50%;
+  animation-name: trace-x;
+}
+
+/* Right, top to bottom — starts as the top stroke arrives at the corner. */
+.trace > span:nth-child(2) {
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  transform-origin: 50% 0;
+  animation-name: trace-y;
+  animation-delay: 130ms;
+}
+
+/* Left, top to bottom, at the same moment as the top. */
+.trace > span:nth-child(3) {
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  transform-origin: 50% 0;
+  animation-name: trace-y;
+}
+
+/* Bottom, left to right — the second half of the left-hand path. */
+.trace > span:nth-child(4) {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform-origin: 0 50%;
+  animation-name: trace-x;
+  animation-delay: 130ms;
+}
+
+@keyframes trace-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes trace-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes trace-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trace {
+    display: none;
+  }
+}
+
+/* --- a card leaving the board ---------------------------------------------
+   The real card is gone in the same frame the grid closes over its slot; this
+   is a still of it, pinned where it stood, shrinking into the mark for whatever
+   happened to it. Under the undo offer, because that is the thing you might
+   actually need to act on. */
+
+.vanish-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 14;
+  pointer-events: none;
+}
+
+.vanish {
+  position: fixed;
+  overflow: visible;
+}
+
+/* Shrinks to the middle of itself, where the mark is, and is gone by just past
+   halfway. What you follow at the end is the mark, not the paper — the paper
+   only has to show you which card it was. */
+.vanish-card {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  transform-origin: 50% 50%;
+  animation: vanish-card 460ms var(--ease-exit) both;
+  animation-delay: var(--vanish-delay, 0ms);
+}
+
+@keyframes vanish-card {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  46% {
+    transform: scale(0.3);
+    opacity: 0.4;
+  }
+  62% {
+    transform: scale(0.1);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(0.1);
+    opacity: 0;
+  }
+}
+
+/* Comes up under the shrinking card, then holds still, alone, at half again
+   its normal size. The hold is the whole point: at 300ms the mark was drawn
+   and never read, so the gesture ended on nothing. Drawn at 1.5x because it is
+   the only thing on screen at that moment and it is standing in for a card. */
+.vanish-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: calc(var(--icon-nav) / -2) 0 0 calc(var(--icon-nav) / -2);
+  color: var(--ink);
+  animation: vanish-mark 460ms var(--ease-enter) both;
+  animation-delay: var(--vanish-delay, 0ms);
+}
+
+@keyframes vanish-mark {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  26% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+  78% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* --- the undo offer --------------------------------------------------------
+   This was a strip and is now a mark, and the change is worth stating in both
+   places it lives.
+
+   The strip was a full-width box carrying three things: a rule draining along
+   its top edge, the words for what had just happened ("Archived 3"), and an
+   Undo button. Two of those are furniture. Nobody acts on the words — you know
+   what you just did, and the board in front of you shows it — and they were
+   the largest part of a box thrown across the bottom of the screen for the
+   least important thing on it. What was left was the offer itself, at the size
+   of the thing you would tap; it then lost its word as well. "Undo" set in
+   mono was a label the width of a short sentence for an act every editor
+   already draws as one arrow, and the arrow is a mark the app already owns
+   (`IconUndo`), so the button is a square now, and the square is the size of
+   a tap.
+
+   The countdown moved onto the button rather than sitting beside it: the
+   border is drawn **on** over the eight seconds, from nothing to a complete
+   rule, and then the whole thing goes. A clock you have to look somewhere else
+   to read is a second object; a clock that is the edge of the button is the
+   button telling you how long it is staying.
+
+   It says one word for its first seconds — the verb of what it would undo,
+   small, in the machine face — and then settles to the arrow (review
+   2026-10-01, UX-09). And it no longer floats: it stood over the board's
+   bottom-right corner, on a card's date, on the menu's Search row, on the
+   Sorter's ✕, and a tap meant for any of them undid the last action instead
+   (UX-01, UX-02). Each screen gives it a place of its own (`UndoPlace`).
+   -------------------------------------------------------------------------- */
+
+/* The slot, not the button — so the button is only as wide as itself, and the
+   place it stands is decided here, once per screen. */
+.undo-slot {
+  flex: 0 0 auto;
+  display: flex;
+}
+
+/* The board, on a short screen only: a cell of the capture bar, after the
+   words and before the corner cells, a bar's height tall and bound to the field
+   by the same soft hairline the corner cells carry. Everywhere else the
+   header's creature says the offer, in its bubble (`.speech`). */
+.undo-slot-bar {
+  align-self: flex-end;
+  height: var(--bar-h);
+  border-left: 1px solid var(--rule-soft);
+}
+
+.undo-slot-bar .undo {
+  min-width: var(--bar-h);
+  height: 100%;
+}
+
+/* The Sorter: floated at the top of the note, so the words run round it. The
+   head band has no room for it on a phone, and the foot is all destinations. */
+.undo-slot-face {
+  float: right;
+  /* A fixed box, the width of the mark with its word and its height: the
+     note's lines break the same whether the word is up, settled to the arrow,
+     or gone (review 2026-10-04, UI-C-01). */
+  width: 132px;
+  min-height: var(--hit);
+  justify-content: flex-end;
+  margin: 0 0 8px 12px;
+}
+
+/* ...and at the end of the pile, in the summary's empty top corner. The
+   summary is a centred column, so a float would be a row of its own there and
+   the column would jump when it went. */
+.sorter-end > .undo-slot-face {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  float: none;
+  width: auto;
+  min-height: 0;
+  margin: 0;
+}
+
+/* Over the open note, for the one kind of offer made from inside it — Untick
+   all and Clear done (`inPlace` on the undo entry). The only place it still
+   floats: the sheet stands at 20 and it stands above it, in a corner of the
+   note that holds nothing else. */
+.undo-slot-over {
+  position: fixed;
+  right: 10px;
+  bottom: calc(var(--sheet-foot, 0px) + 10px + env(safe-area-inset-bottom));
+  z-index: 23;
+}
+
+/* Furniture, so it takes `--raised` like the rest of the chrome — never an ink
+   fill, which in a dark scheme is a near-white slab for the least important
+   thing on screen. No border of its own: the border is the clock, drawn by
+   the SVG positioned over it, and a static rule underneath would make the
+   clock read as one already full. */
+.undo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit);
+  min-height: var(--hit);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  background: var(--raised);
+  cursor: var(--cursor-pointer);
+}
+
+/* Not a button: a notice ("Copied 3") has nothing to reverse, so it is not
+   offering anything and must not read as something to press. Same surface,
+   same clock, no pointer — and it keeps its words, since words are all it
+   has. */
+.undo-notice {
+  padding: 0 18px;
+  color: var(--muted);
+  cursor: var(--cursor-default);
+}
+
+/* The one word, for the offer's first seconds (UNDO_WORD_MS): small mono caps
+   in --muted beside the arrow in --ink, so the arrow is still what reads first.
+   Then it goes and the button is the arrow's own square again — never a strip. */
+.undo[data-said] {
+  gap: 8px;
+  padding: 0 14px 0 12px;
+}
+
+.undo-word {
+  color: var(--muted);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.undo:active .undo-word {
+  color: inherit;
+}
+
+.undo:active {
+  color: var(--paper);
+  background: var(--invert);
+}
+
+.undo-notice:active {
+  color: var(--muted);
+  background: var(--raised);
+}
+
+/* The clock: the button's own edge, drawn on at one speed.
+   ---------------------------------------------------------------------------
+   The first version painted a conic sweep into a transparent border. A sweep
+   is measured in *angle*, and on a rectangle one degree is a few pixels at the
+   middle of an edge and a long run into a corner — so the rule crawled, then
+   raced, then crawled, and looked like a glitch rather than a countdown. This
+   is a stroke, measured in *distance*: `pathLength="1"` on the rect makes the
+   whole perimeter one unit, so `stroke-dashoffset` falling from 1 to 0 is a pen
+   travelling the edge at one speed, from the top-left corner clockwise. It
+   also needs no `@property` and no gradient: a plain animated number.
+
+   The SVG is inset by half a pixel so a 1px stroke centred on the rect's edge
+   lands wholly inside the button's box, whatever width the words give it. It
+   takes no click — the button underneath does. */
+.undo-clock {
+  position: absolute;
+  top: 0.5px;
+  left: 0.5px;
+  width: calc(100% - 1px);
+  height: calc(100% - 1px);
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* Clockwise from the top-left corner, and **linear**.
+   The one place in the app allowed a linear timing function, and it has to be:
+   this is a clock, not a move. Every curve in motion.ts is a curve precisely
+   because it is meant to feel like something starting or stopping, and any of
+   them here would misreport the time left — an ease-out would sit near empty
+   for most of the window and then fill in a rush.
+
+   The duration is not a motion duration either. It is the undo window itself,
+   handed in from App as --undo-ms, so the drawing cannot outlast the offer.
+
+   Full --ink, never a dimmed hairline: DESIGN.md names the undo clock among
+   the 1px strokes that stay at full ink, because a hairline dimmed is a
+   hairline you cannot see. */
+.undo-clock rect {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: undo-draw var(--undo-ms, 8000ms) linear forwards;
+}
+
+@keyframes undo-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Under reduced motion the border is simply never drawn. A countdown that does
+   not count is worse than no countdown: it would say a full window's worth of
+   time is left, forever. The offer still expires on its own timer. */
+@media (prefers-reduced-motion: reduce) {
+  .undo-clock rect {
+    animation: none;
+  }
+}
+

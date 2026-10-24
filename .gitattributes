@@ -1,0 +1,8 @@
+# Shell scripts must keep Unix line endings. This checkout has core.autocrlf=true,
+# so without this a script would arrive on the Ubuntu server with a carriage
+# return on every line and the shell would refuse it: `\r: command not found`.
+*.sh            text eol=lf
+deploy/post-receive text eol=lf
+# Node scripts too: a carriage return after the #! line makes Node refuse
+# scripts/supabase-setup.mjs on this checkout, and the root suite with it.
+scripts/*.mjs   text eol=lf

@@ -1,0 +1,5 @@
+.vercel
+.env*
+!.env.example
+# The web suite's JSON report, for the slow-test check in CI (scripts/slow-tests.mjs).
+test-report.json

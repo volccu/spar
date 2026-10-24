@@ -1,0 +1,902 @@
+/* --- spatial idea folder ---------------------------------------------------
+   An idea is a cover for its source notes. The folder is a native two-axis
+   scroll surface: wheel, touch, scrollbars and keyboard all work without a
+   custom gesture layer. The sheet is deliberately huge rather than bounded, so
+   a note can be carried a long way without finding an edge. */
+.canvas-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+/* The sheet is full screen, so on a phone its bar sits under the status bar
+   unless it says otherwise — every other top-level bar in the app already
+   does. */
+.canvas-bar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: calc(7px + env(safe-area-inset-top)) 8px 7px;
+  background: var(--card);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* A place is named in the display face, in tracked capitals, with its count
+   beside it in the machine face — exactly what a board tab does, because this
+   is the same kind of thing. The count was once set in the naming face with
+   the word "notes" after it, which put data in the wrong voice and a label
+   where the app uses a number. */
+.canvas-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* It keeps its own width, so the tools beside it give way (they scroll) rather
+     than the name being squeezed to its first letters. */
+  flex: 0 0 auto;
+  min-width: 0;
+  color: var(--ink);
+}
+
+/* A sketch with nothing on it yet. Quiet, in the middle, and never in the way of
+   a stroke: the finger goes through it. */
+.canvas-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  margin: 0;
+  text-align: center;
+  font-family: var(--body);
+  font-size: var(--t-text);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* The name of the place, and the control that changes it. A board tab you can
+   rename: same face, same tracking, same capitals — the only difference is
+   that touching it opens the one field. */
+.canvas-title {
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  font-weight: 400;
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* It is a button now, and a button brings furniture with it. A thumb's
+     --hit tall, though the line is ~13px: the padding grows the target and the
+     equal negative margin keeps the name exactly where it sat (it measured
+     19px tall on a phone, the one way to rename an idea; audit 2026-10-24,
+     UX-006). The bar is 56px and centres it, so nothing else moves. */
+  --title-pad: max(3px, calc((var(--hit) - var(--t-nav) * var(--lh-chrome)) / 2));
+  padding: var(--title-pad) 6px;
+  margin: calc(-1 * var(--title-pad)) -6px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: var(--cursor-pointer);
+}
+
+/* An idea nobody has named says so in the secondary tone: the word "Idea" is
+   the app standing in for a name, not the name. */
+.canvas-title[data-unnamed="true"] {
+  color: var(--muted);
+}
+
+/* Hovered, it does what every other control in this bar does: the text goes to
+   full ink and the furniture raises one step (`.canvas-tool-btn` two rules
+   down makes the identical move). It used to go to `--signal`, which is the
+   top of the ramp — DESIGN.md §3 gives that tone to a live address and to the
+   focus ring and says "never give anything else the signal", by name. It was
+   the only place in the stylesheet that did, and what it lit was a heading in
+   the chrome. A named title already rests at ink, so the raise is what carries
+   it there; an unnamed one makes the muted → ink step as well. The padding is
+   negative-margined back so the bar's height does not move. */
+.canvas-title:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* Typing into the bar. It takes the raised fill the chrome uses for engaged,
+   never an inverted slab — a bone block in the top bar is exactly what
+   --raised exists to stop. */
+/* One pixel more inset than the button, to pay for the border it adds —
+   the same arithmetic as `.sheet-name-input` — so the name does not step a
+   pixel down and right as the field opens. */
+.canvas-title-input {
+  min-width: 8ch;
+  width: 22ch;
+  max-width: 40vw;
+  padding: 3px 6px;
+  margin: -4px -7px;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  cursor: var(--cursor-text);
+}
+
+/* The same inset rule, on the field DESIGN.md §3 names as the model for it.
+   It had no outline of its own, so it took the signal ring the section it is
+   cited in forbids. */
+.canvas-title-input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.canvas-title-input::placeholder {
+  color: var(--muted);
+  letter-spacing: var(--track-caps);
+}
+
+/* How many notes are on this canvas. `--muted` outright rather than the
+   inherited tone at half strength, for the reason the board counts above give:
+   a dimmed token is a tone the ramp does not have, and this one landed at
+   2.26:1. Muted is the app's own word for "secondary text" and is verified at
+   5.88 against the ground. */
+.canvas-count {
+  font-size: var(--t-data);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* The toolbar grows when the pencil is out, and a phone is narrower than the
+   controls. It scrolls rather than wrapping, so the bar keeps one height and
+   the canvas below it never moves. */
+.canvas-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* The cut edge fades open wherever there are still controls past it — the
+     same mask the tab strip and the selection strip wear, written by
+     `useEdgeFade`. The scrollbar is hidden here, so without it a phone with
+     the pencil out simply had no way of knowing that Clear and the zoom
+     readout existed. 28px, like the other two. */
+  --fade-l: 0px;
+  --fade-r: 0px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--fade-l),
+    black calc(100% - var(--fade-r)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black var(--fade-l),
+    black calc(100% - var(--fade-r)),
+    transparent
+  );
+}
+
+.canvas-tools[data-fade-left="true"] {
+  --fade-l: 28px;
+}
+
+.canvas-tools[data-fade-right="true"] {
+  --fade-r: 28px;
+}
+
+.canvas-tools::-webkit-scrollbar {
+  display: none;
+}
+
+/* Every control in this bar takes the thumb's floor, the same `--hit` the
+   open note's marks were grown to (audit 2026-09-04, F6). The canvas is the
+   one surface in the app that is *drawn on* with a finger, and its own
+   toolbar was the last row of 40s and 34s and 22s left in the app. The bar
+   grows by four pixels and nothing else moves.
+   *
+   * The **widths** of the pen swatch and the stroke-weight rules are still
+   under the floor and are left alone deliberately: each of those controls is a
+   *sample* of what it draws, so widening it means redrawing it, and three
+   44-wide swatches would push more of this already-scrolling bar off a phone.
+   That one is a layout decision, not a token one. */
+.canvas-tool-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.canvas-tool-btn:hover {
+  color: var(--ink);
+}
+
+/* Furniture raises, it does not invert. These were solid ink, which in a dark
+   scheme is a near-white slab held on screen for as long as the tool is
+   selected — the loudest thing in a room full of notes, for the least. */
+.canvas-tool-btn:active,
+.canvas-tool-btn[data-on="true"] {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* Undo with nothing to take back: still there, so nothing beside it moves, and
+   plainly not pressable — the hairline's own tone, the quietest the ramp has
+   (the same step `.attach-row .iconbtn:disabled` takes). */
+.canvas-tool-btn:disabled {
+  color: var(--rule);
+  background: transparent;
+  cursor: var(--cursor-default);
+}
+
+.canvas-tool-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 20px;
+  background: var(--rule-soft);
+  margin: 0 4px;
+}
+
+/* The swatch stays the 22px sample it has always been; the *button* takes the
+   full height, and the sample is drawn inside it. The tone rides in on
+   `--pen`, set by the component, so the paint can move to the pseudo-element
+   without the button itself having a fill. */
+.canvas-color-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  cursor: var(--cursor-pointer);
+}
+
+.canvas-color-btn::after {
+  content: "";
+  display: block;
+  width: 22px;
+  height: 22px;
+  background: var(--pen);
+  border: 1px solid var(--rule-soft);
+}
+
+.canvas-color-btn[data-on="true"]::after {
+  border-color: var(--ink);
+  outline: 1px solid var(--card);
+  outline-offset: -2px;
+}
+
+.canvas-width-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.canvas-width-btn:hover {
+  color: var(--ink);
+}
+
+.canvas-width-btn[data-on="true"] {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.canvas-width-rule {
+  display: block;
+  width: 18px;
+  background: currentColor;
+}
+
+/* A pinch you cannot undo strands you: a mono readout of the current zoom,
+   shown only away from 100% and doubling as the way back. Same voice as
+   every other machine-facing number in the app — no colour, no size of its
+   own, an auto width rather than the fixed 40px square the icon buttons
+   take, because a percentage doesn't fit one. */
+.canvas-zoom-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--hit);
+  padding: 0 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.canvas-zoom-btn:hover {
+  color: var(--ink);
+}
+
+/* `touch-action: none` is what lets a second finger be seen at all — native
+   touch scrolling used to consume one of the two pointers a pinch needs
+   before this handler ever got it. (The draw tool used to set this on its
+   own, for exactly the same reason: a finger drawing was panning instead,
+   because the gesture and the scroll were the same one and the browser
+   always won it. It is now the base rule everywhere, pinch or no.)
+   One-finger panning is `startPan`'s job now regardless of pointer type,
+   since the browser no longer does it for a touch pointer. */
+/* The line a fresh merge opens with (review 2026-10-01, UX-26): hung under
+   the canvas bar, over the top of the canvas, so its arriving and going moves
+   nothing — the capture line's shape, said at the other end of the screen.
+   The bar's furniture: `--card` ground, a `--rule` hairline, mono words in
+   `--muted`. It catches no touch; the first touch of the canvas takes it. */
+.canvas-merged {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 3;
+  max-width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--card);
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  pointer-events: none;
+}
+
+/* A phone's drawing tools stand at the foot of the screen, under the thumb, in
+   up to two rows: the tools (with Clear and the zoom at the far end), and with
+   the pen out its tones and weights. Nothing scrolls sideways. It pays the
+   bottom inset the way every band on a layer's edge does. The surface above it
+   is a flex sibling that ends where this begins, so no touch for the drawing
+   can land on a control. */
+.canvas-dock {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-2) var(--s-4) calc(var(--s-2) + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--rule);
+}
+
+.canvas-dock-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+/* Clear and the zoom, pushed to the far end of the tools' own row. */
+.canvas-dock-end {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+
+/* The swatch and the weight stay the samples they are; their buttons take the
+   thumb's floor here, where there is a whole row to spend (the bar above this
+   said they could not, three wide at 44 each, and it was right: it had no row).
+   Three and three at 44 is 264 — inside the narrowest phone's 360. */
+.canvas-dock .canvas-color-btn,
+.canvas-dock .canvas-width-btn {
+  width: var(--hit);
+}
+
+.canvas-dock .canvas-tool-sep {
+  margin: 0 var(--s-3);
+}
+
+@media (max-width: 699px) {
+  /* The bar holds only Back and the name now, so the name may have the room. */
+  .canvas-title,
+  .canvas-title-input {
+    max-width: 60vw;
+  }
+
+  .canvas-merged-sep {
+    display: none;
+  }
+
+  .canvas-merged-how {
+    display: block;
+    margin-top: 4px;
+  }
+}
+
+.canvas-surface {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: none;
+  cursor: var(--cursor-grab);
+  background: var(--paper);
+}
+
+.canvas-surface:active {
+  cursor: var(--cursor-grabbing);
+}
+
+.canvas-surface[data-tool="draw"],
+.canvas-surface[data-tool="erase"] {
+  cursor: var(--cursor-crosshair);
+}
+
+.canvas-surface[data-tool="draw"]:active,
+.canvas-surface[data-tool="erase"]:active {
+  cursor: var(--cursor-crosshair);
+}
+
+/* With the pen or the eraser out, a note is ground to mark on, not a thing to
+   pick up. */
+.canvas-surface[data-tool="draw"] .spatial-note,
+.canvas-surface[data-tool="draw"] .canvas-text,
+.canvas-surface[data-tool="erase"] .spatial-note,
+.canvas-surface[data-tool="erase"] .canvas-text {
+  pointer-events: none;
+}
+
+/* The sizing div a zoom needs: `.canvas-world` is transformed with
+   `scale()`, which repaints it without ever changing the layout size it
+   claims — so nothing about the scroller's real, scrollable extent would
+   change as the zoom did unless something else carried that size instead.
+   This is that something, sized in script to `WORLD_SIZE * zoom`. */
+.canvas-zoom {
+  position: relative;
+}
+
+/* The paper needs to recede behind the notes: enough texture to make movement
+   visible while scrolling, never enough to compete with the card rules. */
+.canvas-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-image:
+    linear-gradient(to right, var(--rule-faint) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rule-faint) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Strokes sit behind the notes, filling the full world space. Pointer-events
+   are off because the canvas div handles all drawing input, not the SVG. */
+.canvas-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* A folder note is a home-grid card freed from its row: same surface, same
+   padding, same body face and same footer. Only the height changes — here the
+   note is allowed to be exactly as long as it is. */
+.spatial-note {
+  position: absolute;
+  width: min(260px, calc(100vw - 32px));
+  min-height: var(--card-h);
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 13px 8px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  color: var(--ink);
+  text-align: left;
+  cursor: var(--cursor-grab);
+  opacity: 1;
+  user-select: none;
+  touch-action: none;
+}
+
+.spatial-note:hover,
+.spatial-note:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+/* Moving a note never dims it. The card stays fully readable under the hand. */
+.spatial-note[data-dragging="true"] {
+  cursor: var(--cursor-grabbing);
+  opacity: 1;
+}
+
+/* A canvas note has no footer row to put the flag in, so here it stands above
+   the text as a row of its own rather than floating in the corner over it.
+   The note is `height: auto` on a surface where vertical space costs nothing,
+   so a line for the mark is the one arrangement that can never collide with a
+   word — which is the whole reason it left the corner on the board too. */
+.spatial-priority {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+}
+
+.spatial-note .spatial-card-body {
+  flex: 1 1 auto;
+  max-height: none;
+  overflow: visible;
+  white-space: pre-wrap;
+}
+
+/* A resize handle sits in the bottom-right corner of every spatial note.
+   Hidden until the pointer rests on the note, then a small diagonal grip
+   appears — the same move a text editor uses for its resize corner. */
+.spatial-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: var(--cursor-resize);
+  opacity: 0;
+  transition: opacity 120ms var(--ease-enter);
+  touch-action: none;
+  z-index: 2;
+}
+
+.spatial-resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid var(--muted);
+  border-bottom: 1px solid var(--muted);
+}
+
+.spatial-note:hover .spatial-resize-handle {
+  opacity: 1;
+}
+
+.spatial-resize-handle--img {
+  z-index: 3;
+}
+
+.spatial-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.spatial-att-image {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.spatial-att-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule-soft);
+  background: var(--raised);
+}
+
+.spatial-att-file {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--rule-soft);
+  background: var(--raised);
+}
+
+/* --- right-click context menu on the canvas ---------------------------------
+   A small popover that appears at the cursor on right-click. Follows the same
+   visual grammar as the rest of the app: card surface, hard rule, inverted
+   press state. The dismiss layer covers the whole screen so clicking anywhere
+   outside closes the menu. */
+.ctx-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+}
+
+.ctx-menu {
+  position: fixed;
+  z-index: 26;
+  min-width: 160px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule-soft);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  color: var(--ink);
+  text-align: left;
+  cursor: var(--cursor-pointer);
+}
+
+.ctx-item:last-child {
+  border-bottom: 0;
+}
+
+.ctx-item:hover {
+  background: var(--raised);
+}
+
+.ctx-item:active {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+/* The tool this menu is offering is the one already in the hand. Said with the
+   same raise the toolbar uses, so the two agree. */
+.ctx-item[data-on="true"] {
+  background: var(--raised);
+  font-weight: 700;
+}
+
+/* Divides the tools from the one row that changes the idea rather than the
+   pointer. A division inside one thing, so the soft rule. */
+.ctx-sep {
+  display: block;
+  height: 1px;
+  background: var(--rule);
+}
+
+/* --- canvas text labels -----------------------------------------------------
+   Free-standing text on the infinite canvas. Positioned in world coordinates
+   like notes and strokes. Double-click to edit inline, right-click to delete,
+   drag to reposition. */
+.canvas-text {
+  position: absolute;
+  max-width: 300px;
+  min-width: 40px;
+  cursor: var(--cursor-grab);
+  user-select: none;
+  touch-action: none;
+}
+
+.canvas-text:active {
+  cursor: var(--cursor-grabbing);
+}
+
+.canvas-text-label {
+  display: inline-block;
+  padding: 4px 8px;
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px dashed transparent;
+}
+
+.canvas-text:hover .canvas-text-label {
+  border-color: var(--rule-soft);
+}
+
+.canvas-text-input {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 8px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+  color: var(--ink);
+  resize: both;
+  overflow: auto;
+}
+
+/* One hue, and it is a link. A focused field is not one. */
+.canvas-text-input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+/* --- idea card snapshot on the grid -----------------------------------------
+   The canvas at card size. Each source note is drawn at the width and length it
+   is actually set at, its text as ghost rules — full where the line runs the
+   column, short where it stops early, absent where the note has a blank line.
+   Paper behind it, because that is what is behind it when you open it. */
+/* The name of the idea, on its card.
+   ---------------------------------------------------------------------------
+   The one card in the app that carries a header row of words, and the reason
+   is that it is the one card that shows none of the note's own. Every other
+   card *is* the note at a smaller size; an idea card is a picture of a canvas,
+   so without this a shelf of ideas is a shelf of grey miniatures that can only
+   be told apart by opening them.
+
+   Said in the display face at nav size, in capitals — the same way the folder
+   bar says it and the same way the board tabs say their names, because it is
+   the same kind of thing: the name of a place. Nothing is drawn at all when
+   the idea has not been named. */
+.card-idea-name {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* An unnamed idea's first words, one line under the picture, in the words'
+   face at the card's own size (review UX-A-09). Muted: it is the user's text,
+   but it is a pointer to the sources, not the face. It takes its line out of
+   the picture, never out of the card. */
+.card-idea-line {
+  flex: 0 0 auto;
+  font-size: var(--t-text);
+  line-height: var(--card-lh);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card[data-selected="true"] .card-idea-line {
+  color: var(--paper);
+}
+
+.idea-snapshot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* The name row above it takes its space out of the picture, never out of the
+     card: every row of the grid is exactly one card tall. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.idea-snapshot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.idea-snapshot-note {
+  fill: var(--card);
+  stroke: var(--rule);
+  /* Non-scaling keeps the note's edge a hairline at any zoom, so a canvas that
+     happens to be spread wide does not lose its rules to sub-pixel widths. */
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Text at this size is texture, not words. --muted rather than --ink: a card
+   of solid ink bars reads as a filled block and says nothing about length. */
+.idea-snapshot-line {
+  fill: var(--muted);
+  opacity: 0.45;
+}
+
+.idea-snapshot-image {
+  fill: var(--raised);
+  stroke: var(--rule-soft);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The board's priority flag, said in the snapshot's own vocabulary — a filled
+   square at the card's corner, which is what the flag was before it moved to
+   the footer — and it means the same thing. */
+.idea-snapshot-priority {
+  fill: var(--ink);
+}
+
+.idea-snapshot-stroke {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+
+/* A picture on a card is cropped to the card's box, which is what a resting
+   pointer is asking to see past. Grown, it is shown whole at its own
+   proportions instead — the crop is the thing being undone, so keeping it and
+   merely making it taller would answer the wrong question. */
+.card[data-peek="true"] .card-shot {
+  height: auto;
+  max-height: calc(var(--card-lines) * var(--card-lh));
+  object-fit: contain;
+  opacity: 1;
+}
+
+/* The card face is the note's own text and nothing else. There is no title
+   row: a note has no heading, so the card must not invent one. That also
+   means this text is full ink — it is the content, not a subtitle under it.
+
+   The max-height is the important line. Clamped to a whole number of line
+   boxes, the text can only ever end *on* a baseline; without it the last
+   visible line is sliced through its own x-height and the card looks broken
+   rather than cut. The character budget in face.ts is derived from the same
+   two numbers, so the "+1.4k" underneath is measuring the real remainder. */
+/* Sized to its own text, not to the space left over. The foot is held on the
+   floor by its own margin-top:auto, so the body has no reason to grow — and
+   growing put the fade below the last line, over blank card, where it did
+   nothing. It has to end where the words end. */
+.card-body {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: calc(var(--card-lines) * var(--card-lh));
+  font-size: var(--t-text);
+  line-height: var(--card-lh);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow: hidden;
+  word-break: break-word;
+  text-wrap: pretty;
+}
+
+/* Every line of a card face is its own box now, so a list on a card can be set
+   as a list. A plain line keeps the full card leading and is indistinguishable
+   from the pre-wrapped text this replaced. */
+.card-line {
+  display: block;
+}
+
+/* A user-marked heading keeps its line slot on the card but uses the same name
+   size as the open note, so the `# ` the user wrote has a visible consequence
+   even in the board's compact representation. */
+.card-line[data-heading="true"] {
+  font-weight: 700;
+  line-height: var(--card-lh);
+}
+
+/* A note's name, on its card: the `# ` line at the very top of the note.
+   Said exactly the way `.card-idea-name` says an idea's — the display face at
+   nav size, in capitals — because it is the same thing. It stays in the line
+   slot the heading already had and keeps the card leading, so every card is
+   still `--card-lines` boxes tall and the cut lands where the budget says.
+   One line, cut with an ellipsis like the idea's, rather than a wrap the
+   budget measured in body characters and capitals would overrun. */
+.card-line[data-name="true"] {
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  font-weight: 400;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+

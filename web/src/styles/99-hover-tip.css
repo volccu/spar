@@ -1,0 +1,26 @@
+/* --- the hover hint (lib/hoverTips.ts) --------------------------------------
+   The app's own box for a `title`, in place of the browser's grey, rounded,
+   shadowed one in the system face. It is chrome, so it stands on `--raised`
+   with the edge of a thing (`--rule`); its words are interface prose, the
+   reading face at --t-text in full ink. Square, flat, no shadow: the same
+   furniture as every panel. It catches nothing, and stands over every layer,
+   dialogs included, because it only ever labels what the pointer is on. */
+.hover-tip {
+  position: fixed;
+  z-index: 200;
+  max-width: 280px;
+  padding: var(--s-2) var(--s-4);
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-item);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hover-tip[hidden] {
+  display: none;
+}

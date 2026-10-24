@@ -1,0 +1,32 @@
+# What `docker build` never sees. The image is built from source alone: no
+# installed modules, no earlier builds, no secrets and no personal notes.
+
+# Installed and built output; the image makes its own.
+**/node_modules
+web/dist
+server/dist
+**/*.tsbuildinfo
+
+# Secrets and local settings. A web/.env here would bake one installation's
+# backend into an image meant for every installation.
+**/.env
+**/.env.*
+.claude
+supabase/.temp
+supabase/.branches
+
+# Personal data: a Keep export, the Phase 0 database, seeded real notes and
+# the reports rendered from them.
+Takeout
+notes.db
+notes.db-*
+web/src/seed/notes.json
+reports
+**/*.report.html
+*.sql
+
+# Scratch and history.
+.git
+TEMP
+.superpowers
+deploy

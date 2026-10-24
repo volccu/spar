@@ -1,0 +1,720 @@
+/* --- reading and editing a note ------------------------------------------
+   The reader and the editor are set identically on purpose. Tapping the text
+   swaps one for the other in place, at the same size, on the same line grid,
+   with the caret where the finger landed — so there is no visible "mode", you
+   just touch the note and start typing. The reader exists for one reason: a
+   textarea cannot hold a working link, and a note full of links you cannot
+   tap is a note you have to retype into the address bar.
+   ------------------------------------------------------------------------- */
+
+/* 33em of Baskerville lands at roughly 62 characters a line, which is where
+   the eye stops having to hunt for the start of the next one. Note that
+   neither of these may take text-wrap: pretty — the two must break lines
+   identically or the swap between them becomes visible. */
+.editor,
+.reader {
+  width: 100%;
+  max-width: 33em;
+  margin: 0 auto;
+  display: block;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-family: var(--body);
+  font-size: var(--t-read);
+  line-height: var(--lh-read);
+  letter-spacing: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Both fit their content, and neither reserves a screen of empty space under
+   the words. They used to stand 60dvh tall so there was somewhere to tap to
+   start editing a two-line note — but that space is *inside* the text, so it
+   pushed the verbs under it a whole screen down from the last line they
+   belong to. The tap target did not go away; it moved below the strip, as
+   `.sheet-rest`. */
+.editor {
+  resize: none;
+  /* Above the lamp. The light is behind the words, always — it lights the
+     paper they are written on and must never wash over them. */
+  position: relative;
+  z-index: 1;
+}
+
+.editor:focus {
+  outline: none;
+}
+
+/* What the editor's lamp is measured and drawn against.
+   ---------------------------------------------------------------------------
+   The reader is a bare block in `.sheet-body` and the editor swaps in for it
+   at exactly the same size on exactly the same line grid, so this wrapper has
+   to be invisible to layout: it carries the measure and the centring the
+   editor already had, and the editor keeps its own copy of both, which inside
+   a box already that wide changes nothing. `.sheet-body` is a plain scrolling
+   block and not a flex container, so a block in the middle of it displaces
+   nothing.
+
+   `position: relative` is what the lamp and the mirror are placed against, and
+   `isolation: isolate` gives the lamp a group to blend inside rather than
+   letting it lighten the sheet behind the note.
+
+   It states the reading size for one reason: `33em` is 33 ems of whatever
+   this box is set in. Left to inherit the page's 16px, the wrapper came out
+   16.5px narrower than the reader's 33em at --t-read — so tapping into a note
+   stepped every line ~8px right (the narrower box is centred) and re-broke
+   the lines, the exact swap this pair exists to hide. Same trap, same fix, as
+   `.sheet-verbs`; styles.test.ts holds all three to one measure. */
+.editor-field {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: 33em;
+  margin: 0 auto;
+  font-size: var(--t-read);
+}
+
+/* The editor's own mirror. Same job and same rules as `.capture-mirror`, and
+   the properties that decide where a character lands are copied onto it by
+   lib/caret.ts from whichever field it is pointed at. */
+.editor-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.reader {
+  cursor: var(--cursor-text);
+}
+
+/* The rest of the screen under the strip: nothing to look at, and the place
+   to tap to start writing at the end of the note. It is the 60dvh the reader
+   used to carry, moved to the far side of the verbs so the strip can sit
+   where a chat message's own strip sits — against the last line. */
+.sheet-rest {
+  min-height: 50dvh;
+  cursor: var(--cursor-text);
+}
+
+/* --- link preview ----------------------------------------------------------
+   A saved URL gets a local unfurl made from its own title and domain. The tile
+   is deliberately a quiet domain mark rather than a remote screenshot: the
+   note remains useful offline and no third-party metadata request can block it.
+   -------------------------------------------------------------------------- */
+
+/* The open note's boxes above and below the text state its measure in the
+   text's own ems — `calc(33 * var(--t-read))` — rather than `33em`, which in a
+   box set at 16px (or 10.5px mono) is a narrower column, centred, and so
+   indented from the words on both sides. */
+.link-preview {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  max-width: calc(33 * var(--t-read));
+  min-width: 0;
+  margin: 0 auto 18px;
+  padding: 0;
+  overflow: hidden;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--rule-soft);
+  text-decoration: none;
+}
+
+.link-previews {
+  max-width: calc(33 * var(--t-read));
+  margin: var(--s-7) auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.link-previews .link-preview {
+  margin: 0;
+}
+
+/* One box and the button that puts it away. The button is the box's sibling,
+   laid over its top-right corner — never inside the anchor, where a press
+   would also follow the link. It is a full `--hit` square (`.iconbtn`), so the
+   copy leaves its width clear whether or not the button is showing: a box that
+   re-wrapped its title when the pointer arrived would move under the reader. */
+.link-preview-item {
+  position: relative;
+}
+
+.link-preview-item .link-preview-copy {
+  padding-right: calc(var(--hit) - 6px);
+}
+
+/* Quiet: on the ramp's `--muted`, rising to the ink under the pointer and
+   when pressed, like every other mark that dismisses. */
+.link-preview-hide {
+  position: absolute;
+  top: 0;
+  right: 0;
+  color: var(--muted);
+}
+
+.link-preview-hide:active {
+  color: var(--ink);
+}
+
+/* A pointer that hovers is shown the button when it is over the box or when
+   the keyboard is on it. A finger has no hover, so on touch it is always
+   there (the rule above is all it needs). */
+@media (hover: hover) and (pointer: fine) {
+  .link-preview-hide {
+    opacity: 0;
+  }
+
+  .link-preview-item:hover .link-preview-hide,
+  .link-preview-hide:focus-visible {
+    opacity: 1;
+  }
+
+  .link-preview-hide:hover {
+    color: var(--ink);
+  }
+}
+
+/* "Show 5 more" and "3 hidden · show": a count and the verb that acts on it,
+   `--muted`, no box, in words like every control (UI-01). A thumb tall
+   and flush with the previews' own edge. */
+.link-previews-row {
+  align-self: flex-start;
+  min-height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+  text-align: left;
+}
+
+.link-previews-row:active {
+  color: var(--ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link-previews-row:hover {
+    color: var(--ink);
+  }
+}
+
+.link-preview-compact {
+  flex: 0 1 auto;
+  min-height: 58px;
+  margin: 0;
+  border-color: var(--rule);
+}
+
+.link-preview-compact .link-preview-thumb {
+  flex-basis: 48px;
+}
+
+.link-preview-compact .link-preview-copy {
+  gap: 2px;
+  padding: 6px 8px 6px 0;
+}
+
+/* On a card the row is one line, and it says so outright rather than leaning
+   on `nowrap` to beat the clamp it inherits. A card is a fixed height and the
+   preview is inside a `max-height` box on it, so nothing here could shift
+   anything — this is only about the two declarations agreeing. */
+.link-preview-compact .link-preview-title {
+  white-space: nowrap;
+  -webkit-line-clamp: 1;
+}
+
+/* A page with no picture gets an outlined square on the ground, not a filled
+   one (review UI-27). It was --raised, the shade the app keeps for chrome that
+   is switched on, so on a card it read as a pressed control inside a note —
+   and §5 says never to spread --raised to a card. A picture, when there is
+   one, covers the square exactly as before. */
+.link-preview-thumb {
+  position: relative;
+  flex: 0 0 68px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  border-right: 1px solid var(--rule-soft);
+  color: var(--muted);
+}
+
+.link-preview-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.link-preview-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 12px 10px 0;
+}
+
+.link-preview-domain {
+  color: var(--muted);
+  /* The site is the part that says where a link goes: cut, it says so. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two lines, and that is a bound on a *layout shift*, not a taste about
+   titles.
+   ---------------------------------------------------------------------------
+   A preview is drawn from the note's own words the instant it is on screen and
+   is then quietly replaced by the page's real metadata when the background
+   fetch lands (`needsUnfurl`). The local title is usually one line; a real
+   `og:title` can be five, and the whole open note below it moved down by four
+   lines a second after it had been read. Unfurling still adds its description
+   — that is the thing arriving, and it is already clamped to two — but the
+   *title* growing without limit was the part that made the note jump. */
+.link-preview-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  font-weight: 700;
+  line-height: var(--lh-item);
+  text-overflow: ellipsis;
+  text-wrap: pretty;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.link-preview-url {
+  overflow: hidden;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-data);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-preview-description {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--t-text);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.link-preview-compact .link-preview-description {
+  display: none;
+}
+
+.link-preview-interactive:hover {
+  background: var(--raised);
+}
+
+/* One address on a card: the picture box, three card lines tall, exactly as
+   it has always been. `.link-preview-compact` is 58px and three line boxes are
+   58.5, so one fits and that is the whole of what this box is for. */
+.card-link-previews {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(3 * var(--card-lh));
+  overflow: hidden;
+}
+
+/* Several addresses on a card: a ledger, one line each, no pictures.
+   ---------------------------------------------------------------------------
+   This box used to hold the picture boxes too, two of them and a "+N links"
+   line — inside a `max-height` of 58.5px, against a `min-height` of 58. So a
+   note with ten addresses in it rendered three children, showed the first, and
+   clipped the other two away without a mark: the card was indistinguishable
+   from a note with one link in it, which is exactly what the owner reported
+   (2026-09-19). A line per link fits what it draws.
+
+   `--card-link-lines` is set on the element by `NoteCard`, because a note that
+   is *nothing but* addresses has no words to print underneath and the strip
+   takes the card. Three is the fallback and the ordinary case; `face.ts`'s
+   `LINK_STRIP_LINES` is the same number and `constants.test.ts` holds them
+   together. No gap: the lines sit on the card's own line box, so a link line
+   is set exactly like a line of the note's words and the two shapes stack
+   without a seam. */
+.card-link-list {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(var(--card-link-lines, 3) * var(--card-lh));
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+
+/* Name at the leading edge, site at the trailing one — the Links row's order,
+   for the Links row's reason: the left edge is what is read down, so it has to
+   be the half that tells two notes apart. The site never squeezes the name; it
+   is the name that gives way, because a domain cut in half says nothing. */
+.card-link-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  height: var(--card-lh);
+  line-height: var(--card-lh);
+}
+
+.card-link-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--t-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-link-site {
+  flex: 0 0 auto;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The count, on the last line the strip has. Set in the machine face like
+   every other number the app states about itself. */
+.card-link-more {
+  height: var(--card-lh);
+  line-height: var(--card-lh);
+  color: var(--muted);
+}
+
+/* A link is the one thing in a note that is not just text, and it is marked
+   without a colour, because the app has none.
+
+   It is set at the top of the ramp — brighter and warmer than the words
+   around it, 1.37:1 above them — and underlined. Two signals, and both are
+   needed: the tonal lift alone is too quiet inside a paragraph, and an
+   underline alone is what every other underlined thing in the app already
+   looks like. Together an address is the brightest thing in the note, which
+   is exactly what it is.
+
+   The underline is set off the baseline far enough to clear Baskerville's
+   descenders, and it is 1px because the rules everywhere else in the app are
+   1px — an address is not a heavier statement than a card's own edge. */
+.reader a {
+  color: var(--signal);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: var(--cursor-pointer);
+}
+
+/* Hovered, it inverts — the app's existing word for "this one", rather than a
+   second colour it does not have. */
+.reader a:hover {
+  background: var(--signal);
+  color: var(--signal-ink);
+  text-decoration: none;
+}
+
+/* --- what the user marked: one line grid -----------------------------------
+   Four marks, and every one of them is still characters in the note: "**",
+   "*", "`" and "#". They are kept in the string, so the rendered note still
+   equals the stored note character for character and a tap still lands on the
+   character it looks like it landed on.
+
+   THE RULE HERE IS THAT READING AND WRITING ARE ONE PICTURE (2026-09-17).
+   Tapping a note swaps this reader for a plain textarea, and a textarea can
+   only draw every character at one size, on one leading, with no margins. The
+   reader used to set a heading at --t-name with air above it, lists on a
+   tighter leading with gaps between items, marks and fences hidden, code in the
+   machine face in a ruled box — and so every tap into a formatted note threw
+   the whole page around under the finger, which the owner asked never to
+   happen. So nothing in here may change where a character lands:
+
+   - no size, no leading, no margin, no padding, no other face on any run;
+   - the marks and fences are DRAWN, in `--muted`, instead of hidden;
+   - emphasis is carried by what costs no width — a stroke, a slant of the
+     roman, a tone, a line under or through.
+
+   Bold is `-webkit-text-stroke` over the regular cut rather than the bold cut,
+   because the bold cut is wider and re-breaks the line. Italic is the regular
+   cut slanted (the "Libre Baskerville Roman" alias above, which has no italic
+   face for the browser to prefer), because the real italic is narrower. Both
+   are synthesised on purpose and both keep every advance width identical to
+   the textarea's. Cards are unaffected: they are never edited in place, and
+   keep the real cuts.
+   -------------------------------------------------------------------------- */
+
+.reader .note-mark {
+  color: var(--muted);
+}
+
+/* A note opened from a search result, until it is tapped into: the card's own
+   emphasis, said once more (`.card-body[data-dim]` above, `NoteReader`). The
+   note steps down to --muted and the words the query matched stand at --ink,
+   so the eye lands where the card pointed — and then the page opens round them:
+   the muted words hold for a beat and come up to ink over `LIT_MS` (`lit`
+   below; only the words that are not hits move, so the hits are what was lit
+   first). It is a tone and nothing else — no weight, no box, no underline —
+   because the one-line-grid rule below holds here too: a hit may not move a
+   character. The animation has no fill, so when it ends every word stands at
+   its own tone and nothing was ever restyled. `data-dim` is written only where
+   a hit is actually drawn, and the note drops it for good at the first tap,
+   which ends the breath at once, so the page being written on is never the
+   dimmed one. Under reduced motion there is no breath: the dim stays as it
+   always was, until the first tap (the block below).
+
+   An address steps down with the rest (it keeps its underline, which is what
+   says it is an address) or it would out-shine the hits; `:not(:hover)`
+   leaves the hover's inversion to the rule that owns it. */
+@keyframes lit {
+  0%,
+  30% {
+    color: var(--muted);
+  }
+}
+
+@keyframes lit-rank {
+  0%,
+  30% {
+    color: var(--invert);
+  }
+}
+
+/* The animations sit on every address, hovered or not: a selector that let go
+   of an address under the pointer would restart its breath each time the
+   pointer left it, and the link would blink back to muted. */
+.reader[data-dim="true"],
+.reader[data-dim="true"] a {
+  animation: lit var(--lit-ms) var(--ease-enter);
+}
+
+.reader[data-dim="true"] [data-hit="true"],
+.reader[data-dim="true"] [data-hit="true"] a {
+  animation: none;
+}
+
+.reader[data-dim="true"] [data-hit="true"],
+.reader[data-dim="true"] [data-hit="true"] a:not(:hover) {
+  color: var(--ink);
+}
+
+/* The card's ranking said again (`.card-body[data-ranked]` above): the line
+   the note opened on keeps its hits at --ink, every other hit one tone down
+   and rising to ink with the rest. */
+.reader[data-ranked="true"] [data-hit="true"]:not([data-best="true"]),
+.reader[data-ranked="true"] [data-hit="true"]:not([data-best="true"]) a {
+  animation: lit-rank var(--lit-ms) var(--ease-enter);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader[data-dim="true"],
+  .reader[data-dim="true"] a:not(:hover) {
+    color: var(--muted);
+    animation: none;
+  }
+
+  .reader[data-dim="true"] [data-hit="true"],
+  .reader[data-dim="true"] [data-hit="true"] a:not(:hover) {
+    color: var(--ink);
+  }
+
+  .reader[data-ranked="true"] [data-hit="true"]:not([data-best="true"]),
+  .reader[data-ranked="true"] [data-hit="true"]:not([data-best="true"]) a:not(:hover) {
+    color: var(--invert);
+    animation: none;
+  }
+}
+
+/* A heading is the marks in muted and its words at the bolder stroke — the
+   same appearance inline bold has, which is the old two-levels objection come
+   back, and accepted: the `# ` in front of it is what tells the two apart. */
+.heading {
+  display: block;
+  -webkit-text-stroke: 0.45px currentColor;
+}
+
+.heading .note-mark {
+  -webkit-text-stroke: 0;
+}
+
+.em[data-strong="true"] {
+  font-weight: 700;
+}
+
+.em[data-em="true"] {
+  font-style: italic;
+}
+
+.reader .em[data-strong="true"] {
+  font-weight: 400;
+  -webkit-text-stroke: 0.45px currentColor;
+}
+
+.reader .em[data-em="true"] {
+  font-family: var(--body-roman);
+  font-style: italic;
+}
+
+/* A snippet inside a sentence, on a card: the machine face and a hairline. */
+.inline-code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  padding: 0 0.25em;
+  border: 1px solid var(--rule-soft);
+  border-radius: 0;
+  white-space: pre-wrap;
+}
+
+/* In the open note it keeps the reading face and says "code" with its own
+   backticks, drawn, and a dotted line under it. */
+.reader .inline-code {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  text-decoration: underline dotted var(--muted);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* --- list items in a note -------------------------------------------------
+   A dash or a tick box. The item is still a block — the grip, the drag and
+   the drop rule all need a box to hang from — but a block on the prose
+   leading with nothing between items, so it lands exactly where the textarea
+   puts that line. The newline above an item is drawn outside it and the one
+   that ends it inside it; see NoteView for why that pairing reproduces the
+   textarea's blank lines exactly.
+   -------------------------------------------------------------------------- */
+
+.item {
+  position: relative;
+  display: block;
+}
+
+/* The grip stands in the margin, left of the text, and takes nothing from
+   the line — `.sheet-body` pays for the room. */
+.item-grip {
+  position: absolute;
+  left: -20px;
+  top: calc((var(--lh-read) * 1em - 18px) / 2);
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  color: var(--muted);
+  cursor: var(--cursor-grab);
+  /* The page must not scroll out from under a drag on a phone. */
+  touch-action: none;
+  /* Over the tick box's widened hit area (`.check-hit::after`), which shares
+     this margin: where the grip is drawn, a press is a drag; above and below
+     it, the margin ticks. */
+  z-index: 1;
+}
+
+.item-grip:active {
+  cursor: var(--cursor-grabbing);
+  color: var(--ink);
+}
+
+/* In the air: lifted off the paper, following the finger, and drawn on its own
+   opaque ground so the items it passes over do not read through it. */
+.item[data-lift="true"] {
+  position: relative;
+  z-index: 2;
+  background: var(--raised);
+  cursor: var(--cursor-grabbing);
+}
+
+/* Where it will land. A rule in the gap rather than a moving gap, so nothing
+   below it shifts while the finger is still deciding.
+
+   Drawn as an absolutely positioned bar and not as `box-shadow: 0 ±1px 0`.
+   That was the same 1px of ink and took no layout either, and it was still
+   wrong: this system has no shadows at all, and the one written down as an
+   example of what not to do is precisely a box-shadow standing in for a rule.
+   A rule with no exceptions survives; a rule with one good exception in the
+   codebase is one the next person generalises from. */
+.item[data-drop="above"]::before,
+.item[data-drop="below"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--ink);
+  pointer-events: none;
+}
+
+.item[data-drop="above"]::before {
+  top: -1px;
+}
+
+.item[data-drop="below"]::after {
+  bottom: -1px;
+}
+
+/* The tick box: a real button, set exactly as the characters it is. It
+   answers the finger through a pseudo-element rather than by growing, so no
+   line moves: `--hit` tall, and wide — out into the margin the drag grip
+   shares (the grip stands over it, so a press on the grip is still a drag),
+   and in over the item's first characters (owner approved 2026-10-05, review
+   QA-07). Measured, the box answered an 18×27px patch, and ticking a
+   shopping list is a daily one-thumb job. */
+.check-hit {
+  position: relative;
+  display: inline;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: 0;
+  color: var(--ink);
+  cursor: var(--cursor-pointer);
+}
+
+.check-hit::after {
+  content: "";
+  position: absolute;
+  left: -20px;
+  /* A thumb's worth from the box's left edge, past the grip's margin: 44px of
+     the row answer the tick whatever the reading size, where 1.5em past the
+     box came to 44 only at 16.5px (2026-10-13, review QA-03). */
+  width: calc(20px + var(--hit));
+  top: 50%;
+  height: var(--hit);
+  transform: translateY(-50%);
+}
+
+.check-hit:active {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+.item[data-done="true"] .item-words {
+  color: var(--muted);
+}
+
+.item[data-done="true"] .check-hit {
+  color: var(--muted);
+}
+

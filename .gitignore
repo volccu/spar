@@ -1,0 +1,71 @@
+# Real Keep export — never commit personal notes
+/Takeout/
+
+# Secrets. Any .env variant is local; only the examples are shared.
+.env
+.env.*
+!.env.example
+web/.env
+
+# Per-machine Claude Code settings
+.claude/
+
+# Throwaway Phase 0 data & generated reports
+notes.db
+notes.db-*
+*.report.html
+/reports/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Subagent-driven-development scratch
+/.superpowers/
+
+# Design prototypes and scratch. Standalone HTML pages a look was drawn in
+# before it was built, plus whatever else a session needs somewhere to put.
+# They are kept on disk because they are worth re-opening, and untracked
+# because none of them is the app: once a look ships, styles.css is the copy
+# that is true and the prototype is a second one that quietly goes stale.
+/TEMP/
+
+# Review working folders: screenshots, scans and raw findings behind each app
+# review (the finished report goes to docs/audits/). ~100 MB of pictures that
+# `update-server.ps1`'s `add -A` would otherwise sweep in (audit 2026-10-10, SEC-5).
+/review/
+
+# Generated SQL dumps (one-shot)
+supabase-import.sql
+output-test.sql
+
+# Seeded real notes for the web app — personal data, regenerate with `npm run seed`.
+# Named explicitly, not as a directory (web/src/seed/), so fixture.json — the
+# tracked, synthetic file a fresh checkout (CI included) seeds from instead —
+# stays visible to git; excluding the whole directory would hide it too, and
+# a later "!" negation can't undo that once the parent directory is excluded.
+web/src/seed/notes.json
+web/dist/
+web/dist-demo/
+server/dist/
+
+web/*.tsbuildinfo
+
+# A test kept on the PC but out of the project, by the owner (2026-09-25).
+# It was swept in by update-server.ps1 rather than chosen; ignored here so a
+# future run cannot pick it up by accident again. The file stays on disk and
+# vitest still runs it locally.
+web/src/App.reminders.test.tsx
+
+# Browser checks (web/playwright.config.ts): reports and failure pictures. The baselines
+# are committed once CI has taken them; see docs/browser-checks.md.
+web/e2e/results/
+web/e2e/report/
+
+# OS junk, logs and temp files (tidy-up 2026-10-22)
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log
+*.tmp
+coverage/

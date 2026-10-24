@@ -1,0 +1,20 @@
+-- 0018_prefs_inbox_since.sql — where the Inbox starts.
+--
+-- The Inbox is the landing board and it holds the notes that were never filed (SPEC §6). For an
+-- archive that predates it that is 237 notes on the first morning, which is a bill rather than a
+-- landing page — so the app asks once whether that pile is the Inbox or a backlog to leave alone,
+-- and stores the answer as a single date. Unfiled notes older than it stay active, stay on Recent
+-- and stay in search; they are simply not part of the pile the Inbox offers to clear.
+--
+-- **Nothing about this touches a note.** It is one nullable column on the one-row-per-person
+-- preferences table (migration 0014, repurposed in 0016), beside the folder list — the same kind of
+-- thing, and the same conflict rule already carries it: `store/boardSync.ts` pushes only when this
+-- device actually changed something, so a device that has never been asked takes the answer given
+-- on the other one instead of overwriting it with a blank.
+--
+-- Null means the question has not been answered anywhere yet. The epoch means "the whole pile is
+-- the Inbox", which is what "Sort them" and the menu's *Bring in the old notes* both write — one
+-- value carrying both answers, rather than a second column saying whether the first one counts.
+--
+-- Safe to run more than once.
+alter table public.prefs add column if not exists inbox_since timestamptz;

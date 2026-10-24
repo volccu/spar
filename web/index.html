@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- One tag, the first-paint value only: the dark ground, which
+         theme-boot.js below turns to the light paper on a device that chose
+         light, and themeColor.ts then rewrites from the resolved --paper
+         whenever the theme changes, so the stylesheet stays the single
+         definition of the ground. -->
+    <meta name="theme-color" content="#0c0a08" />
+    <!-- Puts data-theme (and data-motion) on <html> before anything paints,
+         so a light device never opens on a flash of black. A file, not an
+         inline script: the CSP is script-src 'self'. Synchronous on purpose,
+         and precached by the service worker like the rest of the shell. -->
+    <script src="/theme-boot.js"></script>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Without this the browser asks for /favicon.ico on every load and 404s. -->
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!-- Self-hosted, and preloaded so the first paint is already in the right
+         faces. Three faces, three jobs, one file each on the critical path:
+         the user's words, the names of things, and the machine. The latin cuts
+         cover Swedish and Finnish; the ext files load only if something on
+         screen actually needs them.
+         The Baskerville bold and italic are preloaded too (2026-09-17). Left
+         to load on first use they arrived after the text was laid out in the
+         fallback, and every bold or italic line — a link's title, a card's
+         heading, an empty board's aside — re-broke under the reader a moment
+         later. The service worker precaches every .woff2 at install anyway, so
+         this costs a first visit two small files and every later open nothing. -->
+    <link
+      rel="preload"
+      href="/fonts/libre-baskerville-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/libre-baskerville-bold-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/libre-baskerville-italic-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/marcellus-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/plex-mono-400-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <!-- iPhone's home screen takes this rather than a screenshot of the page.
+         The icon is on the paper ground already, with no transparency. -->
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!-- The picture a pasted link shows (review GD-04): the app's own look, the
+         mascot, the wordmark, About's line and a slice of cards. Named by the
+         public demo's full address, since some scrapers refuse a relative one
+         (review PS-02); the file itself is public/og.png, in every build. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://spar.willemaki.com/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://spar.willemaki.com/og.png" />
+    <title>spår</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

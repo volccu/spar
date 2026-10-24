@@ -1,0 +1,1352 @@
+/* --- a card that is a search result -----------------------------------------
+   The face has already wound forward to the line the match is on (`face.ts`).
+   This is the other half: the context drops one step down the ramp and the
+   words actually matched stay at full ink, so the eye lands on the hit rather
+   than reading the card to find it.
+
+   No new tone and no colour: it is the same step the tag line takes, used for
+   the same reason.
+
+   **The condition is a hit being drawn, not a query being run.** This used to
+   key on `.card[data-search="true"]`, which is true of every card on screen the
+   moment anything is typed — so a result that matched on an attachment's
+   filename, or on a word that only ever appeared inside an address the face
+   strips, had its whole body stepped down the ramp with nothing standing back
+   up at full ink. The user's own words were being dimmed to report that a
+   search was running, which is the same failure `data-filed` was taken off the
+   card for. The face therefore marks the container itself: `data-dim="true"` is
+   set only where at least one `[data-hit="true"]` is actually rendered inside,
+   so a result with nothing to point at reads exactly like the note it is, and
+   an ordinary board is untouched because the attribute is never written at all.
+
+   Every face that carries words a hit can land in says it the same way — the
+   text face's `.card-body`, the checklist's own `<ul>`, and the Links row's
+   title — because a hit inside a tick box is the same fact as a hit inside a
+   paragraph. They are named one by one rather than matched on the attribute
+   alone: a bare `[data-dim="true"] [data-hit="true"]` weighs (0,2,0), which
+   ties with `.check-item[data-done="true"]` and loses to it on order, so a
+   matched word inside a ticked-off item would have stayed muted — the one
+   place in the card faces where a hit is hardest to see already. */
+.card-body[data-dim="true"],
+.check-list[data-dim="true"],
+.card-row-title[data-dim="true"] {
+  color: var(--muted);
+}
+
+.card-body[data-dim="true"] [data-hit="true"],
+.check-list[data-dim="true"] [data-hit="true"],
+.card-row-title[data-dim="true"] [data-hit="true"] {
+  color: var(--ink);
+}
+
+/* Several words, and one line holding the most of them (`bestLine`,
+   `data-ranked`): that line's hits keep --ink and every other hit steps one
+   tone down to --invert, still well above the --muted words around it. The
+   line that answers the whole query is then the brightest thing on the card,
+   not merely the first of many marked words (review 2026-10-04, UI-A-11). A
+   tone and nothing else, as every hit is. Declared before the inverted card's
+   rule below, which ties with it on weight and has to win. */
+.card-body[data-ranked="true"] [data-hit="true"]:not([data-best="true"]),
+.check-list[data-ranked="true"] [data-hit="true"]:not([data-best="true"]) {
+  color: var(--invert);
+}
+
+/* An inverted card stands the whole thing down, and it has to.
+   ---------------------------------------------------------------------------
+   Selected, a card becomes a light --invert slab and everything on it is drawn
+   in --paper — the state grammar's "anything inside an inverted panel must be
+   darker than the fill". The two rules above knew nothing about that: the dim
+   painted --muted and the hit painted --ink straight onto the bone, so the
+   matched words — the one thing a search result exists to show — went to
+   roughly 1.4:1 and vanished on any card the user had picked. Neither rule was
+   losing a specificity fight; they were simply the only rules naming those
+   elements, so nothing on the inverted card ever spoke for them.
+
+   So both go back to --paper here, at (0,4,0), which settles it by weight
+   rather than by where this happens to sit in the file. The hit is then exactly
+   as legible as the words around it and never less — 9.66:1 on the slab, the
+   same as every other word on a selected card — and that is the whole of what
+   is owed, because there is no step *below* --paper on a light slab to
+   emphasise it with and inventing one would be a tenth tone. A card you have
+   picked is also not one you are scanning: the dim exists so the eye can find
+   the hit on a board of results, and this is the result you found.
+   (`.card-body`'s own `opacity: 0.9` in the selection block applies to its
+   whole subtree, hits included — opacity is a group, so no child of it can
+   ever be drawn stronger than the parent.) */
+.card[data-selected="true"]
+  :is([data-dim="true"], [data-dim="true"] [data-hit="true"]) {
+  color: var(--paper);
+}
+
+/* A tag line is not the note. It is the word a Keep import left on line one,
+   and on the Inbox four cards in a row open with the same one — so it steps
+   a step down the ramp, at the card's own size, in the user's own face.
+   Never when it is the only line: then it is the note and keeps full ink
+   (`cardLines` in face.ts). */
+.card-line[data-tag="true"] {
+  color: var(--muted);
+}
+
+/* The break, at half price — see `cutToLines` in face.ts, which charges it
+   the same 0.5. The two must agree or the card overflows the budget the cut
+   was measured against. */
+.card-line:empty {
+  height: calc(var(--card-lh) / 2);
+}
+
+.storage-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--raised);
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--t-data);
+}
+
+/* Two ways out of one warning — ask again, or stop asking — kept together at
+   the row's trailing end so the banner stays the two-part shape it already
+   has: what happened, and what you can do about it. */
+.storage-warning-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.storage-warning button {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: inherit;
+  cursor: var(--cursor-pointer);
+  font: inherit;
+}
+
+/* Code keeps the machine face on the card, but not its fence lines, and sits
+   on the open note's panel ground (`.codeblock`). Each line paints its own
+   stretch, so a run of them reads as one panel, inset by --s-3 (the card body
+   clips anything carried out into its padding). One line of code is one line
+   of the card: never wrapped, its indentation kept, a long line giving way
+   with an ellipsis, so the card shows the code's shape (2026-10-23; the budget
+   charges it one line, `cutToLines`). The card remains a line-budgeted preview
+   rather than a second editor. */
+.card-line[data-code="true"] {
+  font-family: var(--mono);
+  font-size: var(--t-text);
+  letter-spacing: 0;
+  padding-inline: var(--s-3);
+  background: var(--rule-faint);
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-code-fence {
+  display: none;
+}
+
+/* An item is pulled in tight and given air above instead — the same trade the
+   open note makes, sized so the pair still measures one --card-lh. The gap goes
+   above every item that isn't the first, including one that follows a plain
+   line, which is where a list starts. */
+.card-item {
+  display: block;
+  line-height: var(--card-item-lh);
+}
+
+.card-item:not(:first-child) {
+  margin-top: var(--card-item-gap);
+}
+
+/* "1." and "10." are not the same width, so their words land on different left
+   edges and the list reads ragged. A column fixes it, and tabular figures fix
+   it again for fonts that have them. A dash is exempt: every dash is already
+   the same width, and a column would only push the text away from it. */
+.card-mark[data-num="true"] {
+  display: inline-block;
+  min-width: 1.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The pen (`Pen`, `STRIKE_MS`): a ticked item's words are crossed out by a
+   drawn 1px line in the words' own tone, left to right, as the words settle to
+   --muted. A background on an inline box, never a text decoration, so it
+   moves no character, and `clone` gives every line of a wrapped item a line of
+   its own. The transition only runs when the item's own `data-done` changes:
+   an item already ticked on first paint is simply struck. The same rule draws
+   it on the card's lists, the open note and the Ticker, and un-ticking wipes it
+   back the other way. */
+.pen {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 var(--pen-at);
+  background-size: 0% 1px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-size var(--strike-ms) var(--ease-enter);
+}
+
+:is(.card-item, .check-item, .item)[data-done="true"] .pen,
+.ticker-item[data-done] .pen {
+  background-size: 100% 1px;
+}
+
+/* The words settle to muted with the pen only where a tick is the thing being
+   watched: the open note and the Ticker. On a card the tone is inherited from
+   states that change at once (selected, a search's dim, the theme), and a
+   colour transition there left the words lagging behind the rest of the card. */
+:is(.reader, .ticker-item) .pen {
+  transition:
+    background-size var(--strike-ms) var(--ease-enter),
+    color var(--strike-ms) var(--ease-enter);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pen,
+  :is(.reader, .ticker-item) .pen {
+    transition: none;
+  }
+}
+
+.card-item[data-done="true"] {
+  color: var(--muted);
+}
+
+/* The strike is a drawn line on the words (`.pen`, below), so the marker keeps
+   its "[x]" whole beside them (review UI-25) without any help. */
+
+/* A cut card fades its last line out rather than stopping mid-word — but only
+   that line, and only sideways.
+   -----------------------------------------------------------------------
+   This used to be a mask fading the whole final line box top to bottom, which
+   dimmed the entire line uniformly and then cut it off dead at the same
+   height every other line already ends at. That reads as one darker line
+   sitting above a hard edge, not as text running on past the edge — which is
+   backwards, because a line of prose doesn't get dimmer as you read it, it
+   runs out of room. The eye already expects the *end of the line*, on the
+   right, to be where a sentence trails off; a vertical fade was answering a
+   question nobody was asking.
+
+   So the last line now fades left to right — legible where reading stops
+   being interrupted, gone by the edge the text is actually cut off at — and
+   every line above it stays at full ink, because only the last one is
+   unfinished.
+
+   It is not a mask. It is an opaque overlay in the surface's own colour,
+   because that lets the fade sit *in front of* the text without touching the
+   text's own alpha — a mask over the whole line dims the ink itself, which is
+   what made the old version read as "dimmer" rather than "ending". Painting
+   over it instead makes letters vanish behind the surface exactly the way
+   they would if the card were narrower, which is the effect a trailing edge
+   is supposed to have.
+
+   The surface it fades into is --cut-bg, not a literal colour, because the
+   card is not always the same colour: selected, it inverts to
+   --invert (set below, beside the other overrides that state already makes),
+   and the fallback covers every other case, where the card is simply --card.
+   color-mix eases three intermediate stops so the covering itself doesn't
+   read as a hard-edged block — same reasoning as the vertical version this
+   replaced, just turned 90 degrees. */
+.card-body[data-cut="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--card-lh);
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    transparent 46%,
+    color-mix(in srgb, var(--cut-bg, var(--card)) 22%, transparent) 64%,
+    color-mix(in srgb, var(--cut-bg, var(--card)) 62%, transparent) 80%,
+    color-mix(in srgb, var(--cut-bg, var(--card)) 90%, transparent) 92%,
+    var(--cut-bg, var(--card)) 100%
+  );
+  pointer-events: none;
+}
+
+/* --- file face -------------------------------------------------------------
+   A note that is a file and nothing else shows the file. For an image that is
+   the picture, which is the entire reason this beats hunting through a folder:
+   you recognise a screenshot without reading anything. The thumbnail travels
+   inside the note itself, so it is already here when the note arrives.
+
+   The picture fills the same box the text would have filled — exactly
+   --card-lines of them — so a file card is the same height as every other card
+   and the grid stays a grid.
+   -------------------------------------------------------------------------- */
+
+.card-shot {
+  flex: 0 0 auto;
+  width: 100%;
+  height: calc(var(--card-lines) * var(--card-lh));
+  object-fit: cover;
+  /* The picture is the note's own content, not chrome; a border here would
+     draw a frame inside a frame. */
+  display: block;
+  background: var(--rule);
+  opacity: var(--shot-opacity);
+  transition: opacity 160ms var(--ease-enter);
+}
+
+/* A document page is a negative, read from its top (review GD-01). A PDF's
+   first page is white paper with black type: at the picture's 0.68 it came out
+   a flat grey slab (≈#b1b0b0), the brightest block on the board, and cropped
+   to its middle it lost the heading — the one line that says which document it
+   is. Inverted, the paper falls to the ground and the type comes up in the
+   ramp's own warm light, at full opacity because there is no glare left to
+   damp; anchored at the top, the title is what shows. Photographs are left
+   exactly as they are: their tones are the picture. */
+.card-shot[data-doc="true"] {
+  object-position: top;
+  filter: var(--doc-filter);
+  opacity: 1;
+}
+
+/* A card that is several files and no words: squares, two rows of them, the
+   same crop the strip under a note's words uses. Where the face is wide (a
+   desktop column) the first file takes two rows and two columns and the rest
+   follow it in small squares; where it is about as wide as it is tall (a
+   phone) they are all one size, four to a face, read left to right. Two files stand side by side
+   at the largest square that fits. The row runs to the card's right edge and
+   fades there when it holds more than fits, as the strip does; the footer's
+   file mark says how many.
+
+   The face is a size container so a square can be sized off its height
+   (`cqh`), which is the one length the card fixes. */
+.card-file-grid {
+  --fade-w: calc(var(--card-lines) * var(--card-lh) / 2);
+  position: relative;
+  flex: 0 0 auto;
+  height: calc(var(--card-lines) * var(--card-lh));
+  margin-right: -13px;
+  overflow: hidden;
+  container-type: size;
+}
+
+/* Narrow: two to a row, read left to right, a third row cut off below. */
+.card-file-scroll {
+  height: 100%;
+  overflow: hidden;
+}
+
+.card-file-squares {
+  --sq: calc((100cqh - var(--s-3)) / 2);
+  display: grid;
+  grid-template-columns: repeat(2, var(--sq));
+  grid-auto-rows: var(--sq);
+  gap: var(--s-3);
+  width: max-content;
+  height: 100%;
+}
+
+/* Wide: two rows, filled a column at a time after the large first square, so
+   the row runs on to the right and fades there. */
+@container (min-aspect-ratio: 3 / 2) {
+  .card-file-squares {
+    grid-template-columns: none;
+    grid-template-rows: repeat(2, var(--sq));
+    grid-auto-flow: column;
+    grid-auto-columns: var(--sq);
+  }
+
+  .card-file-squares > .card-file-tile:first-child {
+    grid-row: span 2;
+    grid-column: span 2;
+  }
+}
+
+.card-file-grid[data-count="2"] .card-file-squares {
+  display: flex;
+  align-items: flex-start;
+}
+
+.card-file-grid[data-count="2"] .card-file-tile {
+  flex: 0 0 auto;
+  width: min(calc((100cqw - 13px - var(--s-3)) / 2), 100cqh);
+  aspect-ratio: 1;
+}
+
+.card-file-squares .card-file-tile {
+  border: 1px solid var(--rule-soft);
+}
+
+/* A named file card: the name row over the picture takes its space out of the
+   picture, never out of the card, exactly as it does over an idea's canvas. */
+.card-idea-name + .card-shot,
+.card-idea-name + .card-file-grid {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  max-height: calc(var(--card-lines) * var(--card-lh));
+}
+
+.card-file-tile {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--card);
+}
+
+.card-file-tile .card-shot {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-file-tile .card-file {
+  height: 100%;
+  padding: 8px;
+}
+
+/* `--strip-lines` is `FILE_STRIP_LINES` in face.ts (`constants.test.ts`). */
+.card[data-has-files="true"] {
+  --strip-lines: 4;
+}
+
+.card[data-has-files="true"] .card-body,
+.card[data-has-files="true"] .check-list {
+  max-height: calc((var(--card-lines) - var(--strip-lines)) * var(--card-lh));
+}
+
+/* The files under a note's words: squares in a row, standing on the footer
+   rule so the pictures along a row of cards line up whatever the words above
+   them run to. The row runs to the card's own right edge (past the padding,
+   like the footer rule) and, when it has more than fits, fades into the card
+   there exactly as a cut line of text does — same surface, same stops. A
+   single picture used to stretch across the whole width as a letterbox crop;
+   every tile is now a square, so every picture is cropped the same way. */
+.card-attachment-strip {
+  --strip-h: calc(var(--strip-lines) * var(--card-lh) - 6px);
+  --fade-w: var(--strip-h);
+  position: relative;
+  flex: 0 0 auto;
+  height: var(--strip-h);
+  margin: auto -13px 0 0;
+  overflow: hidden;
+}
+
+.card-strip-row {
+  display: flex;
+  gap: var(--s-3);
+  height: 100%;
+  overflow: hidden;
+}
+
+/* The footer gives up its push to the floor: the strip has already taken it,
+   and two automatic margins would split the slack and float the strip. */
+.card[data-has-files="true"] .card-foot {
+  margin-top: 0;
+}
+
+.card-attachment-strip .card-file-tile {
+  flex: 0 0 auto;
+  height: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--rule-soft);
+}
+
+/* More than fits: the row slides sideways under a finger or a trackpad, and
+   only then — a row that fits keeps the card's `pan-y`, so a swipe across it
+   pages the board (`SWIPES_ITSELF` in useBoardPaging.ts). No scrollbar: the
+   fades are what say there is more. `contain`, so reaching the end of the row
+   never carries on into a back gesture or the page. */
+:is(.card-attachment-strip, .card-file-grid)[data-scrolls="true"] > :is(.card-strip-row, .card-file-scroll) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: none;
+}
+
+:is(.card-attachment-strip, .card-file-grid)[data-scrolls="true"]
+  > :is(.card-strip-row, .card-file-scroll)::-webkit-scrollbar {
+  display: none;
+}
+
+.card-attachment-strip[data-before="true"]::before,
+.card-file-grid[data-before="true"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  width: calc(var(--fade-w) / 2);
+  background: linear-gradient(
+    to left,
+    transparent 0%,
+    color-mix(in srgb, var(--cut-bg, var(--card)) 62%, transparent) 62%,
+    var(--cut-bg, var(--card)) 100%
+  );
+  pointer-events: none;
+}
+
+.card-attachment-strip[data-over="true"]::after,
+.card-file-grid[data-over="true"]::after {
+  z-index: 1;
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--fade-w);
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--cut-bg, var(--card)) 22%, transparent) 34%,
+    color-mix(in srgb, var(--cut-bg, var(--card)) 62%, transparent) 62%,
+    color-mix(in srgb, var(--cut-bg, var(--card)) 90%, transparent) 84%,
+    var(--cut-bg, var(--card)) 100%
+  );
+  pointer-events: none;
+}
+
+/* A file with no picture, in a square too small for its name: the mark and
+   the type, centred. The name is on the open note. */
+.card-attachment-strip .card-file {
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-2);
+}
+
+.card-attachment-strip .card-file-name {
+  display: none;
+}
+
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover .card-shot {
+    opacity: 1;
+  }
+}
+
+/* No picture to show: the mark for the family of thing it is, the type in its
+   own letters, and the name. The mark only names the family — a musical note,
+   a film strip, a table — and the extension text under it still says exactly
+   what the file is, which no drawing can: a .7z and a .tar.gz are both boxes.
+   In a tile too short for all three, whatever no longer fits is cut from the
+   bottom — the mark reads first, the name is on the open note anyway. */
+.card-file {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: calc(var(--card-lines) * var(--card-lh));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+
+/* The mark is a label, not a control: it reads at the same weight as the
+   type text beside it, never at ink. */
+.card-file .icon,
+.spatial-att-file .icon {
+  color: var(--muted);
+}
+
+.card-file-kind {
+  align-self: flex-start;
+  padding: 2px 6px;
+  border: 1px solid var(--rule);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-data);
+  color: var(--muted);
+}
+
+.card-file-name {
+  font-size: var(--t-text);
+  line-height: var(--card-lh);
+  color: var(--ink);
+  word-break: break-word;
+}
+
+/* --- checklist face ------------------------------------------------------- */
+
+/* A checklist row occupies exactly one body line box, so a to-do card and a
+   text card sit on the same grid and hold the same number of rows. That is
+   also what lets face.ts count hidden items with one number. */
+.check-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(var(--card-lines) * var(--card-lh));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--t-text);
+  line-height: var(--card-lh);
+}
+
+.check-item {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  /* Was `height: var(--card-lh)`, with the words ellipsised on one line. An
+     item is a whole thing: it may take a second line box, and the card shows
+     fewer of them rather than nine fragments you cannot read. --card-item-lh
+     + --card-item-gap still sum to --card-lh, so a one-line item costs
+     exactly what it always did (see face.ts's checklist budget). */
+  /* --card-item-lh, not --card-lh (review UI-07). With the full line box as
+     a floor, a one-line item stood 19.5px and then took its 3px gap on top,
+     so eight items needed 177px of a 156px list and the last one was cut off
+     the card without the cut mark saying so. */
+  min-height: var(--card-item-lh);
+  line-height: var(--card-item-lh);
+}
+
+.check-item + .check-item {
+  margin-top: var(--card-item-gap);
+}
+
+/* A box is machine data even when the words beside it aren't. */
+.check-box {
+  font-family: var(--mono);
+  font-size: var(--t-data);
+  letter-spacing: 0;
+  flex: 0 0 auto;
+}
+
+.check-item[data-done="true"] {
+  color: var(--muted);
+}
+
+/* The strike goes through the words and never the box (review UI-25): it is
+   the `.pen` on the words alone. */
+
+.check-text {
+  /* No clamp. The list is clamped as a whole by .check-list's max-height. */
+  overflow: hidden;
+}
+
+/* --- THE CUT -------------------------------------------------------------
+   The signature. Overflowing cards do not fade out softly — the text stops
+   at a hard rule and the mass hidden behind it is printed underneath. You
+   always know whether a card is the whole note or the tip of 15k characters.
+   ------------------------------------------------------------------------- */
+
+/* margin-top:auto, not just the body's flex-grow: a one-line note has almost
+   no body to push with, and the rule and date must still sit on the floor of
+   the card. Every card's foot lines up with every other card's foot.
+
+   The row mixes drawn marks (a fixed 14px box, see .icon-data) with text of
+   several kinds — mono counts, the tick-box characters, the date. Baseline
+   alignment lined up the text's own baseline and left every icon to be
+   nudged into place by hand (see the old .cut-mass / .card-link transforms,
+   now gone); one drawing forgotten was one drawing sitting a pixel off. This
+   centers every child on the row's own cross-axis instead, and line-height:1
+   here strips the text's default leading so a glyph's own box — not an
+   invisible line-box taller than it — is what gets centered. One rule for
+   the whole row, not one nudge per mark. */
+.card-foot {
+  flex: 0 0 auto;
+  /* Full bleed. The rule is the card's floor, so it runs the width of the
+     card the way the card's own edges do, instead of stopping at the 13px
+     the card pads its content by — the lattice gains a horizontal member,
+     and a cut card's fade (which paints in the card's own colour) ends on a
+     line instead of dissolving into the ground its neighbour is made of. */
+  margin: auto -13px 0;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  gap: 8px;
+  height: 22px;
+  padding: 8px 13px 0;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--muted);
+}
+
+/* The stamp is always last, and always hard right; whatever precedes it —
+   the marks box on a card, a bare link count on a canvas note, nothing at
+   all — packs to the left. */
+.card-foot > :last-child {
+  margin-left: auto;
+}
+
+/* A missed one-off reminder: "passed" in the open note's overdue grammar
+   (`.meta-overdue`) — full ink beside a 3px rule, the app's one error mark
+   (DESIGN.md §3) — on every board, not only the Reminders list (review
+   FX-B-04). `currentColor`, so the rule turns with a picked card's slab. */
+.card-foot[data-overdue="true"] .card-time {
+  color: var(--ink);
+  border-left: 3px solid currentColor;
+  padding-left: 6px;
+}
+
+.card[data-selected="true"] .card-foot[data-overdue="true"] .card-time {
+  color: var(--paper);
+}
+
+.card-time {
+  text-transform: none;
+  /* Nothing about shrinking is said here. The stamp holds its size because
+     `.card-foot > *` below says every child of the row does, and on a card the
+     marks box is the only child that rule is overridden for — see the
+     precedence note there.
+     A `flex: 0 0 auto` written here as well used to look like the rule that
+     protected the stamp, and did nothing at all: it ties with the row rule on
+     specificity and loses to it on order, so the comment beside it described a
+     precedence the stylesheet was not drawing. */
+  white-space: nowrap;
+}
+
+.card-foot[data-cut="true"] {
+  border-top-color: var(--rule);
+}
+
+.cut-mass {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink);
+}
+
+/* The cut mark is in the row on every card, carrying its icon only when there
+   is something under the cut — so on an uncut card it was an empty flex item,
+   and `gap` still charged 8px for it. That pushed the first *visible* mark 8px
+   right on every uncut card while a cut one started flush, so the marks did
+   not line up in a column down the board. The row is the one place this app
+   keeps every fact about a note; a ragged left edge on it is the same failure
+   the verb strip's `--t-read` measure exists to prevent.
+
+   It has to reach inside `.card-marks` as well as across the row's own
+   children, because that is where the cut mark now lives — written as a child
+   selector alone it stopped matching the moment the marks were boxed, and the
+   ragged left edge it exists to prevent came straight back. */
+.card-foot > :empty,
+.card-marks > :empty {
+  display: none;
+}
+
+/* --- when the row runs out of room -----------------------------------------
+   The footer is a fixed 22px band and the marks in it are unbounded: priority,
+   cut level, files, links, tick boxes, code, reminder, sync, folder, and the
+   stamp. On a narrow phone column a note carrying several of those has more
+   marks than width.
+
+   The row states a precedence rather than leaving it to the layout, and until
+   the marks were boxed the precedence it stated was the opposite of the one it
+   got. Every child was `flex: 0 0 auto`, the stamp included, so nothing could
+   give up a pixel; the negative free space simply overflowed the row to the
+   right and was clipped by the card's own hidden edge. The stamp is last in
+   source order, so the stamp is what went — the one thing this comment
+   promised would never go.
+
+   What makes it true is a box. `.card-marks` holds every mark, and it is the
+   only child of the row allowed to shrink: `min-width: 0` so the flex
+   algorithm may take it below its contents, and its own clipped edge so the
+   marks that no longer fit are cut off there rather than at the card's. Last
+   in its source order goes first, which is newest-added first, because each
+   mark is a footnote about the note while the stamp is a fact about the board
+   — the only ordering cue a card carries now that the board draws no period
+   rules, and a card whose position you cannot account for is the thing the
+   stamp exists to prevent. No mark is ever squashed: inside the box they keep
+   `flex: 0 0 auto` like everything else in the row, because a squashed drawing
+   is worse than an absent one.
+
+   Only the horizontal axis is clipped, and that is why this is `clip` rather
+   than `hidden`. `[ ]` is drawn as the characters it is everywhere else in
+   this app, and a bracket at `--t-data` on a `line-height: 1` row is taller
+   than its own line box, so a box that clipped both axes would shave the tops
+   and tails off the tick-box marks on every card that has one — trading a rare
+   overflow for a permanent nick. `hidden` on one axis forces the other to
+   `auto`, which clips it too; `clip` leaves the other axis at its initial
+   `visible`, so nothing is written for it here and nothing needs to be.
+
+   `min-width: 0` used to sit on the row-wide rule, where it could do nothing:
+   it only matters for an item that is allowed to shrink, and nothing there
+   was. It is on the one item that is. */
+.card-foot > * {
+  flex: 0 0 auto;
+}
+
+.card-foot > .card-marks {
+  display: flex;
+  align-items: center;
+  /* The row's own gap, restated: the marks are still spaced from each other
+     exactly as they were when they were the row's own children, and the same
+     8px still separates the box from the stamp. Change one and change both. */
+  gap: 8px;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow-x: clip;
+}
+
+/* The marks themselves, now that `.card-foot > *` no longer reaches them: the
+   box is a level deep, so without this they would fall back to the flex
+   default and be allowed to shrink, and the box above would have been
+   promising in a comment something the stylesheet did not say. The box gives
+   up room; the marks in it never do. */
+.card-marks > * {
+  flex: 0 0 auto;
+}
+
+.card[data-archived="true"] .cut-mass {
+  color: var(--muted);
+}
+
+/* Sits beside the cut mark in the footer, at the same data size, and drawn at
+   the same stroke as every other mark even when a bold count stands beside it:
+   a bolder mark read as a thicker icon than its neighbours (owner, 2026-10-19). */
+.card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink);
+}
+
+.card[data-archived="true"] .card-link {
+  color: var(--muted);
+}
+
+/* Where the note lives, on the boards where that is not otherwise obvious
+   (All, search, Archive) — see `inBoard` in App.tsx. No hue: this mark
+   stays --muted like every other one in the footer, whatever tint the folder
+   carries on its own tab (DESIGN.md §2b is unchanged — a tint touches only a
+   board's own mark, never a line or a card). */
+.card-filed {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The count beside the mark. It was 9px — a seventh size, invented for one
+   number in one corner of one card, and the scale says there are six. At the
+   data size it also matches the tick-box count and the stamp sitting on the
+   same footer baseline, which is what it should have been doing all along. */
+.link-n {
+  font-size: var(--t-data);
+  font-weight: 700;
+}
+
+/* The tick-box mark is characters, not a glyph — no icon box, no drawing.
+   Bold, like the counts beside it. An icon brings its own side bearing to the
+   2px gap; `[ ]` has none, so it read as touching its count ("[ ]2/7") and
+   takes the next step instead (audit 2026-10-24, UX-008). */
+.card-boxes {
+  gap: var(--s-2);
+  font-weight: 700;
+}
+
+/* --- the Links board's rows ------------------------------------------------
+   A saved link carries four things at once — a picture, a title, a domain and
+   whatever the user wrote beside it — and a card on a phone is a ~160px column.
+   Four things did not fit, so the board used to drop the user's own words
+   (`bareLinks`), which is losing information rather than fixing the fit. Given
+   the width of the window, all four fit, so the Links board draws its deck as a
+   single column of full-width rows instead.
+
+   **This is not the rejected list/grid toggle.** Nothing here is switchable and
+   nothing is offered to the user: one board has a geometry of its own, the way
+   an idea card has a face of its own. Every other board is untouched.
+
+   It is still exactly one `.card` per note — same button, same press, hold,
+   drag, keyboard walk and leaving animation. Only the box changed.
+   -------------------------------------------------------------------------- */
+
+/* One column, and every row exactly as tall as what it holds (review UI-24):
+   a name, then as many lines of the note's own words as it has, up to
+   --row-lines, then the footer. Every row used to be pinned at --row-h, which
+   is the tallest a resting row can be — so a link saved with no words of its
+   own, which is most of them, drew its name, then two empty line boxes, then
+   its site, and a phone held five links where it can hold eight. --row-h is
+   now that ceiling and the size an off-screen row is assumed to be.
+
+   A row that grows under a resting pointer still runs over its neighbours
+   rather than shoving the list about: the grown row hands back the height it
+   grew by as a negative bottom margin (`NoteCard`), so its track stays the
+   height it was resting at.
+
+   Capped and centred on a wide window. A single row spanning 1920px is not a
+   measure anybody reads, and 33em is the one this app already uses for a
+   readable measure — the open note's reader, the editor and the link preview
+   all take it. At the grid's inherited size that is 528px, which leaves the
+   words about 64 characters a line once the picture and the padding are out of
+   it. Below 528px — every phone — the cap does nothing and the rows still run
+   edge to edge, so "no gutters" is untouched where it is felt. */
+.grid[data-rows="true"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: auto;
+  max-width: 33em;
+  margin: 0 auto;
+}
+
+/* Rows stack, so a row draws its bottom rule and nothing else. Same discipline
+   as the card's right-and-bottom pair, and the same reason: two neighbours must
+   never draw a doubled 2px line between them. */
+.card[data-row="true"] {
+  /* The row's own line box (see --row-lh): the name, the words and a list's
+     items all read --card-lh, so saying it once here makes every row a whole
+     number of pixels. A list item still costs exactly one line box. */
+  --card-lh: var(--row-lh);
+  --card-item-gap: calc(var(--row-lh) - var(--card-item-lh));
+  height: auto;
+  border-right: 0;
+  /* Off screen a row is skipped and sized from this. `auto` remembers the
+     height it was last drawn at, so scrolling back over it shifts nothing. */
+  contain-intrinsic-block-size: auto var(--row-h);
+}
+
+/* A grown row is clamped by --row-lines rather than --card-lines, and it
+   grows from its own resting height rather than from a card's: the peek's
+   `min-height: var(--card-h)` would stretch a short row to a card. */
+.card[data-row="true"][data-peek="true"] {
+  height: auto;
+  min-height: calc(var(--row-pic) + 2 * var(--s-5));
+  max-height: var(--peek-room, none);
+}
+
+/* --- the Links picture ------------------------------------------------------
+   Owner picked mockup C (2026-10-17). On a phone the page's picture is a
+   square at the row's leading edge and the words step over to make room; the
+   row is never shorter than the square. The footer drops its inner rule there,
+   so one link is one stripe and not two. On a desktop the same rows stand as
+   tiles in the grid's own columns, the picture across the top. */
+.card[data-row="true"] {
+  padding-left: calc(var(--gutter) + var(--row-pic) + var(--s-5));
+  min-height: calc(var(--row-pic) + 2 * var(--s-5));
+}
+
+.card[data-row="true"] .card-foot {
+  border-top: 0;
+}
+
+.card-row-pic {
+  position: absolute;
+  top: var(--s-5);
+  left: var(--gutter);
+  width: var(--row-pic);
+  height: var(--row-pic);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rule-soft);
+  color: var(--muted);
+  overflow: hidden;
+}
+
+/* Over the mark, and over the square's edge too: a picture is not framed. */
+.card-row-shot {
+  position: absolute;
+  inset: -1px;
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
+  object-fit: cover;
+  background: var(--rule);
+  opacity: var(--shot-opacity);
+}
+
+/* The picture is held down to --shot-opacity, so the mark under it would show
+   through; it steps aside while a picture stands, and comes back if one fails. */
+.card-row-pic:has(> .card-row-shot:not([hidden])) > svg {
+  visibility: hidden;
+}
+
+.card[data-row="true"] ~ .card-row-site {
+  left: calc(var(--gutter) + var(--row-pic) + var(--s-5));
+}
+
+@media (min-width: 700px) {
+  .grid[data-rows="true"] {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-auto-rows: var(--card-h);
+    max-width: none;
+    margin: 0;
+  }
+
+  .card[data-row="true"] {
+    height: var(--card-h);
+    min-height: 0;
+    padding-left: var(--gutter);
+    border-right: 1px solid var(--rule);
+    contain-intrinsic-block-size: auto var(--card-h);
+  }
+
+  .card[data-row="true"][data-peek="true"] {
+    min-height: var(--card-h);
+  }
+
+  .card[data-row="true"] .card-foot {
+    border-top: 1px solid var(--rule-soft);
+  }
+
+  .card-row-pic {
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: 0 0 auto;
+    width: calc(100% + 2 * var(--gutter));
+    height: var(--row-tile-pic);
+    margin: -11px calc(-1 * var(--gutter)) 0;
+    border: 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .card[data-row="true"] ~ .card-row-site {
+    left: var(--gutter);
+  }
+}
+
+/* --- the Todos slips -------------------------------------------------------
+   The Todos board's one change to the grid (owner picked mockup B,
+   2026-10-17): most to-dos are one sentence, and a full card spent 180px of
+   black on each. Rows are counted in thirds of a card, a full card spans three
+   and a slip — a to-do whose words fit in `SLIP_LINES` (`lib/face.ts`) — spans
+   one. Still no gutters, the same hairlines right and bottom, the same columns
+   on a phone and a desktop; three thirds are exactly one card, so a full card
+   keeps its height, its cut and its peek. No `dense` packing: the board's order
+   is newest first and a slip may not jump ahead to fill a hole. */
+/* A whole number of pixels: a third of 206 is 68.67, and a hairline on a
+   fractional edge blurred away between some slips. A full card then fills its
+   three tracks (204px, 228 on a desktop) rather than its own --card-h, so it
+   never pokes 2px into the slip under it; the face's lines and the 47px of
+   chrome still fit inside with room to spare. */
+.grid[data-slips="true"] {
+  grid-auto-rows: calc(var(--card-h) / 3);
+  grid-auto-rows: round(down, calc(var(--card-h) / 3), 1px);
+}
+
+.grid[data-slips="true"] > .card:not([data-slip="true"]) {
+  grid-row: span 3;
+  height: 100%;
+}
+
+.grid[data-slips="true"] > .card[data-peek="true"] {
+  height: auto;
+}
+
+/* The words, then the stamp at the floor. The footer keeps its marks and its
+   stamp but gives up its rule and its 8px band: at 69px (77 on a desktop) two
+   lines and a 22px footer do not fit, and a slip is never cut, so the rule
+   would only ever say "nothing more". */
+.card[data-slip="true"] {
+  height: 100%;
+  gap: 0;
+  padding: 9px 13px 8px;
+  /* Always laid out: whether the words fit is measured off the rendered body
+     (`NoteCard`), and a skipped card has no body to measure. A slip is two
+     lines and a stamp, so painting the ones off screen costs next to nothing. */
+  content-visibility: visible;
+}
+
+.card[data-slip="true"] .card-foot {
+  height: 12px;
+  padding: 0 13px;
+  border-top: 0;
+}
+
+/* --- the Inspiration wall --------------------------------------------------
+   The one masonry in the app (DESIGN.md §8, 2026-10-08, owner approved):
+   Inspiration is where pictures are saved to be looked at, and a picture has a
+   shape of its own. Everywhere else the grid is uniform and this changes
+   nothing about it — `.grid`, `.card`'s pinned height and `grid-auto-rows` are
+   untouched; the wall is `.wall` and a `[data-wall]` card, nothing else.
+
+   Columns are flex columns filled by JavaScript (`lib/wall.ts`: each tile into
+   the shortest column, in board order), so there is no `columns` to reflow a
+   picture between them as it loads — every height is known from the stored
+   size. No gutters, as everywhere: a tile draws its right and bottom hairline
+   and its neighbours supply the rest. */
+.wall {
+  display: flex;
+  align-items: flex-start;
+}
+
+.wall-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.card[data-wall="true"] {
+  height: auto;
+  padding: 0;
+  gap: 0;
+  /* Heights come from the stored picture size, not from a pinned row, so the
+     off-screen skip the uniform grid relies on has nothing to promise. */
+  content-visibility: visible;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The two tiles with no picture are pinned, so the arithmetic that placed them
+   is exact. The quote keeps the card's own padding (11 is the card's optical
+   correction against its line box). */
+.card[data-tile="quote"] {
+  height: var(--wall-quote-h);
+  padding: 11px var(--gutter) var(--s-4);
+}
+
+.card[data-tile="title"] {
+  height: var(--wall-title-h);
+}
+
+/* A picture keeps its own tones: only the ground and the words invert when a
+   tile is selected (DESIGN.md §5), never the photograph. The image fills the
+   box the stored shape gave it, so nothing moves as it loads. */
+.wall-pic {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--raised);
+}
+
+.wall-img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wall-more,
+/* The play mark: a wall tile's, and a film's frame on a card or in a note. */
+.wall-play,
+.media-play {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--s-2) var(--s-4);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--t-data);
+}
+
+.wall-caption,
+.wall-site {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 var(--gutter);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.wall-caption {
+  height: var(--wall-caption-h);
+  line-height: var(--wall-caption-h);
+  font-size: var(--t-text);
+}
+
+.wall-site {
+  height: var(--wall-site-h);
+  line-height: var(--wall-site-h);
+  font-size: var(--t-data);
+}
+
+.wall-title {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 11px 0 0;
+}
+
+/* A quote tile with no words and only a file it cannot draw: the file's name and
+   kind in the machine voice. It lives inside the pinned quote height (the card
+   clips), so the arithmetic that placed the tile stays exact. */
+.wall-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  font-size: var(--t-data);
+  color: var(--muted);
+}
+
+.wall-file-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.wall-title-name {
+  padding: 0 var(--gutter);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* The picking box, in the corner of the tile — over the photograph on a
+   picture, on its own chip so it reads on any tone. */
+.wall-tick {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  /* One fixed row, so the room a text tile keeps for it (below) is exact. */
+  height: var(--s-7);
+  padding: 0 var(--s-4);
+  font-size: var(--t-data);
+  line-height: var(--lh-chrome);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* While a selection runs the chip stands over the tile's corner, so a tile made
+   of words starts them below it instead of under it: padding taken from inside
+   the pinned height (a quote or a file tile) or from the title card's own top
+   margin — never a height, so the arithmetic that placed the tile stays exact.
+   A picture has no words at its corner and needs nothing. */
+.card[data-tile="quote"]:has(> .wall-tick) {
+  padding-top: var(--s-7);
+}
+
+.wall-tick ~ .wall-title {
+  padding-top: var(--s-7);
+}
+
+/* A picked tile is the inverted slab (DESIGN.md §5): the ground comes from the
+   shared selected rule far below, and every word on it goes to --paper, the
+   names, the captions, the title card and the site — what a dark ground cannot
+   keep at its own tone. The quote's words are `.card-body`, which that rule
+   already takes. The photograph is not named here, on purpose. */
+.card[data-wall="true"][data-selected="true"] :is(.wall-caption, .wall-site, .wall-title-name, .wall-file) {
+  color: var(--paper);
+}
+
+.card[data-wall="true"][data-selected="true"] .wall-tick {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+/* A picked picture has no words to invert and its photograph keeps its tones,
+   so the picking is a 1px frame of --invert drawn over its edge (a rule, not a
+   shadow), beside the chip. Over the picture, never on it: no filter, no tint. */
+.card[data-wall="true"][data-selected="true"] .wall-pic::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--invert);
+  pointer-events: none;
+}
+
+/* The row and the link over its site name (review FX-A-01). The wrapper is the
+   grid's item; the card button inside keeps everything it had. `flow-root` so a
+   peeked row's negative bottom margin (`NoteCard`) still hands its height back
+   to the track. */
+.card-row-wrap {
+  position: relative;
+  display: flow-root;
+}
+
+.card-row-wrap > .card {
+  width: 100%;
+}
+
+/* Over the site text in the footer, which is 14px of mono: the hit area is 44
+   tall (the app's `--hit`), reaching up into the row's own words and down to
+   the card's edge, and as wide as the text it names. Invisible: the site text
+   stays the button's, and answers the pointer through :has below. */
+.card-row-site {
+  position: absolute;
+  left: 13px;
+  bottom: 0;
+  /* The real box is the 44 hit area, not a pseudo-element: axe measures the
+     element, and a 14px link fails its target-size rule (e2e/, review STD-03). */
+  height: var(--hit);
+  /* Measured in the footer's own face, so the box is the text's width. */
+  font-family: var(--mono);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-data);
+  width: calc(var(--row-site-ch, 22) * (1ch + var(--track-data)));
+  max-width: 22ch;
+  cursor: var(--cursor-pointer);
+}
+
+/* Its focus ring is the global one, around the whole 44 box. */
+
+@media (hover: hover) and (pointer: fine) {
+  .card-row-wrap:has(.card-row-site:hover) .card-row-domain {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+}
+
+/* The whole row above the footer: a name, then the note's own words, on the
+   card's own line box and with no gap between them — the row's height is built
+   out of those line boxes, so anything between them is a line box the words
+   never get. It carries no gap of its own for the same reason the card's own
+   `gap: 6px` cannot be inherited here. */
+.card-row-face {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* One line, ended rather than wrapped. A name running to two lines would take
+   the second line off the note's own words, which is the half this row exists
+   to give back. */
+.card-row-title {
+  flex: 0 0 auto;
+  font-size: var(--t-text);
+  font-weight: 700;
+  line-height: var(--card-lh);
+  color: var(--ink);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The site, standing at the head of the row's footer.
+   ---------------------------------------------------------------------------
+   Machine data in the row that already holds it, so it costs no line box of its
+   own and the domains line up down the whole board against the footer's rule.
+   Lowercase, against the footer's `mono` caps: a domain is written lowercase
+   everywhere else in the world, it is quieter for it, and it fits half as many
+   characters again — which is the difference between naming a long host and
+   ellipsising it. It is the one child of the footer allowed to shrink, because
+   a squeezed count is unreadable and a shortened domain is still a domain. */
+.card-row-domain {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 22ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-transform: none;
+}
+
+/* The note's own words, clamped to the count the row's height was built from. */
+.card[data-row="true"] .card-body,
+.card[data-row="true"] .check-list {
+  max-height: calc(var(--row-lines) * var(--card-lh));
+}
+
+/* An inverted row is a light slab, so everything drawn on it has to go dark
+   with it — the same statement .card-body and .card-foot already make. (The
+   site needs no line of its own here: it is inside .card-foot, which already
+   turns.) */
+.card[data-row="true"][data-selected="true"] .card-row-title {
+  color: var(--paper);
+  opacity: 0.9;
+}
+

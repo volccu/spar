@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+  <!-- The mascot, idle, standing for the app. The same creature the header
+       draws (components/mascot-element.ts), paused on its one resting state.
+       Every value is a stop on the app's ramp, never a hue: the ground is
+       paper, the shell and legs are muted, the screen is raised, the face is
+       ink (the ramp's own names for them, in styles.css). Nothing else is in
+       the mark, because there is nothing else in the app. Drawn inside the
+       maskable safe circle.
+
+       Do not write a custom property's name with its leading dashes in here:
+       a double hyphen is illegal inside an XML comment, and a browser that
+       meets one refuses the whole file and draws no icon at all. That is
+       exactly what happened on 2026-09-02, and publicIcons.test.ts now parses
+       this file the way a browser does. -->
+  <rect width="100" height="100" fill="#0c0a08"/>
+  <g fill="none" stroke="#948b7d" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="35" y1="75" x2="35" y2="85"/>
+    <line x1="65" y1="75" x2="65" y2="85"/>
+    <rect x="20" y="30" width="60" height="45" rx="9"/>
+    <line x1="50" y1="30" x2="50" y2="18"/>
+  </g>
+  <circle cx="50" cy="14" r="3.2" fill="#948b7d"/>
+  <rect x="28" y="38" width="44" height="29" rx="5" fill="#29221a"/>
+  <g fill="#ded5c6">
+    <circle cx="39" cy="50" r="3.4"/>
+    <circle cx="61" cy="50" r="3.4"/>
+  </g>
+  <line x1="47" y1="58" x2="53" y2="58" stroke="#ded5c6" stroke-width="5" stroke-linecap="round"/>
+</svg>

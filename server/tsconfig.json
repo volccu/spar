@@ -1,0 +1,27 @@
+{
+  // The server's typecheck: `npm run typecheck:server`, which `npm run lint`
+  // runs, so a type error in the server cannot pass the four gates. It also
+  // covers the web and edge-function files the server imports (followed from
+  // the imports, not listed) and the conformance suite that drives it.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test", "../conformance"],
+  // The one test that drives the web client's own adapter: its types reach
+  // into the app's modules (import.meta.env, the DOM's fetch types), which
+  // the web build typechecks against the DOM and this Node-only program
+  // cannot. Vitest still runs it; `npm run build:web` typechecks the adapter.
+  "exclude": ["test/webClient.test.ts"]
+}

@@ -1,0 +1,27 @@
+-- 0026_drop_set_note_embedding.sql — the AI-enrichment RPC goes.
+--
+-- `set_note_embedding(uuid, jsonb)` was the only path through which an enrichment
+-- edge function wrote its vector back to `public.notes`. AI enrichment was
+-- cancelled (SPEC §8, §12b; the "no AI enrichment" entry in `CLAUDE.md`), no
+-- client has called the function since 0007, and the verifier's catalogue still
+-- tracks it only because 0002 declared it. Two migrations renewed the grant
+-- afterwards — 0007 and 0008 — and one rewrote the function with a pinned
+-- `search_path`. Every one of those changes was bookkeeping for something no
+-- code reads.
+--
+-- What stays
+-- ----------
+-- The `embedding` and `embedding_stale` columns the function wrote to. They are
+-- deliberately kept by the trade written up in `PLAN.md`'s "Known dead,
+-- deliberately left" section: removing them would split `src/db.ts` from the live
+-- database on the one machine that holds the migration, and the only payoff is
+-- six column declarations in a CLI one person runs. This migration does not
+-- re-open that argument.
+--
+-- What this does
+-- --------------
+-- Drops the function only. `if exists` makes the statement safe to run twice,
+-- so a half-applied push can be repaired by hand. `verify-migrations.mjs` reads
+-- the catalogue after every apply and fails on a function that was supposed to
+-- go and is still there; that is the proof this one asks for.
+drop function if exists public.set_note_embedding(uuid, jsonb);

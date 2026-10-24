@@ -1,0 +1,78 @@
+name: demo
+
+# The public demo (docs/demo.md): the app with no server behind it, every note
+# kept in the visitor's own browser, and sample notes on the empty Inbox. Built
+# with `npm run build:demo` and deployed to Cloudflare Pages on every version
+# tag, or by hand from the Actions tab. A tag does not start it by itself:
+# check.yml calls it once every check has passed on the tagged commit (audit
+# CODE-3), so a failing suite never reaches the demo.
+#
+# It needs three settings on the repository, and skips cleanly — a notice, a
+# green run, nothing deployed — until all three exist:
+#   secrets.CLOUDFLARE_API_TOKEN   an API token with "Cloudflare Pages: Edit"
+#   secrets.CLOUDFLARE_ACCOUNT_ID  the account that owns the Pages project
+#   vars.DEMO_PAGES_PROJECT        the Pages project's name
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: demo
+      cancel-in-progress: false
+    steps:
+      - name: Check the Pages settings
+        id: settings
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.DEMO_PAGES_PROJECT }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ] && [ -n "$PROJECT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Demo not deployed::Set secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID and variable DEMO_PAGES_PROJECT to deploy the demo (docs/demo.md)."
+          fi
+
+      - name: Check out repository
+        if: steps.settings.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        if: steps.settings.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        if: steps.settings.outputs.ready == 'true'
+        run: npm ci
+        working-directory: web
+
+      - name: Build the demo
+        if: steps.settings.outputs.ready == 'true'
+        run: npm run build:demo
+
+      # The build invariants read dist-demo/ once it exists: no server in it,
+      # the sample notes off the first paint, the host's headers in place.
+      - name: Check the demo build
+        if: steps.settings.outputs.ready == 'true'
+        run: npm test -- src/lib/buildInvariants.test.ts
+        working-directory: web
+
+      - name: Deploy to Cloudflare Pages
+        if: steps.settings.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web/dist-demo --project-name=${{ vars.DEMO_PAGES_PROJECT }} --branch=main --commit-dirty=true

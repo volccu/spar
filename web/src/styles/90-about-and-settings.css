@@ -1,0 +1,604 @@
+/* --- About: the colophon ----------------------------------------------------
+   What the app is, where the notes are, and the way to take them all out
+   (About.tsx). A layer of the Sorter's kind — full size, the ground, the
+   capture bar off the screen — but read rather than worked, so its body is
+   the open note's column: the reading face at the reading size, on the same
+   33em measure, and nothing drawn that the words are not already saying.
+
+   Three voices, each doing its own job and no other: Marcellus names the
+   sections (they are places on the page), Baskerville says what is true, and
+   the machine face gives the machine's own numbers. No rule divides the
+   sections; the space above a heading does, the way a heading in a note
+   belongs to what follows it.
+   -------------------------------------------------------------------------- */
+.about {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+/* Held focus without a ring, for the reason `.sorter:focus` gives. */
+.about:focus {
+  outline: none;
+}
+
+.about-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  /* The header's own gap and padding, exactly (`.topbar`): the About page
+     covers the header, and the wordmark and the creature must not move when
+     it opens (review UI-B-11). Only the right edge differs, for Close. */
+  gap: var(--head-gap);
+  padding: calc(var(--head-top) + env(safe-area-inset-top)) 6px var(--head-bottom) var(--head-x);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The header's wordmark, said again: capitals, tracked, the same face and size
+   (review UI-20). Lowercase tracked letters were a second spelling of the name,
+   and DESIGN.md §4 tracks only capitals and monospace. */
+.about-mark {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: var(--t-read);
+  font-weight: 400;
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-mark);
+  text-transform: uppercase;
+}
+
+/* The creature beside its name, as in the header's masthead, with the same
+   optical margins taking back the clear space inside its box. It visits: the
+   header's is away while this one is drawn, so there is still only one. */
+.about-head spar-mascot {
+  flex: 0 0 auto;
+  margin-left: calc(var(--mascot-trim) * -1);
+  margin-right: calc(var(--mascot-trim) * -1);
+}
+
+.about-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.about-close:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.about-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 8px 16px calc(32px + env(safe-area-inset-bottom));
+  font-size: var(--t-read);
+}
+
+/* In the reading size's ems, not each child's own: `33em` on a 13px status
+   line or a 12px heading was a narrower column, so the left edges down the
+   page were ragged. */
+.about-body > * {
+  max-width: calc(33 * var(--t-read));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.about-body p {
+  margin-top: 0;
+  margin-bottom: 0.8em;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-read);
+  line-height: var(--lh-read);
+  text-wrap: pretty;
+}
+
+/* A link on the page (the demo's "Keep using spår"): the page's own ink with a
+   1px underline clear of the descenders, inverted under the pointer like every
+   other piece of furniture. Not the signal — that tone is an address the user
+   wrote in a note, and nothing else (DESIGN.md §3). */
+.about-body a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: var(--cursor-pointer);
+}
+
+.about-body a:hover {
+  background: var(--invert);
+  color: var(--paper);
+  text-decoration: none;
+}
+
+.about-h {
+  margin-top: 2.2em;
+  margin-bottom: 0.9em;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  font-weight: 400;
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.about-export {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--hit);
+  margin-top: 1.2em;
+  color: var(--ink);
+}
+
+.about-export:active {
+  background: var(--raised);
+}
+
+.about-export:disabled {
+  color: var(--muted);
+  cursor: var(--cursor-default);
+}
+
+/* The export's progress and its receipt: interface prose, a step below the
+   page's own sentences, and a box that is always there so the page does not
+   jump as the words arrive (web/CLAUDE.md, "Anything that arrives late"). */
+/* Three lines reserved: the export's receipt, with its sentence about files
+   left behind, runs to three on a phone, and one line reserved let it push the
+   rest of the page down as it arrived. */
+.about-body .about-status {
+  min-height: calc(3 * var(--t-text) * var(--lh-read));
+  margin-top: 0.6em;
+  color: var(--muted);
+  font-size: var(--t-text);
+}
+
+/* An error is full ink beside a 3px ink rule, as it is everywhere. */
+.about-body .about-error {
+  border-left: 3px solid var(--ink);
+  padding-left: 10px;
+  font-size: var(--t-text);
+}
+
+.about-data {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.about-data > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.about-data dt {
+  color: var(--muted);
+}
+
+.about-data dd {
+  margin: 0;
+  color: var(--ink);
+  text-align: right;
+}
+
+/* The storage line when the browser may clear it: advice, a tone down. */
+.about-data dd.advice {
+  color: var(--muted);
+}
+
+/* The keys (`lib/shortcuts.ts`). Each group is named in the page's own quiet
+   voice — interface prose, a step below the sentences —
+   and each row is the words for what a key does, then the key itself in the
+   hairline box every other shortcut hint in the app is drawn in. The words
+   are the reader's face and not the machine's: they say what happens, which
+   is prose; only the key is machine data. Alternatives stand side by side in
+   their own boxes, and wrap under one another on a narrow screen rather than
+   pushing the words into a column two letters wide. */
+.about-body .about-keys-where {
+  margin-top: 1.4em;
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: var(--t-text);
+  font-style: italic;
+}
+
+.about-keys dt {
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+}
+
+.about-keys dd {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- Settings ----------------------------------------------------------------
+   Settings.tsx (2026-10-11, owner approved). About's layer (`.about`: fixed,
+   full size, the paper ground), laid out the way a settings screen is: the
+   sections down the left under a search field, the chosen section's rows on
+   the right, each row its words on the left and its control on the right. On
+   a phone the sections are a page of their own and a tap goes into one.
+
+   It is chrome throughout, so it speaks the chrome's grammar (DESIGN.md §5):
+   the section you are in and the answer in force are *raised*, never
+   inverted, and nothing is coloured. Names are the display face, words the
+   reading face, states and button labels the machine's.
+   -------------------------------------------------------------------------- */
+.settings-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-5);
+  min-height: calc(var(--hit) + var(--s-6));
+  padding: calc(var(--s-4) + env(safe-area-inset-top)) var(--s-2) var(--s-4) var(--s-6);
+  border-bottom: 1px solid var(--rule);
+}
+
+.settings-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: var(--t-read);
+  font-weight: 400;
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--hit);
+  padding: 0 var(--s-4) 0 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  cursor: var(--cursor-pointer);
+}
+
+.settings-back:active {
+  background: var(--raised);
+}
+
+.settings-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s-5) var(--s-4) calc(var(--s-6) + env(safe-area-inset-bottom));
+  border-right: 1px solid var(--rule);
+}
+
+.settings-search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: var(--hit);
+  margin-bottom: var(--s-4);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--rule);
+  color: var(--muted);
+}
+
+.settings-search:focus-within {
+  border-color: var(--muted);
+}
+
+/* A field is the reading face at the reading size: under 16px an iPhone zooms
+   the page (web/CLAUDE.md). The field's own focus is its edge, above. */
+.settings-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-read);
+}
+
+.settings-search input::placeholder {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.settings-group {
+  margin: 0;
+  padding: var(--s-6) var(--s-4) var(--s-2);
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.settings-section {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  width: 100%;
+  min-height: var(--hit);
+  padding: 0 var(--s-4);
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  text-align: left;
+  cursor: var(--cursor-pointer);
+}
+
+.settings-section[aria-current="true"],
+.settings-section:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings-section:hover,
+  .settings-seg button:hover,
+  .settings-btn:hover {
+    background: var(--raised);
+    color: var(--ink);
+  }
+}
+
+.settings-content {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: var(--s-7) var(--s-8) calc(var(--s-8) + env(safe-area-inset-bottom));
+}
+
+.settings-block {
+  max-width: calc(46 * var(--t-read));
+}
+
+.settings-block + .settings-block {
+  margin-top: var(--s-8);
+}
+
+.settings-h {
+  margin: 0 0 var(--s-2);
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  font-weight: 400;
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+/* Build and speed, folded under its heading until tapped (review WD-04). */
+.settings-fold > summary {
+  min-height: var(--hit);
+  line-height: var(--hit);
+  cursor: var(--cursor-pointer);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-7);
+  min-height: calc(var(--hit) + var(--s-6));
+  padding: var(--s-5) 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.settings-row-words {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-label {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+}
+
+.settings-advice {
+  margin: var(--s-1) 0 0;
+}
+
+.settings-row-whole .settings-advice {
+  margin: 0;
+}
+
+.settings-control {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* A few answers side by side, the one in force raised. */
+.settings-seg {
+  display: inline-flex;
+  border: 1px solid var(--rule);
+}
+
+.settings-seg button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit);
+  min-height: var(--hit);
+  padding: 0 var(--s-5);
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  cursor: var(--cursor-pointer);
+}
+
+.settings-seg button + button {
+  border-left: 1px solid var(--rule-soft);
+}
+
+.settings-seg button[aria-pressed="true"],
+.settings-seg button:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--hit);
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.settings-btn:active {
+  background: var(--raised);
+}
+
+.settings-btn:disabled {
+  color: var(--muted);
+  cursor: var(--cursor-default);
+}
+
+.settings-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* A fact about the device is data, in the machine's voice. */
+.settings-data {
+  color: var(--ink);
+  font-size: var(--t-data);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* The export's progress and receipt: three lines reserved, as on About once,
+   so the page does not jump as the words arrive. */
+.settings-status {
+  min-height: calc(3 * var(--t-text) * var(--lh-read));
+  margin: var(--s-4) 0 0;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+}
+
+/* An error is full ink beside a 3px ink rule, as it is everywhere. */
+.settings-error {
+  margin: var(--s-4) 0 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--ink);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+}
+
+.settings-none {
+  margin: 0;
+  padding-top: var(--s-7);
+}
+
+.settings-close-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: var(--s-4);
+  max-width: calc(24 * var(--t-read));
+}
+
+.settings-close-account .signin-input {
+  flex: 1 1 12em;
+  border-right: 1px solid var(--rule);
+}
+
+/* A phone: the list of sections, or one section, never both. A search is
+   typed on the list, so there the section rows give way to its results. */
+@media (max-width: 699px) {
+  .settings-frame {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .settings-nav {
+    flex: 0 0 auto;
+    border-right: 0;
+  }
+
+  .settings:not([data-searching]) .settings-nav {
+    flex: 1 1 auto;
+  }
+
+  .settings[data-inside] .settings-nav,
+  .settings[data-searching] .settings-section,
+  .settings[data-searching] .settings-group,
+  .settings:not([data-inside]):not([data-searching]) .settings-content {
+    display: none;
+  }
+
+  .settings-content {
+    flex: 1 1 auto;
+    padding: var(--s-5) var(--s-6) calc(var(--s-8) + env(safe-area-inset-bottom));
+  }
+
+  .settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-4);
+  }
+
+  .settings-keys {
+    justify-content: flex-start;
+  }
+
+  .settings-data {
+    text-align: left;
+  }
+}
+

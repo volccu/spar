@@ -1,0 +1,1215 @@
+/* --- files on an open note -------------------------------------------------
+   Under the words (owner, 2026-10-17): the name and the text lead, and the
+   files follow, so a note of twelve screenshots still opens on what was
+   written about them. One line says what is here, with Save all; then the
+   pictures and documents as a grid of small squares; then every other file as
+   a row of its own.
+
+   A square is the picture and nothing else — no name, no ×, no Save stamped
+   over it. Those are in the viewer it opens (Lightbox), where there is room
+   for them. At rest a square is on film, as a card's picture is
+   (`--shot-opacity`): bright screenshots under the words must not outshine
+   them, and the words are the light in this room.
+   -------------------------------------------------------------------------- */
+
+.attachments {
+  max-width: calc(33 * var(--t-read));
+  margin: var(--s-8) auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+/* "9 pictures · 2 files · 23 MB", the mark that says they are all on the
+   other device too, and Save all at the right — a thumb tall, for Save all. */
+.attach-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: var(--hit);
+  color: var(--muted);
+}
+
+/* Save all and a row's Save and Remove stand at the right edge. */
+.attach-head .spacer,
+.attach-row .spacer {
+  flex: 1 1 auto;
+}
+
+.attach-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--s-4);
+}
+
+@media (max-width: 699px) {
+  .attach-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* The square is fixed before anything is known about the picture, so nothing
+   under the grid moves when the bytes arrive. */
+.attach-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--rule);
+  background: var(--rule-faint);
+  overflow: hidden;
+  cursor: var(--cursor-zoom-in);
+}
+
+/* Something is wrong with these bytes: the frame goes to full ink, and the
+   line under the grid says what (the app's one error grammar is ink). */
+.attach-tile[data-warn] {
+  border-color: var(--ink);
+}
+
+.attach-tile .attach-shot {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  background: transparent;
+  opacity: var(--shot-opacity);
+}
+
+.attach-tile:focus-visible .attach-shot {
+  opacity: 1;
+}
+
+/* A document's first page is shown as itself, warmed, never dimmed into a
+   grey slab — the card's rule for the same page (review GD-01). */
+.attach-tile .attach-shot[data-doc="true"] {
+  object-position: top;
+  filter: var(--doc-filter);
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attach-tile:hover {
+    border-color: var(--muted);
+  }
+
+  .attach-tile:hover .attach-shot {
+    opacity: 1;
+  }
+}
+
+/* A picture alone is not a grid: a square cut a screenshot or a panorama to
+   its middle. It takes the whole measure at its own shape — reserved from its
+   width and height before it decodes — held under 60% of the screen, and is
+   not on film: there is nothing beside it to outshine. */
+.attach-grid[data-one] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.attach-grid[data-one] .attach-tile {
+  aspect-ratio: auto;
+  background: transparent;
+}
+
+.attach-grid[data-one] .attach-shot {
+  height: auto;
+  max-height: 60vh;
+  object-fit: contain;
+  opacity: 1;
+}
+
+/* A square with nothing to draw yet: the family mark over its type. */
+.attach-tile .attach-kind {
+  height: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: var(--s-4);
+}
+
+/* A document drawn by its first page says so, in its corner. */
+.attach-badge {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: var(--s-1) var(--s-2);
+  border-top: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--muted);
+}
+
+/* A file on its way up wears the mark in the square's corner until it lands. */
+.attach-tile .attach-state {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: var(--s-2);
+  background: var(--paper);
+}
+
+/* One line for each square whose bytes have something to say. */
+.attach-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--rule);
+}
+
+.attach {
+  border: 1px solid var(--rule);
+}
+
+.attach-shot {
+  display: block;
+  width: 100%;
+  max-height: 48vh;
+  object-fit: contain;
+  background: var(--rule);
+}
+
+.attach-media {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 58px;
+  background: var(--raised);
+}
+
+.attach-player {
+  display: block;
+  width: 100%;
+}
+
+.attach-video {
+  height: 100%;
+  background: var(--rule);
+  object-fit: contain;
+}
+
+/* The player's box is fixed before anything is known about the file, so the
+   note does not move when the bytes arrive or when a video's size is read.
+   Audio is one control row tall; a video is a 16:9 frame (the shape almost
+   every camera and screen recorder writes) and anything else letterboxes
+   inside it. While waiting, the file's mark lies on its side so it fits. */
+.attach[data-media="video"] .attach-media {
+  aspect-ratio: 16 / 9;
+  max-height: 48vh;
+}
+
+.attach-media > .attach-kind {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 14px;
+}
+
+/* On a card whose face is one film, the mark stands in the top corner: the
+   bottom one is the footer's. */
+.media-play-top {
+  top: 0;
+  bottom: auto;
+}
+
+/* A film's frame, before the film: the picture taken when it was attached,
+   with the wall's play mark in its corner. */
+.attach-poster {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.attach-poster .attach-shot {
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+/* The mark sits on the machine row with the name and the size, and reads at
+   the same weight as they do. */
+.attach-state {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+/* A file the open note cannot draw: the family mark over the type in its own
+   letters — the same grammar the card fallback uses, so the two read as one
+   thing. */
+.attach-kind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 22px 14px;
+  color: var(--muted);
+}
+
+.attach-kind-ext {
+  padding: 2px 6px;
+  border: 1px solid var(--rule);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-data);
+}
+
+.attach-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px 0 12px;
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-data);
+  color: var(--muted);
+}
+
+/* A file with no player is its row and nothing else, so the row is the top of
+   the box and wants no rule of its own. */
+.attach:not([data-media]) .attach-row {
+  border-top: 0;
+}
+
+.attach-type {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.attach-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.attach-size {
+  flex: 0 0 auto;
+}
+
+/* Off is a tone, never a fraction of one (DESIGN.md §2): the hairline's own,
+   the quietest the ramp has, so the mark is plainly there and plainly not
+   pressable. Review 2026-10-01, UI-18. */
+.attach-row .iconbtn:disabled {
+  color: var(--rule);
+  cursor: var(--cursor-default);
+}
+
+/* Save all is a word on the count line, not a bar under the files. */
+.attach-download-all {
+  flex: 0 0 auto;
+  min-height: var(--hit);
+  padding: 0 var(--s-2);
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attach-download-all:hover {
+    color: var(--ink);
+  }
+}
+
+/* `.offscreen` — the file inputs' box — is `.sr-only`'s, declared with it. */
+
+/* --- a picture at the size of the screen ------------------------------------
+   The same move a card makes when it opens: a layer that is full-screen from
+   the first frame, with its *clip* animated out of the rect the image sat in.
+   Nothing is scaled, so the picture is never stretched on the way in.
+
+   Paper behind it, not a dimmed backdrop. Everything in this app is flat and
+   opaque, and a scrim would be the one piece of chrome that admits there is
+   something underneath it.
+   -------------------------------------------------------------------------- */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  cursor: var(--cursor-zoom-out);
+}
+
+/* The one control that needs a backing of its own: it sits over a picture, so
+   it cannot be transparent, and it can no longer take --card because a card is
+   the ground now. Raised plus its own rule — the chrome grammar, stated loudly
+   enough to survive landing on the bright corner of a photograph. */
+.lightbox-close {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  right: 8px;
+  z-index: 1;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+}
+
+.lightbox-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* The picture's own frame: what it is clipped by once it is bigger than the
+   screen, and the element that hears the fingers. `touch-action: none` is what
+   lets a second finger be seen at all — the same reason the canvas surface
+   sets it. Without it the browser takes one of the two pointers a pinch needs
+   for a scroll, and the note sheet above already declares `pan-y`, which says
+   a second finger is not a zoom. */
+.lightbox-frame {
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* Zoomed in there is more picture than frame, so the pointer is a hand: what
+   it does here is move the picture under the window. At fit it inherits the
+   layer's zoom-out, which is still the truth — a tap there closes. */
+.lightbox-frame[data-zoomed="true"] {
+  cursor: var(--cursor-grab);
+}
+
+.lightbox-frame[data-zoomed="true"]:active {
+  cursor: var(--cursor-grabbing);
+}
+
+.lightbox-shot {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  /* The pinch anchors around the middle; every offset in ZoomShot is measured
+     from there, so this is part of the arithmetic, not a preference. */
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* A document is read rather than looked at, so it scrolls where a picture is
+   held whole on the screen. Cursor back to normal for the same reason: the
+   pointer is over pages you are reading down, not over one thing you are done
+   with — though tapping still closes it, as it does everywhere in this layer. */
+.lightbox[data-doc="true"] {
+  cursor: var(--cursor-default);
+}
+
+/* A document arrives a page at a time, so the layer becomes scrollable partway
+   through drawing it. The gutter is reserved from the first frame, or page one
+   jumps sideways the moment page two lands. */
+.lightbox[data-doc="true"] .lightbox-content {
+  display: block;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 0;
+}
+
+/* A video in the viewer: a 16:9 box before a byte has arrived, letterboxed in
+   the layer, the poster standing where the stream will not play. */
+.viewer-video {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.viewer-player {
+  width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--paper);
+  border: 0;
+}
+
+.viewer-poster {
+  max-width: 100%;
+  max-height: 80%;
+  object-fit: contain;
+}
+
+.viewer-video-note {
+  margin: var(--s-5) 0 0;
+  color: var(--muted);
+  font-size: var(--t-data);
+}
+
+/* A silent stream leaves room under the player for its one line (UX-8). */
+.viewer-video[data-muted] .viewer-player {
+  max-height: calc(100% - 3rem);
+}
+
+.lightbox-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* The bottom inset is `.lightbox-close`'s top one said at the other end. The
+     layer is `inset: 0`, so this row sits on the floor of the screen — and on
+     a phone with gesture navigation that floor is the system's, which put Save
+     and the `2 / 5` counter under the bar you swipe up from. This is the
+     device the whole file feature exists for. */
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-data);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.lightbox-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.lightbox-size {
+  flex: 0 0 auto;
+}
+
+/* On a phone the facts and the controls take a line each: six controls and a
+   name do not fit 360px, and the last one — Remove — went off the edge. The
+   spacer becomes the line break, and the controls stand at the right. */
+@media (max-width: 699px) {
+  .lightbox-bar {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 0;
+  }
+
+  .lightbox-bar > .lightbox-name {
+    flex: 1 1 0;
+  }
+
+  .lightbox-bar > .spacer {
+    flex: 0 0 100%;
+    height: 0;
+  }
+}
+
+/* Where you are among the note's files. Ink rather than muted, because on a
+   note carrying nine photographs it is the one fact in this row that changes
+   as you walk, and it is the only thing that says there is anywhere to walk. */
+.lightbox-count {
+  flex: 0 0 auto;
+  color: var(--ink);
+}
+
+/* The pointer's way along, drawn only where there is a pointer: a touch screen
+   walks by swiping the picture and a keyboard walks with the arrow keys, and a
+   mark parked over the middle of every photograph on a phone is furniture in a
+   room whose whole idea is one lit thing. Same backing and rule as the close
+   mark — it sits over a picture too, so it cannot be transparent either. */
+.lightbox-step {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+}
+
+.lightbox-step-back {
+  left: 8px;
+}
+
+.lightbox-step-on {
+  right: 8px;
+}
+
+/* At the ends of the note. Drawn in the hairline's tone rather than removed: a
+   mark that disappears moves the other one's meaning, and the point of the pair
+   is that the picture you are on has a place in a row of them. */
+.lightbox-step:disabled {
+  color: var(--rule);
+  cursor: var(--cursor-default);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lightbox-step {
+    display: inline-flex;
+  }
+}
+
+.pdf {
+  min-height: 100%;
+  padding: 12px 12px 40px;
+}
+
+/* One column, centred, at the note's own measure or the window — whichever is
+   narrower. A page rendered edge to edge on a wide monitor is a page you read
+   by moving your head. */
+.pdf-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* The one literal colour left in the app, and it is not the app's — it is the
+   document's. A PDF page is white paper, and rendering someone's document on a
+   tinted ground would be misrepresenting it; the same white is also baked into
+   the page bitmaps by lib/pdf.ts, so this is agreeing with the content rather
+   than deciding anything. Every page still draws its own rule: the white
+   stands in for a page that has not decoded yet, which reads as a sheet
+   waiting rather than as a hole. The shape comes from the element's own width
+   and height, so
+   `height: auto` keeps each page's proportions without the document resizing
+   under the thumb as the pages arrive. */
+.pdf-page {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--rule);
+  background: #ffffff;
+}
+
+.pdf-note {
+  margin: 12px 0 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* The same line carries two different things and only one of them is an error.
+   "first 5 of 40 pages" is a count, and a count is muted and centred like every
+   other count in the app. A document that would not draw is a failure, and a
+   failure here takes the grammar .signin-error and .sheet-conflict already
+   carry — full ink beside a 3px ink rule, left-aligned because a rule down the
+   left of centred text is a rule attached to nothing. */
+.pdf-note[data-failed="true"] {
+  max-width: 900px;
+  margin: 12px auto 0;
+  text-align: left;
+  padding-left: 10px;
+  border-left: 3px solid var(--ink);
+  color: var(--ink);
+}
+
+/* --- a file being dragged in -----------------------------------------------
+   A rule around the window and one word. Nothing is dimmed and nothing moves:
+   the grid underneath is what the pointer is aiming at, and covering it would
+   be hiding the answer to "where is this going".
+   -------------------------------------------------------------------------- */
+
+.dropzone {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 22vh;
+  pointer-events: none;
+  border: 2px solid var(--ink);
+}
+
+/* Inverted, the same mark the app already uses for "on" and "selected". */
+.dropzone span {
+  padding: 9px 16px;
+  background: var(--invert);
+  color: var(--paper);
+  font-size: var(--t-nav);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+/* --- code in a note --------------------------------------------------------
+   A code block is a panel: one step off the paper (`--rule-faint`) inside a
+   `--rule` edge, its ``` fences drawn muted as the panel's first and last
+   line, and Copy at the panel's top right. The panel is drawn *behind* the
+   lines and out into the margin, so it costs the words nothing: the code stays
+   the reading face on the note's own line grid (see "one line grid"), because
+   the textarea can draw no other face and a tap must move no character. The
+   editor draws the same panels behind its text (`.editor-bands`,
+   CodeBands.tsx), so the block is there whether the note is read or written.
+   It replaced a bare hairline in the margin, which nobody could see as code
+   (2026-10-16, owner asked).
+   -------------------------------------------------------------------------- */
+
+.codeblock {
+  position: relative;
+  display: block;
+  /* The panel's own layer, so it sits behind these words and nothing else. */
+  isolation: isolate;
+}
+
+.codeblock::before {
+  content: "";
+  position: absolute;
+  inset: 0 calc(-1 * var(--s-4));
+  z-index: -1;
+  background: var(--rule-faint);
+  /* The edge of a thing (DESIGN.md §5): at --rule-soft it sat one step off
+     the ground and the panel read as a smudge, not a box. */
+  border: 1px solid var(--rule);
+  pointer-events: none;
+}
+
+.code {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* While reading, a code block is code (owner, 2026-10-23; the design critique
+   is in docs/decisions/web-ui.md): the machine face at --t-text on a whole
+   20px line (--row-lh), padding of its own, space above and below, and long
+   lines scrolling sideways instead of wrapping. This is the one place the
+   reader leaves the textarea's picture on purpose: tapping in to edit sets the
+   code back in the reading face, and that shift is the price the owner
+   accepted. The editor's panels (`.editor-bands`) are untouched. The panel is
+   the box itself here, not a layer behind the words; it stands out into the
+   margin by --s-4 and its 1px edge, so the code still lines up with the words
+   above and below it. */
+.reader .codeblock {
+  margin: var(--s-4) calc(-1 * var(--s-4) - 1px);
+  padding: var(--s-5) var(--s-4);
+  background: var(--rule-faint);
+  border: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: var(--t-text);
+  line-height: var(--row-lh);
+  letter-spacing: 0;
+}
+
+.reader .codeblock::before {
+  content: none;
+}
+
+/* The fences stay in the text, muted, as the panel's first and last line, at
+   the machine face's small size, so the opening fence reads as the block's
+   label (its language name included) rather than a smudge of backticks. */
+.reader .codeblock > .note-mark {
+  display: block;
+  font-size: var(--t-data);
+  color: var(--muted);
+}
+
+/* The newline under the block: the block's own margin draws that break. */
+.reader .code-tail {
+  display: none;
+}
+
+/* The scroller runs to the panel's edge, so a long line is cut there (the cut
+   is the hint on a phone, where no scrollbar shows), never faded. */
+.reader .code {
+  display: block;
+  margin-inline: calc(-1 * var(--s-4));
+  padding-inline: var(--s-4);
+  white-space: pre;
+  word-break: normal;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+.reader .code-copy {
+  top: calc(var(--s-5) + (var(--row-lh) - var(--hit)) / 2);
+  right: 0;
+}
+
+/* The editor's copy of the panels: the text laid out again, transparent,
+   under the textarea and on exactly its box and face. */
+.editor-bands {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  font-family: var(--body);
+  font-size: var(--t-read);
+  line-height: var(--lh-read);
+  letter-spacing: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: transparent;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* No text node in here — the label is the mark and an aria-label. A word in
+   this corner would be counted by the range that maps taps onto characters.
+   It stands on the panel's first line, at its right edge: on a fenced block
+   that line is the short opening fence, so it covers nothing; on a detected
+   block it carries the panel's own ground, so a long first line runs under
+   it rather than through it. */
+.code-copy {
+  position: absolute;
+  top: calc((var(--lh-read) * 1em - var(--hit)) / 2);
+  right: calc(-1 * var(--s-4));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.code-copy .icon {
+  padding: var(--s-1);
+  background: var(--rule-faint);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .code-copy:hover {
+    color: var(--ink);
+  }
+
+  .code-copy:hover .icon {
+    background: var(--raised);
+  }
+}
+
+.code-copy:active .icon,
+.code-copy[data-copied="true"] .icon {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+.sheet-meta {
+  max-width: calc(33 * var(--t-read));
+  margin: 0 auto 16px;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  color: var(--muted);
+}
+
+.sheet-meta .meta-when,
+.sheet-meta .meta-date {
+  text-transform: none;
+}
+
+/* Nothing left in it disappears the row. The board moved out of here and down
+   to the footer, so on most notes — not edited, not trashed, not part of an
+   idea — every child of this is now false and what is left is an empty box
+   still charging the text 16px of margin above it. */
+.sheet-meta:empty {
+  display: none;
+}
+
+/* The name, offered above the text of a note that has none (`NoteView`,
+   `lib/name.ts`). The same control the canvas bar gives an idea — the display
+   face at nav size, in capitals, muted while it is the app's word standing in
+   for a name — set on the text's own measure rather than in the bar, because
+   the bar is six marks with no room left on a phone, and because a written name
+   becomes the text's first line and appears exactly here. The row states the
+   reading size so its 33em is the reader's 33em, as `.sheet-verbs` does. */
+.sheet-name {
+  max-width: 33em;
+  margin: 0 auto 12px;
+  display: flex;
+  font-size: var(--t-read);
+}
+
+.sheet-name-title {
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  font-weight: 400;
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  padding: 3px 6px;
+  margin: -3px -6px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  text-align: left;
+  cursor: var(--cursor-pointer);
+}
+
+/* "Add a name" is a whole thumb tall — the box itself, not an invisible
+   overhang, so what is measured is what is hit (review 2026-10-01, UX-23). The
+   vertical margin takes the extra height back out, so the words sit where they
+   always did and the text under them does not move: one line of nav-size type
+   is what the row occupies, and the rest overhangs into the 12px under it and
+   the space above. */
+.sheet-name-offer {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit);
+  padding: 0 6px;
+  margin: calc((var(--t-nav) * var(--lh-chrome) - var(--hit)) / 2) -6px;
+}
+
+/* Hovered, the move `.canvas-title` makes: full ink, and the furniture raises
+   one step. Never `--signal` (DESIGN.md §3). */
+.sheet-name-title:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* Typing the name. The raised fill and inset ink rule `.canvas-title-input`
+   takes; the 1px border is margined back so nothing below it moves. */
+.sheet-name-input {
+  width: 22ch;
+  max-width: 100%;
+  margin: -4px -7px;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  cursor: var(--cursor-text);
+}
+
+.sheet-name-input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.sheet-name-input::placeholder {
+  color: var(--muted);
+  letter-spacing: var(--track-caps);
+}
+
+/* The board a note is filed in, said with the board's own mark beside its
+   name — the glyph the shelf wears, at the data tier so it sits on the small
+   mono baseline of the row it is in rather than shouting over the facts around
+   it. It lives in `.sheet-verbs` now, between the stamp and the verbs.
+
+   It sits with the stamp in `.sheet-facts`, which takes the row's slack, so
+   the reading order is the same whether or not there are verbs to sit after
+   it: the date, then where the note lives, then, at the far edge, what you can
+   do with it.
+
+   It takes the data size back for itself, exactly as `.meta-stamp` and
+   `.meta-verb` do: the strip around it states the reading size only to buy the
+   text's own measure. */
+.meta-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sheet-facts .meta-board {
+  font-size: var(--t-data);
+}
+
+/* "3 hours ago" is the thing you came to this row to read; the exact day beside
+   it is the footnote. Ink against muted is the whole of the emphasis — no
+   weight, no size, no second type style in a row that is already mono. */
+.meta-when {
+  color: var(--ink);
+}
+
+/* A note on its way out says so, in ink rather than in a colour. */
+.meta-warn {
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+/* The trashed note's line is its worded Put back (review 2026-10-01, UX-24):
+   underlined as an address is, because it is pressed like one. A button reset
+   to the row's own mono, and a thumb tall through a box that overhangs it, as
+   `.check-hit` does — a real 44px box would carry its underline 16px below the
+   words. */
+.meta-putback {
+  position: relative;
+  background: none;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: var(--cursor-pointer);
+}
+
+.meta-putback::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: 50%;
+  height: var(--hit);
+  transform: translateY(-50%);
+}
+
+/* The timestamp row, made a tap target for the reminder picker without
+   changing how it reads: a <button> reset back to plain inline mono, so the
+   row looks exactly as it always has until a reminder gives it something new
+   to say.
+
+   It reads the same but it is not the same size. The text is 12px tall and
+   that was the whole hit area — a quarter of a thumb — for the one place a
+   reminder can be set from the note (2026-09-04 audit, F4). The box is now
+   44px tall, the floor every panel row already keeps, and the vertical
+   margin takes the same height back out so the footer row does not grow and
+   the words do not move: the verbs beside it hold the row at 32px, and 44
+   less twice 6 is 32. A clock at the data size stands first, 6px from the
+   words, in the row's muted tone — the affordance the bare text never had. */
+.meta-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--hit);
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: -6px 0;
+  font: inherit;
+  /* The footer around it states the reading size to buy the text's measure;
+     the stamp is machine data and takes the data size back, the same call the
+     verbs make for themselves. */
+  font-size: var(--t-data);
+  color: inherit;
+  text-transform: inherit;
+  /* Stated here, on the 10.5px box, so 0.1em is 1.05px. Inherited from the
+     strip around it, the length was worked out at its 16.5px and came down as
+     1.65px, half again as wide as every other mono label. */
+  letter-spacing: var(--track-data);
+  cursor: var(--cursor-pointer);
+}
+
+.meta-stamp:hover,
+.meta-stamp[aria-expanded="true"] {
+  color: var(--ink);
+}
+
+/* In the Trash it is a date and nothing to press (UX-2). */
+.meta-stamp:disabled {
+  color: inherit;
+  cursor: var(--cursor-default);
+}
+
+/* The words themselves, at the 12px gap they always had between "3 hours
+   ago" and the exact day. */
+.meta-stamp-words {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+/* The note's verbs — copy, share, read — in a strip under the text, the
+   shape a message carries under itself in a chat. Same measure as the text
+   and the meta row, so the marks start where the words start; a rule above
+   is the one thing that says "this is not the note". */
+.sheet-verbs {
+  /* The measure is 33em *of the text*, not of the marks. The strip is set in
+     the data face at --t-data, where 33em is barely two thirds of the column
+     the words occupy — so a strip that shared the number sat centred inside
+     the text's own width, indented from the first letter of every line above
+     it. Stating the text's size here buys the same width; the verbs inside
+     take the data size back for themselves. */
+  font-size: var(--t-read);
+  line-height: var(--lh-chrome);
+  max-width: 33em;
+  /* No rule. The strip is already the end of the note — it is set small, in
+     the machine face, in muted, under the last line. A line drawn over that
+     is a second way of saying what the type has said, and DESIGN.md spends
+     its rules on edges rather than on emphasis. */
+  /* Less air than the words needed. Each verb now carries its own tap target
+     around a mark, which is height the strip did not used to have, and 14 on
+     top of that pushed it away from the last line it is supposed to sit
+     against. */
+  margin: 8px auto 0;
+  display: flex;
+  gap: 12px;
+  /* The date on the left, the verbs on the right — one footer row under the
+     last line, the shape the open note closes on. The verbs never wrap: they
+     have one place, the right end of the first line, and it is the facts
+     beside them that take a second line when they need one (`.sheet-facts`,
+     review 2026-10-01, UI-17). Top-aligned, so the verbs stay on that first
+     line however many the facts take. */
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  color: var(--muted);
+}
+
+/* The stamp and the board, together, taking whatever the verbs leave. They
+   wrap inside this box — the board under the date, a long reminder line over
+   two lines — rather than pushing the verbs off the date line, which is what
+   made them sit at the right on one note and drop to the left on the next. */
+.sheet-facts {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.sheet-facts .meta-stamp {
+  min-width: 0;
+  text-align: left;
+}
+
+.sheet-facts .meta-stamp-words {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  min-width: 0;
+}
+
+/* The verbs, grouped so `space-between` above pins them as one block to the
+   right edge rather than spreading copy, share and read across the row. */
+.meta-verb-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  /* Half of what a 44px box adds around a 20px glyph, so the last mark ends
+     where the measure ends rather than 12px short of it. */
+  margin-right: -12px;
+}
+
+/* One verb: a footer mark and a word, reset to plain mono the same way
+   .meta-stamp is, so it reads as quietly as a fact until it is tapped. Then
+   it answers in the meta row's only grammar — ink against muted for as long
+   as it has something to say: "copied" for COPIED_MS (lib/clipboard.ts),
+   "stop" for as long as the voice goes. No fill, no inversion: the code
+   block's corner button inverts because it sits on a box; these sit in a
+   line of text. */
+.meta-verb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  /* Not `font: inherit`: the strip around it is stated at the reading size to
+     buy the text's measure, and a verb set at that size would shout. The face,
+     the tracking and the caps come down from `.mono` on the strip; only the
+     size is taken back. */
+  font-family: inherit;
+  font-size: var(--t-data);
+  line-height: var(--lh-chrome);
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: var(--cursor-pointer);
+  /* The words are gone from these — a mark says "copy" perfectly well, and
+     three words in the machine face under every note was the last row of
+     furniture between the reader and the end of the note. What the words were
+     also doing, though, was making the button big enough to hit: a 20px mark
+     on its own is a 20px target. So the box is held at a thumb's worth — it
+     was 32 square, which is three quarters of one (audit F6) — with the mark
+     in its centre, and the row takes the extra height back out through the
+     margin, the same trade `.meta-stamp` makes beside it, so the footer
+     stays 32px tall and nothing above it moves. The verbs sit at the right
+     edge of the measure; `.meta-verb-row`'s negative margin is what keeps the
+     last glyph flush with it. A verb with something to say (only "no share")
+     grows past the minimum on its own. */
+  min-width: var(--hit);
+  min-height: var(--hit);
+  margin: -6px 0;
+  justify-content: center;
+}
+
+.meta-verb:hover,
+.meta-verb:active,
+.meta-verb[data-on="true"] {
+  color: var(--ink);
+}
+
+/* An overdue reminder is the app's one error mark, sat beside meta-warn
+   rather than reusing its softer rule: full ink beside the 3px rule
+   .signin-error already carries (DESIGN.md §3), here on the left edge of the
+   word since this sits inline in a row of short mono facts rather than alone
+   under a form. */
+.meta-overdue {
+  color: var(--ink);
+  border-left: 3px solid var(--ink);
+  padding-left: 6px;
+}
+
+/* The reminder panel's one non-button row: a label and a native picker, set
+   to look like the rows around it rather than like a form. color-scheme is
+   already dark from :root, so the browser draws its own calendar to match. */
+.selpanel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* 6, not the rows' 12: the picker inside is a thumb's worth tall now and
+     the row would otherwise be half again the height of the rows above it. */
+  padding: 6px 18px;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--ink);
+}
+
+.selpanel-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--hit);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  color: inherit;
+  padding: 4px 6px;
+}
+
+/* A field you type a name or a search into, inside a panel or a sheet: the
+   board chooser's "Search or new board", a folder's rename, the Look sheet's
+   "Find a mark". The reading face at the reading size, which is what every
+   field you type into is set in (DESIGN.md §4) — these three were the machine
+   face at 10.5px in tracked capitals, so "Kök och Årsplan" came out as tiny
+   KÖK OCH ÅRSPLAN while it was being typed, and anything under 16px makes iOS
+   Safari zoom the page on focus (review UI-09). The rows around it keep the
+   machine voice; only the words being written change face. */
+.field-words {
+  font-family: var(--body);
+  font-size: var(--t-read);
+  line-height: var(--lh-chrome);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* A field standing in a row's place: 4px top and bottom makes it exactly a
+   `.selpanel-btn` tall (16 + 20 + 16 against 4 + 44 + 4), so the panel does
+   not change height when the row turns into the field. */
+.selpanel-row-field {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* A row kept for its box while the panel is doing something else. */
+.selpanel-held {
+  visibility: hidden;
+}
+
+/* The field rule, the same one every other field takes. Without it this field
+   took the signal ring like the other two. */
+.selpanel-row input:focus {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+

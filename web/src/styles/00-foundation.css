@@ -1,0 +1,1091 @@
+/* ===========================================================================
+   spår — design tokens
+   "spår" is Swedish for trace / track. Notes are traces you leave behind.
+
+   DIRECTION: DARKROOM. See DESIGN.md — that file is the source of truth for
+   everything below, and this stylesheet is its only implementation. If the
+   two disagree, the stylesheet is the bug.
+
+   THE APP HAS NO COLOUR. Not one hue, not an accent, not a link. Nine tones
+   on a single warm greyscale, and that ramp is the entire visual system —
+   there is nothing else to reach for, which is the point. Every question
+   about emphasis has exactly one kind of answer available: move a step along
+   the ramp, or change a rule weight.
+
+   The ground is a warm near-black — #0c0a08, black with a trace of amber in
+   it rather than a neutral charcoal. Everything above it carries the same
+   warmth, so the tones read as one material lit at different strengths
+   instead of as grey with a tint applied. Hue holds between 27° and 42° the
+   whole way up; saturation is heaviest in the shadows, thins out through the
+   mid tones, and comes back in the highlight.
+
+   DARK IS THE GROUND. The ramp below is the app, and the default on every
+   device. A light ramp exists as the device's own choice (2026-10-11, owner
+   approved): the same nine tones turned over onto warm paper, restated once in
+   the `:root[data-theme="light"]` block straight after the token block, keyed
+   on the *resolved* theme lib/theme.ts puts on <html> — never a
+   `prefers-color-scheme` media query, so there is exactly one copy of each
+   ramp. Nothing outside those two blocks names a colour, so nothing outside
+   them knows which one it is drawn in.
+
+   Brutalist *structure* — flat, 1px rules, no radius, no shadow, no blur —
+   but humane body text, because this app is 15,000-character walls of prose
+   and brutalist typography applied to dense reading is punishment.
+
+   Three faces, three jobs, no overlap:
+     Marcellus          names of things — the wordmark, the boards.
+     Libre Baskerville  the user's own words, everywhere they appear.
+     IBM Plex Mono      machine data — counts, dates, +1.4k, [x], sync state.
+   A note is only ever set in Baskerville. There is no heading face; a heading
+   the user typed is their own words, and stays in their own face.
+
+   Fonts are self-hosted: this app must open instantly and offline, and a
+   round-trip to Google is neither.
+   =========================================================================== */
+
+/* Latin covers å ä ö, so Swedish and Finnish never need the ext file.
+
+   Every face here declares the ONE weight its file actually holds. These used
+   to say "400 700", which is a claim about a variable font and none of these
+   are one — the browser believed it, matched bold to the regular file, and
+   correctly declined to synthesise anything. Bold therefore rendered as
+   regular: emphasis that was there in the markup and invisible on the page.
+   The real 700 cut is below. It is preloaded with the italic (index.html), so
+   bold and italic text is never laid out in a fallback and re-broken when the
+   file lands; the service worker holds every face after install, so that
+   costs nothing past the first visit. */
+@font-face {
+  font-family: "Libre Baskerville";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/libre-baskerville-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Libre Baskerville";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/libre-baskerville-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Libre Baskerville";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/libre-baskerville-italic-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Libre Baskerville";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/libre-baskerville-italic-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* The regular cut again, under a family name that has no italic face. The
+   open note's italic asks for this with `oblique`, so the browser slants the
+   roman instead of reaching for the real italic, which is narrower and would
+   re-break the line when the note is tapped into (see "one line grid"). The
+   same files as the regular: already preloaded and precached, nothing new is
+   fetched. */
+@font-face {
+  font-family: "Libre Baskerville Roman";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/libre-baskerville-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Libre Baskerville Roman";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/libre-baskerville-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* The real bold cut. Libre Baskerville ships Regular, Italic and Bold and no
+   bold italic, so bold *inside* italic is the one combination the browser is
+   left to fake — rare enough to accept, and the alternative is emphasis that
+   does not show. */
+@font-face {
+  font-family: "Libre Baskerville";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/libre-baskerville-bold-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Libre Baskerville";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/libre-baskerville-bold-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* The naming face. Marcellus is an inscriptional Roman — drawn for capitals
+   cut into stone, which is exactly what the app asks of it: the wordmark and
+   the board names, set as wide-tracked capitals, and nothing else. One weight
+   only; Marcellus has no bold, and asking the browser to fake one turns an
+   elegant face into a smudge. */
+@font-face {
+  font-family: "Marcellus";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/marcellus-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Marcellus";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/marcellus-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* The machine face. This used to be a system stack — ui-monospace, then
+   Cascadia on Windows, SF Mono on a Mac, Roboto Mono on Android, Consolas
+   somewhere behind that. Every count, stamp, tick box and sync state in the
+   app is set in it, tracked, at 10.5px, on a fixed 22px baseline in the card
+   footer: the app's most exacting typography, rendering differently on every
+   device it ran on. Two weights, because the counts beside a mark are bold. */
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/plex-mono-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/plex-mono-400-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/plex-mono-700-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/plex-mono-700-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+:root {
+  /* Dark is the default and this states it: the browser paints its own
+     surfaces — scrollbars, form controls, the bars around an installed app,
+     the caret — dark. The light block below says `light` for itself, so the
+     browser's furniture always follows the ramp actually on screen. */
+  color-scheme: dark;
+
+  /* ==========================================================================
+     THE RAMP
+     Nine tones, one warm greyscale, and no colour anywhere in the app. Ordered
+     here darkest to lightest, which is also the order they sit in depth.
+
+       #0c0a08  --paper       the ground              lum 0.003
+       #0c0a08  --card        a note (= --paper, below)    0.003
+       #241e17  --rule-faint  canvas grid, code panel      0.014
+       #29221a  --raised      chrome, engaged              0.017
+       #2d251c  --rule-soft   a division inside a thing    0.020
+       #423830  --rule        the edge of a thing          0.042
+       #948b7d  --muted       secondary text               0.262
+       #ded5c6  --ink         the user's words             0.672
+       #fff8e8  --signal      a live address               0.942
+
+     Hue holds between 27° and 42° the whole way up — it is one material at
+     nine strengths of light, not grey with a wash over it. Saturation is
+     heaviest in the shadows (20–23%), thins through the mid tones (10% at
+     --muted, where a tint would show as a colour cast on small text), and
+     returns in the highlight.
+
+     Every text pair clears its floor with room to spare, measured rather than
+     estimated (this table said #181410 for --card and #1e1913 for --rule-faint
+     for weeks after both moved, with the contrast figures of the old card;
+     these are computed from the values declared below, WCAG relative
+     luminance): ink on card 13.59, ink on paper 13.59, muted on card 5.88,
+     muted on paper 5.88, muted on raised 4.67, signal on card 18.68.
+     If you move any tone, re-measure all six. --muted is the one that fails
+     first.
+     ========================================================================== */
+
+  /* The ground. Warm near-black — black with a trace of amber in it rather
+     than a neutral charcoal, which is what lets every tone above it read as
+     the same material lit harder rather than as grey with a tint applied. */
+  --paper: #0c0a08;
+
+  /* A note — and it is the ground. Not a step off it: the same value.
+     ------------------------------------------------------------------------
+     A card is defined entirely by its two rules, and there is no fill anywhere
+     in the grid. The board is therefore not a tray of tiles at all, it is a
+     lattice of hairlines drawn straight onto the black, and the only things
+     with any brightness on the whole screen are the words.
+
+     This started as a 1.08:1 lift, which was already nearly invisible, and
+     went to zero on purpose. Every step of lift is a step of the app asserting
+     itself in front of 241 notes, and none of them buys anything the rules are
+     not already doing.
+
+     The token stays separate from --paper even though the values match, and
+     must not be collapsed into it: it still means "a surface holding the
+     user's words", which is a different statement from "the ground", and it is
+     what every sheet-like surface in the file is asking for. If a future
+     revision ever wants the sheets back off the ground, this is the one line
+     that has to change. */
+  --card: #0c0a08;
+
+  /* The user's words. A warm bone, deliberately short of white: pure white on
+     a near-black ground halates, and this app is 15,000-character walls of
+     prose. Stopping at 0.672 luminance also leaves headroom above it, which
+     is the only reason --signal can exist at all without a hue. */
+  --ink: #ded5c6;
+
+  /* Secondary text: card footers, board names you are not on, placeholders,
+     the sync state. The one tone in the ramp where saturation is pulled right
+     down — at this lightness a warm cast reads as a colour rather than as
+     warmth, and it would be the only thing in the app that looked tinted. */
+  --muted: #948b7d;
+
+  /* The edge of a thing — a card's own boundary, the bottom of a bar, a
+     dialog's border. At 1.61:1 against a card it is doing the whole job that
+     the near-invisible --card/--paper step deliberately declines to do. */
+  --rule: #423830;
+
+  /* A division *inside* one thing: a card's footer, a control divider. */
+  --rule-soft: #2d251c;
+
+  /* One step quieter again, and used for exactly two things: the graph paper
+     on the spatial canvas, and the ground of a code panel (`.codeblock`,
+     `.card-line[data-code]`; 2026-10-16) — the one place a run of the user's
+     words is set apart by a fill, quiet enough that the words stay the light.
+
+     It was #1e1913, which is 1.13:1 against the ground and simply is not there.
+     A faint rule works at that ratio on a *light* surface, because the eye
+     picks up small darkenings on brightness easily; lifting near-black by the
+     same proportion is invisible. Its whole job is to make movement visible
+     while the canvas is being dragged, and it could not do it. Still the
+     quietest rule in the app, and still well below --rule-soft. */
+  --rule-faint: #241e17;
+  /* One step off the paper, and only ever one step.
+     ------------------------------------------------------------------------
+     The chrome used to say "this one is on" by inverting to full ink, the same
+     as everything else. In a dark scheme that is a solid near-white block, and
+     with three of them on screen at once — the board you are on, and the two
+     buttons in the corner of the bar — the loudest thing in the app was its
+     furniture rather than any note. So the *persistent* states of the chrome
+     take a raised surface instead: lighter than the paper, darker than a card,
+     with the text going from muted to full ink at the same time. Two signals,
+     neither of them shouting.
+
+     Inversion is not gone and must not be removed from where it still belongs:
+     a selected card, a panel row, Save. Those are things you did to a note, and
+     they have to be unmistakable. This is only for the furniture. */
+  --raised: #29221a;
+
+  /* The ground the lenses stand on (2026-10-08, owner approved).
+     ------------------------------------------------------------------------
+     Todos, Links, Files, All and Trash hold nothing of their own — they are
+     ways of looking — and the shelf says so by laying that one run on a
+     slightly lifted ground, where the boards the user made sit on the bare
+     paper. It is deliberately the quietest lift in the file: 1.08:1 against
+     the ground, 1.17 *under* --raised, and far below the board-you-are-on's
+     lamp, so a lens is never mistaken for the board you are standing on. It
+     is a fill for those rows and nothing else — no card, no panel, no hover.
+     Muted on it is 5.45, ink 12.60. If you move it, re-measure both. */
+  --lens-ground: #18140f;
+
+  /* --- inverting ----------------------------------------------------------
+     The fill a *content* surface takes when something has been done to it: a
+     selected card, an open panel, Save, a pressed control.
+
+     It is deliberately not --ink. Inverting used to flip straight to the full
+     bone the words are set in, which on a light ground was correct and on this
+     one is a flare — a selected card became a 206px block of near-cream, and
+     the multi-select panel a cream slab, on a screen whose brightest thing is
+     otherwise a line of text.
+
+     The window here is narrower than it looks and was found by walking both
+     edges: at the full bone (1.0×) it flares; at 1.88× below it the state had
+     lost its punch and a selected card no longer read as selected. This sits
+     at 1.41×, which is a clear step down from the words without becoming a
+     grey. Text on it is --paper at 9.66:1.
+
+     Thin marks do NOT take this and must stay at full --ink — the priority
+     flag, the 1px strokes of the trace animation, the undo clock. A hairline
+     dimmed is a hairline you cannot see; only slabs need the restraint.
+     ---------------------------------------------------------------------- */
+  --invert: #bfb4a2;
+
+  /* --- the signal ---------------------------------------------------------
+     A live address, and nothing else in the app.
+
+     It is not a colour. It is the top of the ramp — the brightest tone there
+     is — sitting 1.37:1 above the body text it is embedded in, warmer as well
+     as brighter, and underlined. That is the whole mechanism, and it works
+     for the same reason a highlight works in a photograph: the eye finds the
+     brightest thing in a frame before it finds anything else.
+
+     It has to be earned this way because nothing here is allowed a hue. If
+     you find yourself wanting to reach for one, the answer is a step along
+     this ramp, a heavier rule, or an inversion. Never a colour.
+     ---------------------------------------------------------------------- */
+  --signal: #fff8e8;
+  /* What sits *on* the signal when it becomes a fill — a hovered link. */
+  --signal-ink: #0c0a08;
+
+  /* --- inside an inverted surface -----------------------------------------
+     A selected card and Save invert: the fill becomes --invert and the text
+     becomes --paper. So an inverted surface is a *bone slab*, and anything
+     drawn inside it has to be darker than bone, not lighter.
+
+     These two used to be rgba(255,255,255,·) — white, laid on a near-white
+     slab. In the old light scheme that was right, because inverting produced
+     a near-black block there; in the dark scheme the same declaration drew
+     white on cream and the divider between two panel rows simply did not
+     exist. With one scheme left, there is one correct answer.
+
+     The panels were their first user, and stopped inverting on 2026-09-16
+     (see `.selpanel`). `--on-ink-rule` is now the edge of a link preview's
+     picture on a selected card; `--on-ink-wash` is used by nothing today. Both
+     stay declared because DESIGN.md §2 names them as the answer for anything
+     that has to be drawn on a selected card, and the next such thing should
+     find the token rather than invent an alpha.
+     ---------------------------------------------------------------------- */
+  --on-ink-rule: rgba(12, 10, 8, 0.24);
+  --on-ink-wash: rgba(12, 10, 8, 0.1);
+  /* The dialog's backdrop: the paper at 62%, so a dialog reads as blocking
+     what is behind it and the dark is still the room's own dark (QA-09/STD-01).
+     It replaces the app's one pure-black literal. */
+  --scrim: rgba(12, 10, 8, 0.62);
+
+  /* --- the one hue, and what it is allowed to be ---------------------------
+     DESIGN.md §1 and §2 say there is no colour, and everywhere in this
+     stylesheet except the thirty-two values below that is still exactly true. A
+     board the user made — and only a board the user made — may be given one
+     of sixteen tints, because a board is a **name they chose**, not a state the
+     app is reporting. The full argument is in lib/boardLook.ts and in
+     DESIGN.md §2b; this is the token block, so this is where the numbers live.
+
+     The rule that keeps it inside the ramp is that **no tint adds a step to
+     it.** Each hue is one mark, `--board-<h>`, at L 0.24 – 0.4633: from
+     --muted's neighbourhood up to --invert's own brightness and never above it
+     (ink, 0.672, stays the only tone brighter), so a pale hue — bone, oat — is
+     possible and no mark outshines a selected card. It replaces --muted on a
+     board's mark. Every one is at least 5.5:1 on the ground. (A second strength
+     for the hairline under the board row was withdrawn 2026-10-23, owner's
+     ask: the row's line is plain --rule again.)
+
+     Solved, not eyeballed: hue and chroma chosen in OKLCH (chroma 0.011-0.087,
+     warm-leaning, "outdoor gear" earths), lightness searched for the target
+     luminance, and the set optimised so no two marks are closer than 0.045 in
+     OKLab. Any edit has to be re-solved the same way, or the colour stops
+     being free and starts being emphasis.
+
+     Redrawn 2026-10-08 (owner approved): eight pigments became sixteen, with
+     off-whites. The keys are the old ones plus eight new — they are what a
+     synced board stores — so --board-sage is now Fern and --board-teal is
+     Forest; the colour called Sage is --board-salvia (lib/boardLook.ts).
+
+     Nothing else in the app may read these. Not text, not a fill, not a card,
+     not a note, not a line. A mark. -------------------------------------- */
+  --board-bone: #b5b3ab;
+  --board-sand: #c69c79;
+  --board-oat: #aea393;
+  --board-clay: #b98a7c;
+  --board-ember: #b97961;
+  --board-ochre: #a78a5c;
+  --board-khaki: #a29f74;
+  --board-moss: #8e965e;
+  --board-olive: #7b8e6f;
+  --board-sage: #67a078;
+  --board-teal: #639392;
+  --board-salvia: #81a291;
+  --board-steel: #6c8fb1;
+  --board-stone: #9098a2;
+  --board-iris: #948cb2;
+  --board-plum: #b3859c;
+
+  /* --- motion ---------------------------------------------------------------
+     The app's two curves, restated here because a CSS `animation` shorthand
+     cannot read a JS export. These and `ENTER`/`EXIT` in lib/motion.ts are two
+     copies of one decision — the values must be identical byte-for-byte, and
+     styles.test.ts checks it. If you change one, change the other in the same
+     edit. ------------------------------------------------------------------ */
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.45, 0, 0.9, 0.35);
+
+  /* The third curve, and the only one in the app that overshoots. It is not
+     orienting motion — it drives a *mark answering the pointer*, where the
+     small overshoot is what makes a lid feel hinged rather than animated. Held
+     to the same byte-for-byte rule as the two above against `NUDGE` in
+     lib/motion.ts, which carries the full argument for why it may exist and
+     how narrowly it is allowed to be used. */
+  --ease-nudge: cubic-bezier(0.34, 1.4, 0.64, 1);
+  /* How long a nav mark takes to answer the pointer. One number for the whole
+     vocabulary, so the set can be retimed in one edit rather than per mark. */
+  --nav-mark-ms: 380ms;
+
+  /* --- the film -----------------------------------------------------------
+     The app's one texture, and the only thing in it that is not a flat tone or
+     a hairline. It is the grain of a sheet of paper, and it exists to be lit:
+     nothing ever shows it whole. See DESIGN.md §2c for the argument, and
+     `the lamp` further down for the mechanism — two surfaces read this now,
+     the focused write box and the board you are on.
+
+     Written here for the same reason the pointer drawings are — a data URI
+     cannot reference a custom property, so it has to live in the one place a
+     literal may appear. Unlike those, this one names no colour at all:
+     `feTurbulence` generates its own image and `feColorMatrix` takes the hue
+     back out of it, so the tile is grey noise and there is no tenth tone
+     hiding in it.
+
+     WARMED, not coloured. Neutral grey screened over this paper read as
+     blue-grey beside it — the ramp is warm, so a grain with no hue at all is
+     the one cool thing in the room. The second matrix scales the channels to
+     roughly the proportions of --invert (1 : .95 : .86), so the grain is the
+     same grey the light itself is. It is a ratio, not a colour: the grain
+     still has no tone of its own, it takes the lamp's.
+
+     TURNING IT UP: the `opacity` on the rect below is how strongly the grain
+     reads where the light is fullest, and it is the one number that moves
+     both lamps at once. It began at 0.16 and could not be seen at arm's
+     length. Past about 0.32 the tooth stops being tooth and starts being
+     dirt on the glass. For one lamp only, turn its `--lamp-lift` instead.
+     It is laid TWICE now (see `lamp-drift`), so 0.15 here is two layers
+     that together land close to the single 0.24 it replaced — read those
+     limits against the pair, not against this number.
+
+     baseFrequency is the grain size. Coarser than this and it reads as
+     dirt on the screen rather than tooth in the paper; finer and it stops
+     resolving at all on a phone and is a wasted layer. */
+  --film: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="f" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.74" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feColorMatrix type="matrix" values="1 0 0 0 0 0 .95 0 0 0 0 0 .86 0 0 0 0 0 1 0"/></filter><rect width="160" height="160" filter="url(%23f)" opacity="0.15"/></svg>');
+  /* How the lamp's wash meets the paper, and how strongly every lit surface
+     reads its own dial. On the black the wash screens — it can only lighten —
+     at each surface's full --lamp-lift. The light ramp multiplies and scales
+     the dials down (see its block): a light can only be drawn on paper as the
+     shade that shows the tooth. Two theme numbers, never a third lamp. */
+  --lamp-blend: screen;
+  --lamp-scale: 1;
+  /* A photograph on a card sits a step under full strength, so a picture is
+     never the brightest block on the black; and a document's first page is
+     shown as a negative, paper falling to the ground and the type coming up
+     in the ramp's warm light (see `.card-shot`). Tokens, because the light
+     ramp answers both differently. */
+  --shot-opacity: 0.68;
+  --doc-filter: invert(1) sepia(0.35) brightness(0.86);
+
+  /* Machine data, self-hosted. The system stack this replaced rendered the
+     app's most exacting typography differently on every OS: Consolas here,
+     SF Mono there, something else again on the phone. */
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", "SF Mono", Menlo,
+    Consolas, monospace;
+  /* Names of things. One weight only — see the @font-face note above. */
+  --display: "Marcellus", "Hoefler Text", Palatino, Georgia, serif;
+  /* Everything the user wrote. Unchanged, and deliberately so: this is 90% of
+     the pixels in the app, it is tuned across 241 real notes, and
+     useCardMetrics is calibrated to its average character width. Restyling
+     the user's own words for a rebrand would be the one decision in this
+     system made for the designer rather than the reader. */
+  --body: "Libre Baskerville", Georgia, "Times New Roman", serif;
+  /* The same face with no italic cut to reach for, so the open note's italic
+     is the roman slanted and keeps its widths ("one line grid"). */
+  --body-roman: "Libre Baskerville Roman", var(--body);
+
+  /* --- the scale ----------------------------------------------------------
+     Six sizes for the whole app, one per job. Nothing may invent a seventh.
+     A slot may be *retuned* when a face changes; a seventh slot may never be
+     added. Two of them are close in number and never confusable in practice:
+     12px Marcellus capitals stand a good deal taller than 13px Baskerville
+     lowercase, because caps are measured to cap height and prose to x-height.
+
+       --t-data  10.5  mono. counts, dates, +1.4k, [x], state, buttons
+       --t-nav   12    Marcellus caps. board names, and only board names
+       --t-text  13    Baskerville. the note on a card; tags; interface prose
+       --t-read  16.5  Baskerville. the note open, every field you type in,
+                       and the wordmark (Marcellus caps, tracked)
+       --t-name  21    Marcellus. names of empty places
+       --t-mark  34    Marcellus caps. the sign-in mark, once
+     ------------------------------------------------------------------------ */
+  --t-data: 10.5px;
+  --t-nav: 12px;
+  --t-text: 13px;
+  --t-read: 16.5px;
+  --t-name: 21px;
+  --t-mark: 34px;
+
+  /* Leading: chrome set solid, prose given air, list items pulled in tight so
+     a wrapped item groups as one thing. The item leading must stay well below
+     --lh-read, and the margin between items well above the difference. */
+  --lh-chrome: 1.1;
+  --lh-read: 1.65;
+  --lh-item: 1.3;
+  /* Where the pen's line crosses a ticked item's words, down the inline box
+     (`.pen`): the middle of the x-height, where a strike-through goes. */
+  --pen-at: 58%;
+
+  /* Tracking. Baskerville lowercase is never tracked — letterspacing a text
+     serif is the oldest tell of an amateur. Only capitals and mono are, and
+     Marcellus wants the full measure: it is an inscriptional Roman and its
+     capitals are drawn to stand apart. */
+  --track-caps: 0.15em;
+  --track-tab: 0.08em;
+  --track-data: 0.1em;
+  --track-mark: 0.22em;
+
+  /* The one rounded corner in the app: a key cap (`.kbd-cap`), and nothing
+     else may use it (DESIGN.md §6, owner approved 2026-10-08). Everything else
+     is still square, and styles.test.ts holds both halves. */
+  --r-key: 3px;
+
+  /* The spacing scale (DESIGN.md §8, quality bar §1). Defined 2026-10-05; new
+     and touched rules take their space from here and existing values are not
+     rewritten wholesale. 11, 15, 17 and 18 survive only as optical
+     corrections against a line box, each with a comment. --gutter is the one
+     side margin: card text, the board row's mark, the write field's words. */
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 6px;
+  --s-4: 8px;
+  --s-5: 12px;
+  --gutter: 13px;
+  --s-6: 16px;
+  --s-7: 24px;
+  --s-8: 32px;
+
+  /* The masthead, on the 8px grid (2026-10-08, owner approved). The creature's
+     box is 56 — seven units — and the band round it is 8 above and 16 below,
+     which is what centres the *shell and legs* in the band: the antenna is a
+     thin ornament standing in the top margin, and the drawing's own clear
+     space (--mascot-trim, ten on each side of its box) is taken back by the
+     negative margins so the shell, not the box, stands on the 16px side
+     margin and a 16px word-space from the name. The band is 80px and the rule
+     under it makes 81, three less than it was; the board row below is
+     untouched. `.topbar` and `.about-head` both read these so opening About
+     moves nothing. */
+  --mascot-box: 56px;
+  --mascot-trim: 10px;
+  --head-top: var(--s-4);
+  --head-bottom: var(--s-6);
+  --head-x: var(--s-6);
+  --head-gap: var(--s-6);
+
+  /* A card shows a whole number of lines and never a sliced one, so the line
+     box is a fixed pixel value that the card height is then built around. */
+  --card-lh: 19.5px;
+  --card-lines: 8;
+  /* A list item on a card costs exactly one line box and spends it differently:
+     the leading is pulled in, and what that frees is put back between items.
+     These two must sum to --card-lh. If they don't, a list stops costing what
+     the cut was measured against and the card overflows its own clamp. */
+  --card-item-lh: 16.5px;
+  --card-item-gap: 3px;
+  --card-h: 206px;
+  /* The Inspiration wall's pinned heights (DESIGN.md §8, 2026-10-08): the rows
+     printed under a picture and the two tiles with no picture. They are the
+     numbers `lib/wall.ts` places tiles with before any image has loaded, and
+     `styles.test.ts` holds the two to each other — change one, change both. */
+  --wall-caption-h: 26px;
+  --wall-site-h: 26px;
+  --wall-title-h: 132px;
+  --wall-quote-h: 150px;
+  /* The Links board draws its deck as rows instead of cards — see the row
+     section further down. A row is built on its own whole-pixel line box,
+     --row-lh, half a pixel more than a card's:
+
+       the name         1 × --row-lh    20
+       the note's words --row-lines     40
+       padding + gap + foot             47   (11 + 8 + 6 + 22, as on a card)
+                                       ----
+                                        107
+
+     Whole, because a row is as tall as what it holds and the rows stack: on
+     the card's 19.5 a row of one line box or three came out x.5px tall, every
+     row after it started on a half pixel, and the skipped-paint rule
+     (content-visibility) dropped that row's dividing line — every second
+     link ran into the next (review 2026-10-04, UI-A-01). At 20 every row is
+     a whole number of pixels, whatever it holds.
+
+     It was 125: a picture 68 square at the head of the row, and the domain on a
+     line box of its own between the name and the words. The picture was empty
+     on most rows — most pages carry no og:image — and the domain was spending
+     19.5px on 10.5px of mono directly above the words it outranked. Both are
+     gone; the domain stands in the footer with the rest of the machine data,
+     and the row is a line box shorter for it.
+
+     --row-lines is mirrored by ROW_LINES in NoteCard.tsx, which is what the
+     face is actually cut to; constants.test.ts holds the two together. */
+  --row-lines: 2;
+  --row-lh: 20px;
+  --row-h: 107px;
+  /* The page's picture on a Links row: the square beside a phone row's words
+     (a row is never shorter than it plus 12 above and below: 88), and how tall
+     it stands across the top of a desktop tile — 128 leaves a 230px card the
+     name, two lines of words and the footer, as a card's own lines do. */
+  --row-pic: 64px;
+  --row-tile-pic: 128px;
+  --bar-h: 58px;
+  /* The smallest box a pointer target may have, in either direction. The
+     design's own rule — "rows are ~44px so a thumb can hit them" — said as a
+     number once. A control keeps whatever it *draws* (a 20px verb glyph, a
+     40px capture cell); this is the box around it that answers the finger,
+     grown by padding, a min-height or a pseudo-element, never by growing the
+     glyph. Sixteen controls were under it on 2026-09-04 (audit F6); every one
+     now reads this token, and `styles.test.ts` holds the list. */
+  --hit: 44px;
+  /* The board row's one height, whatever is in it: the tab strip, the search
+     field, the Reminders mode's label, the phone's board name. The row used
+     to state a 44px minimum while the strip inside it stood 49 — 12px of tab
+     padding around the New-board tab's 24px mark — so the whole desktop
+     board rose 5px when search opened and dropped when it closed, against
+     the rule that nothing else on screen moves (2026-09-04 audit, F9). Now
+     nothing in the row carries vertical padding of its own; every content
+     takes this height and centres in it. */
+  --shelf-row-h: 44px;
+  /* How tall a folder's Look sheet stands at most — and so how much room the
+     drawer leaves under its rows while one is open over it (`.look`,
+     `.shelf[data-dressing]`). */
+  --look-h: 60dvh;
+
+  /* ------------------------------------------------------------------------
+     Marks. Three sizes, one per job, the same way the type has six.
+
+       --icon-nav    24  bar controls — what you navigate and act with
+       --icon-inline 20  controls inside a row or a panel
+       --icon-data   14  footer marks standing on a monospace baseline
+
+     Heroicons draws on a 24 grid, so a mark at any other size is that drawing
+     scaled — and a scaled 1.5 stroke thins with it. --icon-stroke is therefore
+     set per tier in *user units*, chosen so the stroke lands back on 1.5px
+     once the box is applied: 1.5 × 24/20 = 1.8, 1.5 × 24/14 ≈ 2.57.
+
+     --icon-weight then maps the whole set to the text it sits beside: 400 by
+     default, raised to 700 wherever a mark shares a line with bold monospace,
+     so a mark never reads lighter than its own label. */
+  --icon-nav: 24px;
+  --icon-inline: 20px;
+  --icon-data: 14px;
+  --icon-weight: 400;
+  /* Roughly seven rows. Past that the capture bar is taking more of the grid
+     than the note is worth, and the note view is the right place to be. */
+  --capture-max: 190px;
+
+  /* ------------------------------------------------------------------------
+     THE POINTER
+
+     The one piece of the interface the operating system was still drawing.
+     Every other surface in this app is a hairline on a warm near-black, and
+     the thing the user moves across all of them was a soft grey arrow with a
+     drop shadow under it — the only shadow anywhere near the app, and the
+     only object on screen not on the ramp.
+
+     So it is drawn here, in the app's own vocabulary and nothing else:
+
+       hard corners      no radius, no curve, no shadow, mitre joins only
+       two tones         --paper and --ink, and no third
+       the state grammar a resting pointer is an OUTLINE — a hairline shape on
+                         the ground, exactly like a card. Over something you
+                         can act on it INVERTS to a solid, exactly like a
+                         selected card. "Inverted means engaged" is said once
+                         more, by the pointer itself.
+
+     Carrying both tones is also what makes it legible everywhere: an ink
+     keyline reads on the ground, a paper fill reads on an inverted card, and
+     the arrow is never lost against either.
+
+     A data URI cannot reference a custom property, so the two ramp values are
+     written out inside each drawing (URL-encoded, hence %23). They are
+     --paper and --ink and nothing else; this is the token block, which is the
+     one place in the stylesheet a literal is allowed to appear. The keyword
+     after each url() is the fallback the browser falls back to if it declines
+     the SVG, so every token degrades to what it replaced.
+
+     Hotspots are given in the SVG's own units and are the point of the mark:
+     the arrow's tip, the centre of a cross, the centre of a lens.
+     ------------------------------------------------------------------------ */
+
+  /* Resting: an outline arrow. The tip is the hotspot, at 2 2. */
+  --cursor-default: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M2 2 2 17 6 13.5 8.5 19 11 17.8 8.6 12.9 14 12.6Z' fill='%230c0a08' stroke='%23ded5c6' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    2 2, default;
+
+  /* Engaged: the same arrow, inverted. The app's word for "this one". */
+  --cursor-pointer: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M2 2 2 17 6 13.5 8.5 19 11 17.8 8.6 12.9 14 12.6Z' fill='%23ded5c6' stroke='%230c0a08' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    2 2, pointer;
+
+  /* Text. A 1px I-beam with butt caps — the same hard ends every rule in the
+     app has — carried on a paper halo so it survives landing on a word. */
+  --cursor-text: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='24' viewBox='0 0 16 24'%3E%3Cpath d='M4 3H12M8 3V21M4 21H12' fill='none' stroke='%230c0a08' stroke-width='3.5'/%3E%3Cpath d='M4 3H12M8 3V21M4 21H12' fill='none' stroke='%23ded5c6' stroke-width='1.25'/%3E%3C/svg%3E")
+    8 12, text;
+
+  /* Taking hold of the canvas. Not a hand — no icon set has a hand in this
+     app's drawing, and a plump cartoon glove is the opposite of everything
+     above. Four hard arrowheads on two crossed rules: the directions you can
+     actually go, said as rules. */
+  --cursor-grab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 3V21M3 12H21M9 6 12 3 15 6M9 18 12 21 15 18M6 9 3 12 6 15M18 9 21 12 18 15' fill='none' stroke='%230c0a08' stroke-width='3.5'/%3E%3Cpath d='M12 3V21M3 12H21M9 6 12 3 15 6M9 18 12 21 15 18M6 9 3 12 6 15M18 9 21 12 18 15' fill='none' stroke='%23ded5c6' stroke-width='1.25'/%3E%3C/svg%3E")
+    12 12, grab;
+
+  /* Held: the same mark with the centre filled. Engaged, again. */
+  --cursor-grabbing: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 3V21M3 12H21M9 6 12 3 15 6M9 18 12 21 15 18M6 9 3 12 6 15M18 9 21 12 18 15' fill='none' stroke='%230c0a08' stroke-width='3.5'/%3E%3Cpath d='M12 3V21M3 12H21M9 6 12 3 15 6M9 18 12 21 15 18M6 9 3 12 6 15M18 9 21 12 18 15' fill='none' stroke='%23ded5c6' stroke-width='1.25'/%3E%3Crect x='9' y='9' width='6' height='6' fill='%230c0a08'/%3E%3Crect x='9.5' y='9.5' width='5' height='5' fill='%23ded5c6'/%3E%3C/svg%3E")
+    12 12, grabbing;
+
+  /* The pencil. A cross with a gap at the middle, because the gap is what
+     lets you see the point you are about to draw on. */
+  --cursor-crosshair: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2V9M12 15V22M2 12H9M15 12H22' fill='none' stroke='%230c0a08' stroke-width='3.5'/%3E%3Cpath d='M12 2V9M12 15V22M2 12H9M15 12H22' fill='none' stroke='%23ded5c6' stroke-width='1.25'/%3E%3C/svg%3E")
+    12 12, crosshair;
+
+  /* A lens is a square here. Every other frame in this app is, and a circle
+     would be the one rounded corner in the whole system. */
+  --cursor-zoom-in: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 3H16V16H3ZM16 16 22 22M6.5 9.5H12.5M9.5 6.5V12.5' fill='none' stroke='%230c0a08' stroke-width='3.5' stroke-linejoin='miter'/%3E%3Cpath d='M3 3H16V16H3ZM16 16 22 22M6.5 9.5H12.5M9.5 6.5V12.5' fill='none' stroke='%23ded5c6' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    9 9, zoom-in;
+
+  --cursor-zoom-out: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 3H16V16H3ZM16 16 22 22M6.5 9.5H12.5' fill='none' stroke='%230c0a08' stroke-width='3.5' stroke-linejoin='miter'/%3E%3Cpath d='M3 3H16V16H3ZM16 16 22 22M6.5 9.5H12.5' fill='none' stroke='%23ded5c6' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    9 9, zoom-out;
+
+  /* The corner handle on a canvas note. One rule and two hard heads. */
+  --cursor-resize: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 4 20 20M4 11V4H11M20 13V20H13' fill='none' stroke='%230c0a08' stroke-width='3.5' stroke-linejoin='miter'/%3E%3Cpath d='M4 4 20 20M4 11V4H11M20 13V20H13' fill='none' stroke='%23ded5c6' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    12 12, nwse-resize;
+}
+
+/* ===========================================================================
+   THE LIGHT RAMP — the device's choice, never the default (2026-10-11, owner
+   approved; DESIGN.md §2, "The light ramp").
+   ---------------------------------------------------------------------------
+   Dark is the ground and stays the default. A device that asks for light —
+   Settings, or System on a light-mode device — gets `data-theme="light"` on
+   <html> from lib/theme.ts (and public/theme-boot.js before first paint), and
+   this block restates every colour token for it. It is the same ramp turned
+   over, not a white theme beside it:
+
+       #f3efe7  --paper       the ground — warm paper, short of white    lum 0.866
+       #eee9e2  --lens-ground the lens run, 1.05 under the paper            0.820
+       #e9e3db  --rule-faint  the canvas grid                    1.11        0.774
+       #e6dfd7  --raised      chrome, engaged                    1.15        0.745
+       #e1d9d1  --rule-soft   a division inside a thing          1.22        0.702
+       #cfc6bd  --rule        the edge of a thing                1.47        0.573
+       #4e4940  --muted       secondary text                     7.79        0.073
+       #3f3931  --invert      a content surface, on              9.95        0.043
+       #2d2620  --ink         the user's words                  12.99        0.020
+       #070402  --signal      a live address                    17.83        0.001
+
+   The ground is the lightest tone and everything steps *toward the words*, so
+   every move the dark ramp makes upward this one makes downward: raised chrome
+   is a shade darker than the paper, an inverted card is a dark slab with paper
+   type, and the signal's headroom is BELOW the ink — the ink stops short of
+   black so a live address can be darker and warmer than the words round it, by
+   the same 1.37:1. Hue holds 28°–40°; saturation is heaviest at the paper and
+   the signal and thinnest at --muted, as on the dark side.
+
+   The hairline steps are smaller than the dark ones (--rule 1.47 against
+   1.73) on purpose: the eye reads a small darkening of a bright surface far
+   more easily than the same lift of near-black (§2, "A faint ratio does not
+   survive being moved").
+
+   Measured (WCAG 2.1): ink 12.99 on the paper and 11.28 on --raised; muted
+   7.79 and 6.76; muted on the lens run 7.40; paper on --invert 9.95; signal
+   17.83. styles.test.ts holds every pair, for both ramps. (Raised on
+   2026-10-13, owner note LEAD-01: ink 12.32, muted 6.24, invert 8.77, signal
+   16.88 before; the small muted text was the hard part to read.)
+   ========================================================================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --paper: #f3efe7;
+  --card: #f3efe7;
+  --ink: #2d2620;
+  --muted: #4e4940;
+  --rule: #cfc6bd;
+  --rule-soft: #e1d9d1;
+  --rule-faint: #e9e3db;
+  --raised: #e6dfd7;
+  --lens-ground: #eee9e2;
+  --invert: #3f3931;
+  --signal: #070402;
+  --signal-ink: #f3efe7;
+
+  /* An inverted slab is dark here, so what is drawn on it is the paper at an
+     alpha — lighter than the slab, the mirror of the dark ramp's pair. */
+  --on-ink-rule: rgba(243, 239, 231, 0.24);
+  --on-ink-wash: rgba(243, 239, 231, 0.1);
+  /* The paper again: behind a dialog the room recedes into its own ground. A
+     little less than the dark side's 0.62, because a fog over dark type
+     blocks more than a dark over light type does (ink behind it: 2.5:1). */
+  --scrim: rgba(243, 239, 231, 0.55);
+
+  /* The sixteen, re-solved for this ground (DESIGN.md §2b): each keeps its
+     OKLCH hue; lightness was searched between 5.5:1 on the paper and
+     --invert, never darker, so no mark passes the ink; chroma at most 0.095;
+     no two marks, nor a mark and --muted, closer than 0.045 in OKLab. The
+     pale three (Bone, Oat, Stone) are barely-coloured dark greys here — on a
+     light ground a pale mark is an unreadable one. */
+  --board-bone: #5a5950;
+  --board-sand: #774410;
+  --board-oat: #725940;
+  --board-clay: #673729;
+  --board-ember: #8b4b33;
+  --board-ochre: #7a5715;
+  --board-khaki: #484419;
+  --board-moss: #4c5313;
+  --board-olive: #4f6341;
+  --board-sage: #1b5a33;
+  --board-teal: #1a5656;
+  --board-salvia: #204c39;
+  --board-steel: #235580;
+  --board-stone: #565f6c;
+  --board-iris: #504472;
+  --board-plum: #6a3753;
+
+  /* The lamp (§2c). `screen` can only lighten, so on paper it drew nothing:
+     here the wash of --invert multiplies, and the light shows the tooth as
+     its shade. --raised is the ceiling as before, and on this ground 13% of
+     --invert multiplied is louder than --raised (1.24 against 1.15), so every
+     surface's own lift is scaled to 0.62 of its dial: the board you are on
+     lands at 8%, the write box at 2.1%. */
+  --lamp-blend: multiply;
+  --lamp-scale: 0.62;
+
+  /* A photograph is not dimmed on paper: the 0.68 is a damper for glare on
+     the black, and here it only turns a picture milky. A document's first
+     page is shown as itself, a light page warmed to sit on this paper, rather
+     than as the negative the dark ground needs. */
+  --shot-opacity: 1;
+  --doc-filter: sepia(0.2);
+
+  /* The pointer in this ramp's two tones: a paper fill, an ink keyline. */
+  --cursor-default: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M2 2 2 17 6 13.5 8.5 19 11 17.8 8.6 12.9 14 12.6Z' fill='%23f3efe7' stroke='%232d2620' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    2 2, default;
+  --cursor-pointer: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M2 2 2 17 6 13.5 8.5 19 11 17.8 8.6 12.9 14 12.6Z' fill='%232d2620' stroke='%23f3efe7' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    2 2, pointer;
+  --cursor-text: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='24' viewBox='0 0 16 24'%3E%3Cpath d='M4 3H12M8 3V21M4 21H12' fill='none' stroke='%23f3efe7' stroke-width='3.5'/%3E%3Cpath d='M4 3H12M8 3V21M4 21H12' fill='none' stroke='%232d2620' stroke-width='1.25'/%3E%3C/svg%3E")
+    8 12, text;
+  --cursor-grab: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 3V21M3 12H21M9 6 12 3 15 6M9 18 12 21 15 18M6 9 3 12 6 15M18 9 21 12 18 15' fill='none' stroke='%23f3efe7' stroke-width='3.5'/%3E%3Cpath d='M12 3V21M3 12H21M9 6 12 3 15 6M9 18 12 21 15 18M6 9 3 12 6 15M18 9 21 12 18 15' fill='none' stroke='%232d2620' stroke-width='1.25'/%3E%3C/svg%3E")
+    12 12, grab;
+  --cursor-grabbing: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 3V21M3 12H21M9 6 12 3 15 6M9 18 12 21 15 18M6 9 3 12 6 15M18 9 21 12 18 15' fill='none' stroke='%23f3efe7' stroke-width='3.5'/%3E%3Cpath d='M12 3V21M3 12H21M9 6 12 3 15 6M9 18 12 21 15 18M6 9 3 12 6 15M18 9 21 12 18 15' fill='none' stroke='%232d2620' stroke-width='1.25'/%3E%3Crect x='9' y='9' width='6' height='6' fill='%23f3efe7'/%3E%3Crect x='9.5' y='9.5' width='5' height='5' fill='%232d2620'/%3E%3C/svg%3E")
+    12 12, grabbing;
+  --cursor-crosshair: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2V9M12 15V22M2 12H9M15 12H22' fill='none' stroke='%23f3efe7' stroke-width='3.5'/%3E%3Cpath d='M12 2V9M12 15V22M2 12H9M15 12H22' fill='none' stroke='%232d2620' stroke-width='1.25'/%3E%3C/svg%3E")
+    12 12, crosshair;
+  --cursor-zoom-in: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 3H16V16H3ZM16 16 22 22M6.5 9.5H12.5M9.5 6.5V12.5' fill='none' stroke='%23f3efe7' stroke-width='3.5' stroke-linejoin='miter'/%3E%3Cpath d='M3 3H16V16H3ZM16 16 22 22M6.5 9.5H12.5M9.5 6.5V12.5' fill='none' stroke='%232d2620' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    9 9, zoom-in;
+  --cursor-zoom-out: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 3H16V16H3ZM16 16 22 22M6.5 9.5H12.5' fill='none' stroke='%23f3efe7' stroke-width='3.5' stroke-linejoin='miter'/%3E%3Cpath d='M3 3H16V16H3ZM16 16 22 22M6.5 9.5H12.5' fill='none' stroke='%232d2620' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    9 9, zoom-out;
+  --cursor-resize: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 4 20 20M4 11V4H11M20 13V20H13' fill='none' stroke='%23f3efe7' stroke-width='3.5' stroke-linejoin='miter'/%3E%3Cpath d='M4 4 20 20M4 11V4H11M20 13V20H13' fill='none' stroke='%232d2620' stroke-width='1.25' stroke-linejoin='miter'/%3E%3C/svg%3E")
+    12 12, nwse-resize;
+}
+
+/* A drawn pointer is a desktop object and only a desktop object.
+   ---------------------------------------------------------------------------
+   A phone has no pointer to draw, and a tablet with a stylus wants the
+   platform's own hit behaviour rather than an app's opinion about it. On
+   anything coarse or hoverless every token above falls back to the keyword it
+   was standing in for, so the whole feature costs a touch device nothing —
+   not even the bytes, since a cursor no rule resolves to is never decoded. */
+@media (hover: none), (pointer: coarse) {
+  /* Both selectors: the light ramp restates the cursors at a higher
+     specificity, and a phone in light mode pays nothing either. */
+  :root,
+  :root[data-theme="light"] {
+    --cursor-default: default;
+    --cursor-pointer: pointer;
+    --cursor-text: text;
+    --cursor-grab: grab;
+    --cursor-grabbing: grabbing;
+    --cursor-crosshair: crosshair;
+    --cursor-zoom-in: zoom-in;
+    --cursor-zoom-out: zoom-out;
+    --cursor-resize: nwse-resize;
+  }
+}
+
+/* There is still no `@media (prefers-color-scheme: light)` block, and there
+   must not be one. "System" is resolved to light or dark in lib/theme.ts (and
+   public/theme-boot.js before first paint) and lands here as `data-theme`, so
+   the light ramp is the one block above rather than a second copy inside a
+   media query that could drift from it. Each ramp is placed against its own
+   single ground; every surface below reads tokens and is drawn in either. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Android paints its own translucent blue over anything tappable, and blue is
+   not in this app. Killed globally; every control below supplies its own
+   pressed state, which inverts the way the rest of the app marks "on". */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Selection inverts as well, for the same reason — the UA default is the same
+   blue, and it lands on the user's own words where it is most visible. */
+::selection {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  /* Baskerville sets large for its point size; everything below is tuned
+     against that, not against a system sans. */
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+  /* The app draws its own pointer — see the token block. Set once, here, so
+     everything inherits it and only the controls that mean something else
+     (a link, a grip, a lens, a field) say so for themselves. */
+  cursor: var(--cursor-default);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* A field is where the pointer stops being an arrow. The UA would do this on
+   its own, but its I-beam is the system's drawing and this one is the app's. */
+input,
+textarea {
+  cursor: var(--cursor-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/* The same ring, drawn just inside the row, on the controls that sit flush
+   against a screen edge or against a neighbour that shares their rule: panel
+   rows anchored to the right edge, the drawer's rows against its left edge,
+   the strip's tabs against each other and the bar, the write bar's corner
+   cells and marks against the window's bottom and right edges, and Tidy up's
+   folder buttons against each other (review 2026-10-04, UI-B-02). Two pixels outside, the
+   ring's far side was cut off by the viewport and its top and bottom crossed
+   the rows either side (review UI-12) — DESIGN.md §3's own argument for text
+   fields, said for rows. Same weight, same signal; only where it is drawn. */
+.selpanel-btn:focus-visible,
+.selpanel-x:focus-visible,
+.shelf-row:focus-visible,
+.board-tab:focus-visible,
+.board-trash:focus-visible,
+.board-burger:focus-visible,
+.board-search:focus-visible,
+.board-current:focus-visible,
+.topbar-settings:focus-visible,
+.capture-icon:focus-visible,
+.capture-save:focus-visible,
+.capture-mark:focus-visible,
+.sorter-dest:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Every piece of machine data in the app speaks in the same voice. Tabular
+   figures so a count changing from 9 to 10 doesn't shift the row it sits in. */
+.mono {
+  font-family: var(--mono);
+  font-size: var(--t-data);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-data);
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A control says what it does in words (2026-10-13, owner approved, review
+   UI-01): the reading face at the text size, sentence case, no tracking, the
+   way Things, Bear, Linear and Apple's own apps set a button or a menu row
+   (look-notes.md in the run folder). The machine's capitals are kept for what
+   is data: counts, stamps, key caps, state words. Stated on the control's own
+   class beside `.mono`, so it outranks both `.mono` and the control's own rule
+   whatever order they are written in. */
+.selpanel-btn.mono,
+.selpanel-row-label.mono,
+.btn.mono,
+.fmtbtn.mono,
+.signin-skip.mono,
+.sorter-skip.mono,
+.ticker-skip.mono,
+.sheet-conflict-verb.mono,
+.capture-line-verb.mono,
+.link-previews-row.mono,
+.attach-download-all.mono,
+.search-chip.mono,
+.storage-warning button.mono {
+  font-family: var(--body);
+  font-size: var(--t-text);
+  letter-spacing: normal;
+  text-transform: none;
+  font-variant-numeric: normal;
+}
+

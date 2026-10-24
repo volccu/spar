@@ -1,0 +1,858 @@
+/* --- capture bar ---------------------------------------------------------- */
+
+/* The bar grows with what is being written and shrinks back on save. Its floor
+   is one row; its ceiling is --capture-max, after which the field scrolls
+   inside itself rather than eating the grid. The button stays on the floor of
+   the bar, where the thumb left it, instead of stretching up with the text. */
+.capture {
+  position: fixed;
+  inset: auto 0 0 0;
+  /* One row on a desktop, in every state. The field grows upward as the text
+     wraps and the controls stand on the floor of the bar beside it. A phone
+     with words in the field is the one exception: the words take the whole
+     width and the marks and Save stand on a row under them — see "what a
+     capture is saved as" below, which also says why a footer is right there
+     and was wrong here. */
+  display: flex;
+  align-items: flex-end;
+  min-height: calc(var(--bar-h) + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--rule);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* The field and its clear mark travel together, so the mark can sit in the
+   field's own top corner rather than in the bar — well away from Save, which
+   lives in the bottom corner and is the one control here you must never hit by
+   mistake. */
+.capture-field {
+  position: relative;
+  /* A basis of 0, not auto. A flex item's *hypothetical* size is what it is
+     measured at before anything shrinks, and with `auto` that is the
+     textarea's own natural width: about twenty characters plus its padding,
+     some 330px. On a 390px phone that once pushed a corner cell off the row
+     onto a line of its own, under nothing; the bar no longer wraps, but the
+     field still asks for no width of its own, so the four cells at the
+     corner keep their size and the field grows into whatever they leave. */
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  /* The lamp blends, so it needs a group of its own to blend *within* — or it
+     reaches past the bar and lightens the cards behind it. */
+  isolation: isolate;
+}
+
+/* --- the lamp ---------------------------------------------------------------
+   What a lit surface looks like. DESIGN.md §2c holds the argument; this is the
+   mechanism, and it is two layers and a mask.
+
+     the film    --film, tiled and fixed to the surface, never moved
+     the lift    a flat wash of --invert, which is the ground admitting there
+                 is a light on it
+     the mask    a radial pool, `--lamp-pool` wide, at `--lamp-x`/`--lamp-y`
+
+   The mask is the whole idea. The film paints the entire surface and the pool
+   decides how much of it you may see, so the light reveals paper rather than
+   painting anything of its own — and because the film is nailed down while the
+   pool travels, the grain appears to crawl under the caret with nothing
+   animating at all. There is no canvas: the only work is the mask
+   re-rasterising as `--lamp-x` glides, which happens on keystrokes and lasts
+   `--lamp-follow`. (The two write surfaces do run a loop — the breath and the
+   flicker, further down — but it turns two numbers the lift is multiplied by,
+   never the mask; the board surfaces run none.)
+
+   The lift is a flat colour and not a gradient on purpose. A soft radial fill
+   would be a gradient shading a surface, which this app does not have
+   (styles.test.ts holds the line); it does not need to be one, because the
+   mask already does every bit of the fading. That is the same trade the board
+   strip's fade makes and it is the honest one.
+
+   --invert rather than --signal: the top of the ramp is a live address and
+   nothing else, and neither a capture bar nor a board tab is an address.
+   Inversion is what a *content* surface does when something is being done to
+   it — and in the write box something is, because you are writing in it.
+
+   TWO KINDS OF SURFACE, and DESIGN.md §2c names both — five selectors take
+   the one rule. The write surfaces (the capture bar, the editor) are lit
+   because they are focused; the board you are on (the strip tab, the trash
+   tab, the drawer row) is lit because it is where you are. Each sets its own
+   three knobs and shares everything else:
+
+     --lamp-lift   how much --invert the wash carries. THIS IS THE DIAL.
+     --lamp-pool   the pool's radii, `x y`. Lengths on the write box (the
+                   caret does not know how wide the field is); percentages on
+                   a board row, so one pool fits every width of tab.
+     --lamp-x/y    where the pool sits.
+
+   The ramp sets two more, once, for every surface: --lamp-blend (screen on
+   the black, multiply on paper) and --lamp-scale (1, and 0.62 on paper), so
+   a surface's own dial is never restated per theme.
+
+   Registered as <length-percentage> rather than <length> for exactly that
+   reason: a board's pool is placed at 50% and a percentage against a <length>
+   syntax is invalid and silently falls back to the initial 0px, which parks
+   the light in the top-left corner of every tab.
+
+   `--lamp-follow` is LAMP_FOLLOW_MS and `--lamp-fade` is LAMP_FADE_MS, both
+   set on the element by CaptureBar — which is how every duration but
+   `--nav-mark-ms` reaches this stylesheet. Only the write box's lamp moves, so
+   only the write box needs them. */
+@property --lamp-x {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --lamp-y {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* The lamp is a live flame, not a printed one — DESIGN.md §2c.
+   ---------------------------------------------------------------------------
+   Two numbers, both multiplying `--lamp-lift` in the rule below, both sitting
+   at exactly 1 until something animates them. That is the whole mechanism, and
+   it is built this way for one reason: the lift is shared by all five lit
+   surfaces, and only two of them may move. A board tab never runs either
+   animation, so it reads 1 × 1 and lights exactly as it did before this
+   existed — which is the point. The board you are on is a *state*, and a state
+   that flickers reads as a fault.
+
+   Registered rather than left as plain custom properties because an
+   unregistered one is a string: it would jump from keyframe to keyframe
+   instead of interpolating, and a breath that jumps is a blink.
+
+   They multiply the lift rather than filtering the layer. A `brightness()`
+   filter would have caught the film as well as the wash, which is closer to
+   what "the grain breathes" describes — and it also puts a stacking context
+   under a `mix-blend-mode: screen` layer for no better reason than that it
+   was fewer lines. The lift is the dial the whole effect is already tuned by;
+   turning the dial is the honest way to make it breathe. */
+@property --breath-gain {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+@property --flicker-gain {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* A swell and a settle: out on ENTER, back on EXIT. Amplitude is small on
+   purpose — at the capture bar's 3.4% lift this is the difference between a
+   lamp and a lamp somebody is sitting near. */
+@keyframes lamp-breathe {
+  0% {
+    --breath-gain: 1;
+    animation-timing-function: var(--ease-enter);
+  }
+  50% {
+    --breath-gain: 1.3;
+    animation-timing-function: var(--ease-exit);
+  }
+  100% {
+    --breath-gain: 1;
+  }
+}
+
+/* Dips of a few percent at deliberately uneven spacing. Even spacing is a
+   metronome, and the eye finds a metronome in about two passes. */
+@keyframes lamp-flicker {
+  0%,
+  9%,
+  22%,
+  41%,
+  57%,
+  73%,
+  100% {
+    --flicker-gain: 1;
+  }
+  13% {
+    --flicker-gain: 0.93;
+  }
+  31% {
+    --flicker-gain: 0.97;
+  }
+  49% {
+    --flicker-gain: 0.9;
+  }
+  66% {
+    --flicker-gain: 0.955;
+  }
+  84% {
+    --flicker-gain: 0.925;
+  }
+}
+
+/* The grain drifts. DESIGN.md §2c.
+   ---------------------------------------------------------------------------
+   The film is laid twice — once at its own size and once a little larger, so
+   the two tilings never line up — and each copy glides slowly its own way.
+   Where they cross the grain re-forms, so the paper under the light is never
+   quite the same paper twice: dust turning in a beam, not a pattern sliding.
+
+   This is the one loop the board surfaces run, and it is allowed where the
+   breath and the flicker are not because it touches no brightness at all.
+   The lift is untouched, so a selected tab is exactly as lit at every frame;
+   only the tooth inside the light moves. A state that flickers reads as a
+   fault; a state whose grain drifts at a few pixels a second reads as lit.
+
+   Linear, and a literal, for the reasons the spinner's sand is: it is a
+   picture that loops, not a move with an arrival, and an eased drift would
+   pulse once per lap. Each layer travels a whole number of its own tiles per
+   lap (160 → two tiles, 224 → one tile down and one back), so the lap seam is
+   invisible. 90s: slower and the drift is not seen at all; much faster and
+   the grain reads as crawling rather than turning. */
+@keyframes lamp-drift {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: 320px 160px, -224px 224px;
+  }
+}
+
+.capture-lamp,
+.editor-lamp,
+.board-tab[aria-selected="true"]::before,
+.board-trash[aria-selected="true"]::before,
+.shelf-row[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  background-color: color-mix(
+    in srgb,
+    var(--invert)
+      calc(var(--lamp-lift) * var(--lamp-scale) * var(--breath-gain) * var(--flicker-gain)),
+    transparent
+  );
+  /* The film twice, drifting apart — see `lamp-drift` above. */
+  background-image: var(--film), var(--film);
+  background-repeat: repeat;
+  background-size: 160px 160px, 224px 224px;
+  mix-blend-mode: var(--lamp-blend);
+  animation: lamp-drift 90s linear infinite;
+
+  -webkit-mask-image: radial-gradient(
+    var(--lamp-pool) at var(--lamp-x) var(--lamp-y),
+    #000 0%,
+    rgba(0, 0, 0, 0.82) 42%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: radial-gradient(
+    var(--lamp-pool) at var(--lamp-x) var(--lamp-y),
+    #000 0%,
+    rgba(0, 0, 0, 0.82) 42%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* The write box's lamp. It began at 0.8% and could not be seen from more than
+   a foot away, which is the one thing this feature exists to answer. */
+.capture-lamp {
+  --lamp-lift: 3.4%;
+  --lamp-pool: 175px 52px;
+  z-index: 0;
+
+  /* The two loops, on the write surfaces and nowhere else — see the gains
+     above, and DESIGN.md §2c. Durations come down from lib/motion.ts on the
+     element, the same way `--lamp-fade` and `--lamp-follow` do, because the
+     stylesheet is allowed exactly one duration of its own and it is spent on
+     `--nav-mark-ms`. `both` so the pair hold their start values before the
+     first frame rather than snapping. */
+  animation:
+    lamp-breathe var(--lamp-breath) infinite both,
+    lamp-flicker var(--lamp-flicker) var(--ease-exit) infinite both,
+    lamp-drift 90s linear infinite;
+
+  opacity: 0;
+  transition:
+    opacity var(--lamp-fade) var(--ease-exit),
+    --lamp-x var(--lamp-follow) var(--ease-enter),
+    --lamp-y var(--lamp-follow) var(--ease-enter);
+}
+
+/* The open note's editor. The same light, turned down.
+   ---------------------------------------------------------------------------
+   Reading and writing a note happen in the same place at the same size, and
+   the swap between them must not be visible — so the light here can only ever
+   be the faintest mark that the words have become editable, never a state the
+   page enters. It sits well below the write box on every axis:
+
+     the lift    0.02% against 3.4%   (designed at 2.2%; turned down by hand,
+                                      c3628cf, and kept as found)
+     the pool    80 × 40 against 175 × 52   (designed at 150 × 40, likewise)
+
+   The test holds the ordering — editor below capture on both — and not the
+   numbers, which are the owner's dial.
+
+   40px against a 27px line means the pool is about a line and a half tall, so
+   it hugs the line being written rather than washing over the paragraph. The
+   write box's own pool is deliberately looser, because a capture bar is a
+   place you have arrived at and this is a place you were already reading.
+
+   Being narrower matters more here than it looks: the measure is 33em, three
+   times the width of a one-line capture bar, so a pool the write box's size
+   would light a third of the line at once and stop pointing anywhere. */
+.editor-lamp {
+  --lamp-lift: 0.02%;
+  --lamp-pool: 80px 40px;
+  z-index: 0;
+
+  /* The same two loops. They scale with this lamp's own lift, which the user
+     has turned most of the way down — so the breath here is as faint as the
+     light it belongs to, which is correct. A flicker that stayed loud while
+     the lamp was dimmed would be the effect ignoring the dial. */
+  animation:
+    lamp-breathe var(--lamp-breath) infinite both,
+    lamp-flicker var(--lamp-flicker) var(--ease-exit) infinite both,
+    lamp-drift 90s linear infinite;
+
+  opacity: 0;
+  transition:
+    opacity var(--lamp-fade) var(--ease-exit),
+    --lamp-x var(--lamp-follow) var(--ease-enter),
+    --lamp-y var(--lamp-follow) var(--ease-enter);
+}
+
+.capture:focus-within .capture-lamp,
+.editor-field:focus-within .editor-lamp {
+  opacity: 0.5;
+  transition:
+    opacity var(--lamp-fade) var(--ease-enter),
+    --lamp-x var(--lamp-follow) var(--ease-enter),
+    --lamp-y var(--lamp-follow) var(--ease-enter);
+}
+
+/* A field left alone long enough lets the light go — the caret has already
+   been found, and a lamp that never rests is a lamp the eye learns to ignore.
+   Any stroke or caret move takes the flag off and the light comes straight
+   back. Sits after the focus-within rule on purpose: the two score the same
+   specificity, so this one, later, is what a quiet field wears.
+
+   It states its own transition, and that is the whole of the fix for a
+   fade-out that read as a switch. Without one it inherited the focus-within
+   rule's — `--lamp-fade` at `--ease-enter`, a quarter of a second on a hard
+   decelerate — so a light that is supposed to be settling spent most of its
+   brightness inside the first fifty milliseconds. Going out is slow
+   (`--lamp-dim`) and starts slow (`--ease-exit` is the accelerate), which is
+   what makes it something you never catch happening; coming back is quick
+   (`--lamp-fade`, on the rule above) because that one is a reply to a
+   keystroke. lib/motion.ts holds both numbers and the argument for the gap
+   between them.
+
+   The breath and the flicker are deliberately left running. They used to be
+   paused here on the grounds that a lamp which has gone out is not breathing,
+   which was true when the light was gone in 260ms and is not true across a
+   fade this long: the loops would stop dead while the pool is still plainly
+   lit, and a breath that halts in view is more of an event than the fade it
+   was meant to tidy up after. They cost nothing to leave alone — an unfocused
+   lamp has been running both all along. */
+.capture[data-lamp-idle] .capture-lamp,
+.editor-field[data-lamp-idle] .editor-lamp {
+  opacity: 0;
+  transition:
+    opacity var(--lamp-dim) var(--ease-exit),
+    --lamp-x var(--lamp-follow) var(--ease-enter),
+    --lamp-y var(--lamp-follow) var(--ease-enter);
+}
+
+/* Reduced motion keeps the lamp and drops every move in it. The texture is
+   the answer to "where is the caret", so taking it away would be answering a
+   preference about *movement* by removing information; what goes is the travel
+   and the fade, so the light is simply already where the caret is. */
+@media (prefers-reduced-motion: reduce) {
+  /* The drift goes too, on every lit surface: it carries no information,
+     and the grain simply holds still, as it did before it drifted. */
+  .board-tab[aria-selected="true"]::before,
+  .board-trash[aria-selected="true"]::before,
+  .shelf-row[aria-selected="true"]::before {
+    animation: none;
+  }
+  .capture-lamp,
+  .capture:focus-within .capture-lamp,
+  .editor-lamp,
+  .editor-field:focus-within .editor-lamp {
+    transition: none;
+    /* The breath and the flicker go entirely. Unlike the travel and the fade
+       above — which are removed because the light should simply already be
+       where the caret is — these carry no information at all: they exist so a
+       lit surface does not read as printed. That is exactly the kind of motion
+       this preference is asking not to see, so it is the one part of the lamp
+       that leaves without an argument for keeping it. The gains fall back to
+       their registered 1, and the lamp lights at its plain lift. */
+    animation: none;
+  }
+  /* A light that is not allowed to fade must not settle either: without the
+     move, the idle-fade reads as the light going out, which is information
+     lost, not motion saved. */
+  .capture[data-lamp-idle] .capture-lamp,
+  .editor-field[data-lamp-idle] .editor-lamp {
+    opacity: 0.5;
+  }
+}
+
+/* The copy of the field the caret is measured in (lib/caret.ts). Never seen,
+   never hit, never in the accessibility tree — but it has to lay text out
+   exactly as the field does, so it cannot be `display: none` and it cannot be
+   given a width of its own. The component sets everything that decides where a
+   character lands; this is only what keeps it out of the way. */
+.capture-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* Reserved whether or not the mark is showing: the field must not reflow the
+   text you are in the middle of typing. */
+.capture-field textarea {
+  padding-right: 52px;
+}
+
+/* The vertical padding is what makes a one-row field exactly --bar-h tall:
+   58 = 17 + (16.5 × 1.4) + 17, rounded. Change one and change the other. */
+.capture textarea {
+  /* Above the lamp. The light is behind the words, always — it lights the
+     paper they are written on and must never wash over them. */
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 17px 15px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--body);
+  font-size: var(--t-read);
+  line-height: 1.4;
+  max-height: var(--capture-max);
+  resize: none;
+  overflow-y: auto;
+  /* The scrollbar that arrives on the seventh row would otherwise take ~15px
+     from every line already written and re-break the whole draft. */
+  scrollbar-gutter: stable;
+}
+
+.capture textarea:focus {
+  outline: none;
+}
+
+.capture textarea::placeholder {
+  color: var(--muted);
+}
+
+/* --- the bar's controls -----------------------------------------------------
+   Attach, Menu and Save are one bar-height square each; the three marks are
+   bar-height too but narrower, stated below. They all stand on the floor of
+   the bar however far the field has grown above them, at its right-hand end.
+
+   THE BAR PAINTS EXACTLY ONE OF THEM, AND IT IS SAVE.
+
+   This used to be written as `.capture button`, which is one element more
+   specific than `.capture-icon` — so it painted every button in the bar in
+   ink instead. Attach and Menu were two solid slabs in the corner; the three
+   marks were a bright block sitting above the field; and because
+   `.capture-icon[aria-pressed="true"]` carries two classes and therefore does
+   win, a mark that was *off* came out brighter than a mark that was *on*. The
+   marks have read backwards for as long as they have existed.
+
+   It also reached past the bar altogether. The add panel and the board chooser
+   are rendered inside this `<form>`, so every row in them was being given a
+   bar's height, 20px of side padding and a caps tracking none of them asked
+   for — two panels drawn identically elsewhere in the app that did not match
+   themselves here.
+
+   So the shared geometry is stated on the two classes that want it, and the
+   paint is stated once, on the one control that is an act rather than a
+   switch. */
+.capture-icon,
+.capture-save {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--bar-h);
+  height: var(--bar-h);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: var(--cursor-pointer);
+  letter-spacing: 0;
+}
+
+/* Chrome: a glyph on the bar's own ground, carrying the hairline that binds it
+   to the cell before it. It raises when it is on — the flip the menu button
+   has always made, and now the marks make it too, in the right direction. */
+.capture-icon {
+  background: transparent;
+  color: var(--muted);
+  border-left: 1px solid var(--rule-soft);
+}
+
+.capture-icon[aria-expanded="true"],
+.capture-icon[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--ink);
+  border-left-color: var(--rule);
+}
+
+/* While notes are selected the burger is the door to what can be done with
+   them, and it is the one place on the bar that says so: inverted, with the
+   number on the mark — the same fill the selected cards wear, so the count
+   and the cards read as one state. Open or not, it stays inverted; an open
+   panel is already its own evidence.
+
+   **It keeps its width.** It used to grow to fit the number beside the glyph,
+   from 58px to about 78, and push + and the write box sideways at the moment
+   a thumb was near them — the bar jumping under an ordinary act (review
+   2026-10-01, UI-29). The cell is the same square selected or not, and the
+   number rides in its top-right corner, clear of the glyph, which does not
+   move. */
+.capture-icon[data-selecting="true"] {
+  position: relative;
+  background: var(--invert);
+  color: var(--paper);
+  border-left-color: var(--invert);
+}
+
+/* Up to three figures fit the corner above the glyph's top line, so the tenth
+   or the hundredth note moves nothing either. */
+.capture-tally {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  line-height: 1;
+  font-size: var(--t-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Save is the act, and the only painted surface on the row: the one control
+   here that is found without being read. It takes the corner cell the menu
+   button has while the field is empty, so the right edge of the bar is the
+   same square in both states. */
+.capture-save {
+  background: var(--invert);
+  color: var(--paper);
+}
+
+/* The ring is --signal, which barely shows on an --invert fill; on the two
+   painted cells it is drawn in the fill's own text colour instead. */
+.capture-save:focus-visible,
+.capture-icon[data-selecting="true"]:focus-visible {
+  outline-color: var(--paper);
+}
+
+/* Not one of the bar's controls — this one belongs to the field and travels
+   with it, which is why it states its own everything.
+
+   It sits at the field's TOP, not its middle. On a one-row field those are the
+   same place; on a field grown to seven rows the middle would put the ✕ in the
+   middle of the paragraph being written and halfway down to Save, which is the
+   one control here that must never be hit by mistake. The 7px is what centres
+   a 44px target on a --bar-h row, said as the subtraction it is. */
+.capture button.field-clear {
+  position: absolute;
+  /* Above the textarea, and this is the whole reason the ✕ could not be
+     pressed. `.capture-field` isolates, the textarea inside it is
+     `position: relative; z-index: 1` so the words sit over the lamp, and this
+     button was positioned with no z-index at all — so the field painted on top
+     of it and swallowed every click. The textarea's box does not stop where
+     its text does: `padding-right: 52px` reserves the room the ✕ is drawn in,
+     but the element still covers it. The button was visible the whole time,
+     which is why this read as a dead control rather than a missing one. */
+  z-index: 2;
+  top: calc((var(--bar-h) - var(--hit)) / 2);
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-radius: 0;
+  cursor: var(--cursor-pointer);
+  letter-spacing: 0;
+}
+
+/* Pressed, it goes to the raised surface like every other piece of furniture
+   in the app — see the block that says so, beside --raised. It used to flip to
+   full ink, which in a dark room is a flash of paper for the smallest act on
+   the bar, brighter than Save's own press and next to a field being written
+   in. Save flips because Save is ink already; this is not Save. */
+.capture button.field-clear:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* On a pointer device the cell under the cursor comes up to full ink. Nothing
+   moves and nothing fills: the glyph simply stops being furniture. */
+@media (hover: hover) and (pointer: fine) {
+  .capture-icon:hover {
+    color: var(--ink);
+  }
+}
+
+/* --- what a capture is saved as ---------------------------------------------
+   Three marks — priority, to-do, board — drawn only while there are words to
+   save. On a desktop they stand on the bar's own row immediately ahead of
+   Save, and the bar has one shape in every state: typing the first letter
+   swaps the two corner cells (Attach, Menu) for these four. On a phone they
+   stand on a row of their own under the words; that is the block after this
+   one.
+
+   This corner has now been laid out three ways, and the record is what stops
+   the fourth. The marks began here as four bar-height cells divided by
+   hairlines, and read as a toolbar; on a phone they were moved to a row
+   *above* the field, which dropped in over the words on the first keystroke.
+   They then moved to a footer *under* the words — marks at the far left,
+   Save at the far right — which on a wide screen stranded three small glyphs
+   a screen's width from the act they belong to, over an empty row. The owner
+   chose this from three mockups, and it is still the desktop's.
+
+   What keeps it from being the toolbar again is weight. A mark is 44px wide
+   to Save's 58, carries an inline (20px) glyph to Save's 24, has no fill and
+   no hairline between it and the next — one hairline binds the group to the
+   field, and Save's own paint ends it. Chrome, so "on" raises (and the glyph
+   goes solid), exactly as the menu button says it; they are the same
+   `.capture-icon` the corner already uses, so a mark chosen for a note looks
+   like a mark chosen for the bar. */
+.capture-marks {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: flex-end;
+}
+
+.capture-marks .capture-mark {
+  width: var(--hit);
+  padding: 0;
+  border-left: 0;
+}
+
+.capture-marks .capture-mark:first-child {
+  border-left: 1px solid var(--rule-soft);
+}
+
+/* --- the phone's bar: the words on top, the marks and Save underneath -------
+   The owner's call on 2026-09-29, with the Claude app's message box as the
+   reference for its structure (not its looks: no radius, no colour here).
+
+   The one row cost a phone too much. Four cells beside the words left the
+   field about 210px of a 390px screen, so a five-word line broke into five,
+   and five short lines stood the bar a third of the screen tall — with the
+   keyboard up, most of what was left of the board. So once there are words,
+   they get the whole width and the marks and Save take a slim row under them:
+   the marks at the left, Save at the right end. The footer that was wrong on
+   a desktop is right here for the same reason turned round — on a wide
+   screen the far left of the row was a screen's width from Save; on a phone
+   it is a thumb's reach.
+
+   An empty bar is still one slim row (the field, Attach, Menu). The row under
+   the words arrives with the first letter and opens rather than snaps — the
+   bar is anchored to the floor, so a 44px row lifts the words by 44px, and
+   CaptureBar grows it on the note-opening curve so the line glides up.
+
+   A GRID, NOT `flex-wrap`. A 0-basis field and a 100% footer sum to exactly
+   one line, so a wrapping flex row never breaks and leaves the field no width
+   at all (web/CLAUDE.md, "the write box asks for no width of its own"). Named
+   areas say the two rows outright. Everything else in the form — the panels,
+   the dismiss layers, the line on the top edge, the file input, the reader's
+   live region — is positioned out of flow and takes no cell. */
+@media (max-width: 699px) {
+  .capture[data-ready] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "field field field"
+      "marks undo save";
+    align-items: end;
+  }
+
+  /* The undo cell — only on a short screen, where the header's creature has no
+     band to speak in — joins the row under the words, just short of Save. */
+  .capture[data-ready] .undo-slot-bar {
+    grid-area: undo;
+    height: var(--hit);
+    border-left: 0;
+  }
+
+  .capture[data-ready] .capture-field {
+    grid-area: field;
+  }
+
+  /* The first glyph stands on the words' own left edge: the textarea's 15px
+     less the room either side of a 20px glyph in a 44px cell. No hairline
+     before it, which on the desktop binds the group to the field beside it;
+     here the field is above it, and a rule at the screen's edge binds nothing. */
+  .capture[data-ready] .capture-marks {
+    grid-area: marks;
+    justify-self: start;
+    margin-left: calc(15px - (var(--hit) - var(--icon-inline)) / 2);
+  }
+
+  .capture[data-ready] .capture-mark {
+    height: var(--hit);
+  }
+
+  .capture-marks .capture-mark:first-child {
+    border-left: 0;
+  }
+
+  /* Still the one painted thing on the bar and still the corner it takes on
+     the desktop, but a row's height rather than a bar's: 58 wide by 44 tall,
+     found without being read and no longer a slab beside the words. */
+  .capture[data-ready] .capture-save {
+    grid-area: save;
+    height: var(--hit);
+  }
+
+  /* The ✕ is not drawn on a phone. With the field the whole width it would
+     sit at the end of the first line, which is exactly where a thumb lands to
+     put the caret after the words — and it empties the field and the draft
+     with no way back. Backspace, and the marks resetting when the field
+     empties, cover what it did. */
+  .capture button.field-clear {
+    display: none;
+  }
+
+  /* The cap, measured against what can be seen. `--capture-max` is about
+     seven rows, which with the keyboard up is most of the space above it; so
+     on a phone the field stops at 30% of the visible height (`--visible-h`,
+     written by CaptureBar from the visual viewport, since `dvh` goes on
+     counting the half of the screen the keyboard is covering) — about four
+     rows with the keyboard up, the full seven with it down — and never below
+     three rows (34px of padding and three 1.4em lines), where a field that
+     scrolls is a keyhole. Past the cap it scrolls inside itself, as it does
+     everywhere. */
+  .capture-field textarea {
+    padding-right: 15px;
+    max-height: clamp(
+      calc(34px + 4.2em),
+      calc(var(--visible-h, 100dvh) * 0.3),
+      var(--capture-max)
+    );
+  }
+
+  /* The board chooser opens over the mark that opened it, which on a phone
+     is at the left end of the row. */
+  .capture[data-ready] .capture-chooser {
+    right: auto;
+    left: 0;
+  }
+}
+
+/* The board chooser for the note being written. The panel it reuses pins
+   itself `--bar-h` off the floor, which is right everywhere a bar is one row
+   tall and wrong here, where the field has grown under it: so it is anchored
+   to the bar's own top edge instead, in the bar's own stacking context, and
+   the panel's fixed placement is stood down. Above the dismiss layer, like the
+   add panel beside it. Right-hand corner, over the mark that opened it. */
+.capture-chooser {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  z-index: 22;
+}
+
+.capture-chooser > .selpanel {
+  position: relative;
+  bottom: auto;
+  right: auto;
+}
+
+/* The one line the bar says about a note — "Saved 3 days ago · Open", a
+   share's offer (components/CaptureLine.tsx); "Saved to Inbox · Go" is the
+   header creature's to say now. It stands on the bar's own top
+   edge, like the chooser, so it rides up with a field that has grown; it is
+   over the foot of the board rather than in it, so it moves no card. Left,
+   and the width it may take stops short of the right-hand corner, which the
+   thumb reaches for (the undo offer floated there until 2026-10-01; the
+   header's creature says it now).
+
+   Drawn as the bar's own furniture: its ground, its rule, the words muted
+   and the one verb in ink. It is below the chooser and the add panel, which
+   open over it. */
+.capture-line {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  max-width: calc(100% - var(--hit) - 20px);
+  min-height: var(--hit);
+  padding-left: 14px;
+  background: var(--card);
+  border-top: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+}
+
+/* The words give, never the verb: a folder's name can be forty characters. */
+/* The files waiting on the line, as small squares ahead of its words: a
+   picture is cropped square and held to --shot-opacity like every picture in
+   a note; anything else stands as its family's mark. */
+.capture-line-files {
+  display: flex;
+  flex: none;
+  gap: var(--s-2);
+  margin-inline-end: var(--s-4);
+}
+
+.capture-line-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--s-8);
+  height: var(--s-8);
+  overflow: hidden;
+  color: var(--muted);
+  border: 1px solid var(--rule-soft);
+}
+
+.capture-line-file img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: var(--shot-opacity);
+}
+
+.capture-line-said {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.capture-line-verb {
+  flex: none;
+  min-height: var(--hit);
+  padding: 0 14px;
+  border: 0;
+  color: var(--ink);
+  background: none;
+  cursor: var(--cursor-pointer);
+}
+
+/* The share's second verb sits a step off the first. Both keep the 44px height
+   and the words keep the ellipsis. */
+.capture-line-verb + .capture-line-verb {
+  margin-inline-start: var(--s-4);
+}
+
+.capture-line-verb:active {
+  color: var(--paper);
+  background: var(--invert);
+}
+

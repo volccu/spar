@@ -1,0 +1,21 @@
+{
+  // The root typecheck: `npm run typecheck:root`, which `npm run lint` runs.
+  // It covers src/, tests/ and conformance/, and the web and edge-function
+  // files those import (followed from the imports, not listed). Node's types
+  // and no DOM, like server/tsconfig.json — the shared edge-function files run
+  // in Deno and in Node, and with the DOM library their bytes stop agreeing
+  // with Node's WebCrypto — so the server's few stand-ins for DOM names
+  // (browser-globals.d.ts) are borrowed too.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src", "tests", "conformance", "server/src/browser-globals.d.ts"]
+}

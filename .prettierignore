@@ -1,0 +1,24 @@
+# Same exclusions as eslint.config.js's ignores, plus lockfiles/build
+# artifacts that tools generate, not humans.
+node_modules/
+dist/
+web/dist/
+web/src/seed/
+reports/
+TEMP/
+docs/
+Takeout/
+supabase/
+*.tsbuildinfo
+web/.vercel/
+package-lock.json
+web/package-lock.json
+notes.db*
+*.sql
+web/CLAUDE.md
+CLAUDE.md
+SPEC.md
+DESIGN.md
+AUDIT*.md
+AGENTS.md
+SETUP.md

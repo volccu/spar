@@ -1,0 +1,934 @@
+/* --- note view ------------------------------------------------------------ */
+
+/* The note opens out of the card that was tapped and closes back into it, so
+   the grid is never replaced between two frames and you keep your place in it.
+   The sheet is full size from the first frame; what moves is its clip, driven
+   from NoteView with the card's measured rect. Nothing inside is ever scaled,
+   which is what keeps the type at reading size for the whole move instead of
+   stretching it and letting go. */
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  /* The sheet takes a horizontal swipe to the next note, but vertical motion
+     stays the page's own — the reader scrolls. pan-y says so without the
+     browser having to decide. */
+  touch-action: pan-y;
+  will-change: clip-path, transform;
+}
+
+/* A note on its way out takes no more clicks. Its marks sit where the board's
+   own controls are — Delete exactly where the Settings cog stands — and a quick
+   click after Escape landed on the closing note's Delete instead of the cog
+   (UX review 2026-10-18). The click goes through to what is underneath. */
+.sheet[data-closing] {
+  pointer-events: none;
+}
+
+/* The mark a note collapses onto when it is archived or deleted, dead centre
+   of the screen because that is where the clip closes. */
+.sheet-mark {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  /* Half the nav mark, so the centre of the glyph is the centre of the clip. */
+  margin: calc(var(--icon-nav) / -2) 0 0 calc(var(--icon-nav) / -2);
+  /* Half again the size it is in the bar. It is the only thing left on screen
+     at the end of the collapse, and it is standing in for a whole note. */
+  transform: scale(1.5);
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.sheet-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* 5, not 7: the marks grew from 40 to a thumb's 44 and the bar keeps its
+     54px by giving the difference back here.
+
+     The top inset is the same one .topbar pays and for the same reason: this
+     sheet is `inset: 0` on a page served `viewport-fit=cover`, so on an
+     installed phone the app owns the strip behind the status bar and this bar
+     is what lands in it. Back and the six marks were sitting under the clock.
+     It resolves to 0 everywhere else, so it costs nothing on a desktop. */
+  padding: calc(5px + env(safe-area-inset-top)) 6px 5px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--card);
+}
+
+/* Marks, no words and no frame. The button is a thumb's-worth target with a
+   16px mark in the middle of it: the border was drawing a box around every
+   single one, which turned a four-action bar into four competing rectangles.
+   It was 40px; six of these 2px apart are the open note's most-used controls
+   and Delete is the last of them, so a miss cost the most exactly here. */
+.iconbtn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  cursor: var(--cursor-pointer);
+}
+
+/* The bar's Put back in the Trash carries its word (dogfooding 2026-10-18): a
+   curved arrow alone read as redo or share, beside the same words up in the
+   note's trash line. Still one `--hit` tall; the width is the mark and word. */
+.iconbtn-worded {
+  width: auto;
+  gap: var(--s-3);
+  padding-inline: var(--s-3);
+}
+
+/* Every mark in the app, at whichever tier it was asked for. Size and stroke
+   live here rather than in Icons.tsx so a tier is retuned in one place.
+
+   stroke-width on the <svg> beats the strokeWidth attribute Heroicons sets on
+   the same element (and Lucide's stroke-width="2", width and height, on a
+   folder's mark), and the paths inherit the computed value — which is what
+   lets one declaration re-weight a set of imported components. Solid marks
+   carry no stroke and simply ignore it.
+
+   The `* 1px` is for Firefox: it drops a unitless calc() here, falls back to
+   one user unit and draws every mark at a third of its weight (0.58px on a
+   14px mark). A px inside an SVG is a user unit, so Chromium, which read the
+   unitless form as the same thing, draws exactly what it drew. */
+.icon {
+  display: block;
+  flex: 0 0 auto;
+  stroke-width: calc(var(--icon-stroke) * 1px * var(--icon-weight) / 400);
+}
+
+.icon-nav {
+  width: var(--icon-nav);
+  height: var(--icon-nav);
+  --icon-stroke: 1.5;
+}
+
+.icon-inline {
+  width: var(--icon-inline);
+  height: var(--icon-inline);
+  --icon-stroke: 1.8;
+}
+
+.icon-data {
+  width: var(--icon-data);
+  height: var(--icon-data);
+  --icon-stroke: 2.57;
+}
+
+/* --- marks answer the pointer -----------------------------------------------
+   A mark on the shelf or in a bottom-right panel moves one of its own parts
+   when the pointer is on the row it belongs to: the trash lid tips open, the
+   folder's flap swings, the tick is struck again, the plus turns. The rest of
+   the outline holds still, because two moving parts at 20px is a mark you
+   cannot read rather than a mark that responded — the chain is the single
+   exception, and only because two halves parting is a thing one half cannot
+   say on its own.
+
+   Everything the vocabulary needs is here, in one place, so a new mark is one
+   more pair of rules and the whole set retimes from `--nav-mark-ms`. The parts
+   themselves are named in Icons.tsx as `icon-<mark>-<part>`.
+
+   Three rules hold for every mark that joins:
+
+     The trigger is the *row*, never the mark. The whole nav item is the hit
+     area, and `:focus-visible` fires the same thing so arriving by keyboard
+     gets the same answer arriving by pointer does.
+
+     A gesture plays once; a state holds. A lid tipping open is something that
+     *happened* — it plays through and comes back on its own, so it is an
+     `animation`. A plus turning is what the control *is* while you are on it,
+     so it is a `transition` that holds at 90° and unwinds when you leave. In
+     and out take ENTER and EXIT respectively, which is what those two curves
+     have always been for.
+
+     Only `transform` and `opacity` move. Never a width, an x, or anything else
+     that would make the row re-lay-out under the cursor.
+
+   Transform origins are in viewBox units and each one was picked off the real
+   geometry, not guessed: `transform-box: view-box` puts the origin in the same
+   24-unit space the drawing is in, without which an SVG rotation happens about
+   the user-space origin and throws the part clean off the mark. */
+
+/* The ink lift, which is not motion and so is not inside the reduced-motion
+   guard below. It is deliberately *not* a raised ground: `--raised` is how a
+   tab says it is the board you are on, and hover borrowing that would give
+   two tabs the same fill with one of them lying. Muted → full ink is the
+   quieter half of the same signal, which is the right weight for "the pointer
+   is here" against "this is where you are". */
+@media (hover: hover) and (pointer: fine) {
+  .board-tab:hover,
+  .board-tab:focus-visible,
+  .board-trash:hover,
+  .board-trash:focus-visible,
+  .shelf-row:hover,
+  .shelf-row:focus-visible,
+  .board-search:hover,
+  .board-search:focus-visible,
+  .board-burger:hover,
+  .board-burger:focus-visible,
+  .topbar-settings:hover,
+  .topbar-settings:focus-visible,
+  .board-more:hover,
+  .search-scope:hover,
+  .search-scope:focus-visible {
+    color: var(--ink);
+  }
+
+  /* Already full ink at rest — it is the only board named in its row — so this
+     one answers with the same step off the paper its own pressed state takes. */
+  .board-current:hover,
+  .board-current:focus-visible {
+    background: var(--raised);
+  }
+}
+
+/* Every part that can move, and what it does when it is asked to.
+
+   Each one names its own keyframes in `--nav-anim` rather than being wired up
+   under the trigger by hand: the trigger below then needs to know only *that*
+   a part moves, never which, so adding a mark to the vocabulary is a rule here
+   and nothing anywhere else. Timing is shared and lives on this rule, which is
+   what makes `--nav-mark-ms` a real single point of control.
+
+   `transform-box: view-box` on all of them, including the ones that only
+   translate and do not strictly need it: it puts every transform in the same
+   24-unit space the drawing is in, so a number in a keyframe below means the
+   same thing wherever it appears. */
+.icon-trash-lid,
+.icon-inbox-lip,
+.icon-recent-cell,
+.icon-todo-tick,
+.icon-link-lower,
+.icon-link-upper,
+.icon-file-fold,
+.icon-folder-flap,
+.icon-archive-lid,
+.icon-bars-line,
+.icon-search-lens,
+.icon-signout-arrow,
+.icon-signin-arrow,
+.icon-restore-arrow,
+.icon-priority-banner,
+.icon-inspo-sun,
+.icon-merge-front {
+  transform-box: view-box;
+  animation-duration: var(--nav-mark-ms);
+  animation-timing-function: var(--ease-nudge);
+}
+
+/* The bin's lid tips open on the left-hand corner of its own rim — 3.75 5.955,
+   the leftmost point of the leftmost rim fragment.
+
+   12 degrees, and that is a ceiling rather than a preference. The handle sits
+   only 2.28 units below the top of the box, so the lid swings on a 12.5-unit
+   arm with barely two units of headroom: past this the handle's outer corner
+   leaves the viewBox and the mark gets shaved. At 12 it clears by a fraction
+   of a pixel on the peak frame alone, and the rim's far end still travels a
+   readable 3.4 units. */
+.icon-trash-lid {
+  transform-origin: 3.75px 5.955px;
+  --nav-anim: nav-trash-lid;
+}
+
+/* The archive lid lifts straight off instead of tipping. Deliberately not the
+   trash's gesture said twice: one object is hinged and the other is a box with
+   a lid on it, and the marks should not claim to be the same thing. */
+.icon-archive-lid {
+  --nav-anim: nav-lift;
+}
+
+/* The tray's lip dips, the way it would if something had just landed behind
+   it. The one part in the set that moves *down* — everything else lifts, and
+   an inbox is the one mark where the thing arriving is the point. */
+.icon-inbox-lip {
+  --nav-anim: nav-dip;
+}
+
+/* Four cells lifting on a diagonal wave: top-left, then the two on the
+   counter-diagonal together, then bottom-right. Four separate delays would
+   read as a queue rather than a surface, and would run the gesture well past
+   its budget; three steps keeps it inside 500ms end to end. */
+.icon-recent-cell {
+  --nav-anim: nav-lift;
+}
+
+.icon-recent-cell-2,
+.icon-recent-cell-3 {
+  animation-delay: 60ms;
+}
+
+.icon-recent-cell-4 {
+  animation-delay: 120ms;
+}
+
+/* The tick is struck again: it wipes off along its own length and redraws.
+   The dash pattern is 12 against a stroke 9.63 long, so at rest the whole tick
+   sits inside the first `on` run and the mark is exactly what it always was —
+   and at the far end of the wipe the path lies entirely inside the `off` run,
+   with no zero-length dash left to sprout a round cap.
+
+   ENTER rather than the overshoot: a curve that goes past its target would
+   carry the offset back below zero, which for a single-value dash pattern
+   means the stroke reappearing from the wrong end. */
+.icon-todo-tick {
+  stroke-dasharray: 12;
+  animation-timing-function: var(--ease-enter);
+  --nav-anim: nav-todo-tick;
+}
+
+/* The two halves of the chain part along their own axis and snap back. The
+   only mark whose parts move in opposite directions, which is the one case
+   where two moving parts say something a single one could not. */
+.icon-link-lower {
+  --nav-anim: nav-link-lower;
+}
+
+.icon-link-upper {
+  --nav-anim: nav-link-upper;
+}
+
+/* The folded corner lifts off the page, up and outward along its own fold. */
+.icon-file-fold {
+  --nav-anim: nav-file-fold;
+}
+
+/* The folder's flap opens on its bottom-left hinge. The flap here is a single
+   rule laid across the body rather than a shape — that is how this drawing is
+   built — so the rule is what swings, and it has the whole top of the box to
+   swing into. */
+.icon-folder-flap {
+  transform-origin: 2.25px 12.75px;
+  --nav-anim: nav-folder-flap;
+}
+
+/* Three bars pushed to the right in sequence — a list going somewhere, which
+   is what the mark opens. */
+.icon-bars-line {
+  --nav-anim: nav-bars-line;
+}
+
+.icon-bars-line-2 {
+  animation-delay: 60ms;
+}
+
+.icon-bars-line-3 {
+  animation-delay: 120ms;
+}
+
+/* The lens swells, about the true centre of its circle rather than the middle
+   of the box. It stays welded to its handle: six per cent moves the join by
+   0.45 units, which is less than half the stroke it is joining inside. */
+.icon-search-lens {
+  transform-origin: 10.5px 10.5px;
+  --nav-anim: nav-magnify;
+}
+
+/* Each arrow travels the way it points — out through the door, or in. One rule
+   for a mirrored pair, which is the only thing that needs saying about them. */
+.icon-signout-arrow {
+  --nav-anim: nav-slide-left;
+}
+
+.icon-signin-arrow {
+  --nav-anim: nav-slide-right;
+}
+
+/* The turn-back arrow lifts, back up to where the note was. */
+.icon-restore-arrow {
+  --nav-anim: nav-lift-far;
+}
+
+/* The banner, and it catches a gust from the pole it is tied to — which is
+   where the transform origin has to be, or the flag stretches out of both ends
+   at once and reads as a wobble rather than as wind. */
+.icon-priority-banner {
+  transform-origin: 3px 9.75px;
+  --nav-anim: nav-flag-wave;
+}
+
+/* The front sheet slides onto the one behind it, which is the verb exactly. */
+.icon-merge-front {
+  --nav-anim: nav-merge-front;
+}
+
+/* The picture's sun lifts, as a lid does — Inspiration's own part to move. */
+.icon-inspo-sun {
+  --nav-anim: nav-lift;
+}
+
+/* A folder's chosen mark (2026-10-08, owner approved). The stock glyphs from
+   Lucide and Heroicons have no named parts to move, so a picked mark answers as a
+   whole: a small lift with a few degrees of tilt that settles back — one move,
+   one shot, the same duration and curve as every part above. It is set on the
+   glyph by `BoardIcon` and the chooser's `BoardMark` (class `icon-picked`) and
+   never on the hand-drawn folder, which keeps its own flap. The `<svg>` is an
+   ordinary CSS box, so it pivots on its own centre. */
+.icon-picked {
+  transform-box: border-box;
+  transform-origin: 50% 50%;
+  animation-duration: var(--nav-mark-ms);
+  animation-timing-function: var(--ease-nudge);
+  --nav-anim: nav-picked;
+}
+
+/* The two marks that hold rather than play. A quarter turn lands each of them
+   back on itself, and that is the point: what you saw was the turn, and the
+   mark you were reading is still the mark you are reading. Not 45 degrees for
+   the plus, which would make it an ✕ — and an ✕ here means close. */
+.icon-plus-glyph,
+.icon-clear-glyph {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  transition: transform var(--nav-mark-ms) var(--ease-exit);
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  /* The whole vocabulary, triggered once. Every part above named its own
+     keyframes, so this rule says only "the row under the pointer wakes up
+     whatever it is holding" — and a mark added later needs no line here.
+
+     A disabled panel row is exempt: it is not going to do anything, and a mark
+     that answers a pointer the button will not is the interface lying. */
+  :is(.board-tab, .board-trash, .board-search, .shelf-row, .selpanel-btn:not(:disabled)):is(
+      :hover,
+      :focus-visible
+    )
+    :is(
+      .icon-trash-lid,
+      .icon-inbox-lip,
+      .icon-recent-cell,
+      .icon-todo-tick,
+      .icon-link-lower,
+      .icon-link-upper,
+      .icon-file-fold,
+      .icon-folder-flap,
+      .icon-archive-lid,
+      .icon-bars-line,
+      .icon-search-lens,
+      .icon-signout-arrow,
+      .icon-signin-arrow,
+      .icon-restore-arrow,
+      .icon-priority-banner,
+      .icon-inspo-sun,
+      .icon-merge-front,
+      .icon-picked
+    ) {
+    animation-name: var(--nav-anim);
+  }
+
+  :is(.board-tab, .board-trash, .board-search, .shelf-row, .selpanel-btn:not(:disabled)):is(
+      :hover,
+      :focus-visible
+    )
+    :is(.icon-plus-glyph, .icon-clear-glyph) {
+    transform: rotate(90deg);
+    transition-timing-function: var(--ease-enter);
+  }
+
+  /* The phone's board row is the one nav item holding *two* marks — the burger
+     and the board's own — and two parts moving at once is a row you look at
+     rather than read. Only the burger answers, and it is named by position
+     because that is what it is: the first mark in the row. */
+  .board-current:is(:hover, :focus-visible) > .icon:first-child .icon-bars-line,
+  .board-burger:is(:hover, :focus-visible) .icon-bars-line {
+    animation-name: var(--nav-anim);
+  }
+}
+
+/* --- the keyframes ----------------------------------------------------------
+   Shared where the motion is genuinely the same — a lid lifting off a box and
+   a cell lifting off the grid are one move at one distance, and writing them
+   twice is how two things that should agree quietly stop agreeing. Distances
+   are in viewBox units: at the 20px tier one unit is 0.83 of a pixel. */
+
+@keyframes nav-trash-lid {
+  0% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(-12deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes nav-folder-flap {
+  0% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(-10deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes nav-lift {
+  0% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-1.2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes nav-picked {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  40% {
+    transform: translateY(-1.2px) rotate(-5deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes nav-lift-far {
+  0% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-1.8px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes nav-dip {
+  0% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(1.1px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes nav-slide-left {
+  0% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(-1.5px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes nav-slide-right {
+  0% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(1px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes nav-bars-line {
+  0% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(1.4px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes nav-link-lower {
+  0% {
+    transform: translate(0, 0);
+  }
+  40% {
+    transform: translate(-0.55px, 0.55px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes nav-link-upper {
+  0% {
+    transform: translate(0, 0);
+  }
+  40% {
+    transform: translate(0.55px, -0.55px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes nav-file-fold {
+  0% {
+    transform: translate(0, 0);
+  }
+  40% {
+    transform: translate(0.5px, -0.7px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes nav-merge-front {
+  0% {
+    transform: translate(0, 0);
+  }
+  40% {
+    transform: translate(-0.8px, -0.8px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes nav-magnify {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* A gust catches the banner and it settles again. Stretching away from the
+   pole rather than travelling, because a flag is tied at one end — the same
+   reason `nav-lift` moves the lid and `nav-merge-front` slides the sheet: the
+   motion is the thing the drawing already does. */
+@keyframes nav-flag-wave {
+  0% {
+    transform: scaleX(1);
+  }
+  40% {
+    transform: scaleX(1.07);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes nav-todo-tick {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dashoffset: 12;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Pressed and engaged both raise — the furniture raises, the content inverts
+   (`--raised`, web/CLAUDE.md). These inverted to full ink, so an open note
+   whose priority was on carried a near-white slab in its bar corner for as
+   long as it was open, the loudest thing on a screen of words. Engaged also
+   fills the mark itself (see Icons.tsx), so the state still reads at a
+   glance: two quiet signals, the raised cell and the solid mark. */
+.iconbtn:active,
+.iconbtn[data-on="true"] {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* The save mark lives inside the spacer, so it can only ever take room the
+   spacer had spare. Beside Back it was an item of its own, and on a 360px
+   phone the bar has 26px spare and the mark wants 30 — so opening the editor
+   pushed all six marks right, Delete into the padding. Now it clips instead. */
+.sheet-bar .spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* The save mark, beside Back. Padded to the left so it does not sit against
+   the mark it follows, and held at `--muted` like every other thing in this
+   app that is merely reporting — the six marks on the other side of the
+   spacer are controls and take the ink. Nothing here is pressable, so it takes
+   no target size and no cursor. */
+.save-state {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding-left: 8px;
+  color: var(--muted);
+}
+
+/* The note's marks, in a box of their own (NoteView). On a desktop the box is
+   not drawn at all — the marks stand in the bar at the top, right of the
+   spacer, as they always have. */
+.sheet-marks {
+  display: contents;
+}
+
+/* On a phone the marks stand at the bottom edge, where the thumb is: filing,
+   archiving or deleting one-handed was a stretch to the top corner on every
+   note, and the bottom third held only the + (owner approved 2026-10-05,
+   review UX-A-10). Back and the shelf's burger stay top-left, because they
+   say where you are. The sheet stands as tall as the glass the keyboard
+   leaves (`--visible-h`, written on the sheet by NoteView), so the bar rides
+   above the keyboard while the note is typed into rather than under it.
+   The bar is `--bar-h` tall above the gesture inset — the capture bar's
+   height, so every panel that stands on `--bar-h` lands exactly on it — and
+   `--sheet-foot` tells what floats over the foot of the note (the +, the
+   conflict notice, the undo offer over the sheet) to stand that much higher. */
+@media (max-width: 699px) {
+  :root {
+    --sheet-foot: var(--bar-h);
+  }
+
+  .sheet {
+    bottom: auto;
+    height: var(--visible-h, 100dvh);
+  }
+
+  /* The bar is a flex item, so this lifts it — and the marks band hanging
+     from it — over the body without making it the band's containing block.
+     The opening animations leave both the bar and the body their own
+     stacking context (`fill: both`), and the body, later in the page, would
+     otherwise be drawn over the band and take its presses. */
+  .sheet-bar {
+    z-index: 3;
+  }
+
+  .sheet-marks {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Over the note's own positioned pieces — a lifted list item is 2. */
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    min-height: calc(var(--bar-h) + env(safe-area-inset-bottom));
+    padding: 0 6px env(safe-area-inset-bottom);
+    background: var(--card);
+    border-top: 1px solid var(--rule);
+  }
+
+  /* The + takes the empty left end of the band; the five stay at the right. */
+  .sheet-plus {
+    margin-right: auto;
+  }
+
+  /* Stated with the sheet, to outrank the body's own padding further down. */
+  .sheet > .sheet-body {
+    padding-bottom: calc(40px + var(--bar-h) + env(safe-area-inset-bottom));
+    /* The marks band stands over the foot of this scroller, so the browser's
+       own follow-the-caret stopped at the glass's edge, under the band, and
+       the last lines typed were hidden (dogfooding 2026-10-18). */
+    scroll-padding-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + var(--s-8));
+  }
+
+  /* The insert and reminder panels stand on the marks bar, as the Move
+     chooser already does from `.selpanel`'s own floor. */
+  .sheet .selpanel-over:not(.selpanel-under) {
+    bottom: calc(var(--bar-h) + env(safe-area-inset-bottom));
+    max-height: calc(var(--visible-h, 100dvh) - var(--bar-h) - env(safe-area-inset-bottom));
+  }
+}
+
+.btn {
+  padding: 9px 12px;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  cursor: var(--cursor-pointer);
+}
+
+/* An engaged control inverts. Colour is not used to mean "on" anywhere in the
+   app — the one hue left is a live link, which is the only thing in a note
+   that isn't text. */
+.btn[aria-pressed="true"],
+.btn[data-on="true"] {
+  background: var(--invert);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* The words arrive 50ms behind the frame and rise a few pixels as they land —
+   see NoteView. Driven from script rather than from here, because the same
+   element has to be able to go the other way when the note closes, and a
+   stylesheet can only ever say "on the way in". */
+.sheet-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  /* The measure must not depend on how much has arrived yet. An open note
+     gains height after it is on screen — a link unfurls, an attachment row
+     appears, a document's pages draw — and each of those can be the thing that
+     takes the sheet past the viewport. Without a reserved gutter the whole
+     column of words steps sideways at that moment, which is the one place in
+     the app where the user is actually reading. */
+  scrollbar-gutter: stable;
+  /* 20px at the sides, not 16: the list grip and the code copy button stand
+     in the margin left of the text rather than in the line, so they cost the
+     words nothing (see "one line grid" below), and on a phone the margin is
+     all the room there is. */
+  padding: 16px 20px 40px;
+}
+
+/* Pressed states for the rest of the chrome, replacing the browser's blue.
+   The furniture presses to the raised surface rather than inverting — see
+   --raised. Save still flips, because it is ink already and pressing has to
+   change something. */
+.board-tab:active,
+.board-trash:active,
+.capture-icon:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.capture-save:active {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* A board picked up to be carried along the shelf (lib/useBoardPress.ts) —
+   the strip's tab and the drawer's row alike. Held is pressed, kept: the same
+   step onto --raised and to full ink a press takes, plus the one thing a press
+   does not have, an edge of its own at the weight every real edge takes, so it
+   reads as a thing lifted out of the row rather than a row being touched. No
+   shadow and no scale: DARKROOM lifts by tone and by rule, never by depth.
+   It stands in front of the neighbours that step aside under it. */
+.board-tab[data-lifted="true"],
+.shelf-row[data-lifted="true"] {
+  z-index: 2;
+  background: var(--raised);
+  color: var(--ink);
+  outline: 1px solid var(--rule);
+  outline-offset: -1px;
+  cursor: var(--cursor-grabbing);
+}
+
+/* A press on a board may be the start of a hold, so the long press belongs to
+   the app: no text selection starting under the thumb and no callout sheet on
+   iOS. The name is a label, never something to copy. */
+.board-tab,
+.shelf-row {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* While a board is carried the shelf scrolls under it at the edges, and a
+   snap point would tug the strip back to a tab boundary after every step of
+   that scroll. */
+.boards[data-reordering="true"] {
+  scroll-snap-type: none;
+}
+
+/* --- a newer copy arrived while this one was being written ------------------
+   The app's one error grammar, said where the error happened.
+
+   DESIGN.md §3: an error takes full-ink text beside a 3px ink rule, and never
+   the signal and never a hue — `.signin-error` and `.meta-overdue` are the
+   two that already carry it, and this is the third and last. There is no
+   fill, no radius and no shadow, so the 3px rule is doing all of the work,
+   which is what that weight exists for: it is the only place in the system a
+   rule is allowed to be heavier than a hairline.
+
+   It states `--t-read` for the same reason `.sheet-verbs` does: `max-width:
+   33em` is 33 ems *of whatever the element is set in*, so a block set at the
+   prose size (13px) would buy two thirds of the column and sit indented from
+   the first letter of every line below it. The size is bought here and each
+   child takes its own back.
+   -------------------------------------------------------------------------- */
+
+/* It floats over the foot of the sheet rather than standing in the column.
+   It arrives while the words are being typed, and in the column it pushed
+   them ~90px down under the caret — an error that moved the thing it was
+   about. Over the foot it covers only paper: `.sheet-body[data-conflict]`
+   buys that much room at the bottom, where growing moves nothing on screen.
+   Fixed inside `.sheet`, which is its containing block (the sheet animates a
+   transform), so it stays with the note. */
+.sheet-conflict {
+  position: fixed;
+  z-index: 21;
+  left: 50%;
+  bottom: calc(var(--sheet-foot, 0px) + 10px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  font-size: var(--t-read);
+  width: min(calc(100% - 40px), 33em);
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ink);
+  background: var(--paper);
+}
+
+.sheet-body[data-conflict] {
+  padding-bottom: 240px;
+}
+
+/* Interface prose, which is what --t-text is for. Explicitly not `.mono`: the
+   row this used to live in is uppercase tracked mono, and a whole sentence set
+   in the machine voice is the machine shouting a paragraph — DESIGN.md §11
+   allows it to shout counts and stamps, not sentences. */
+.sheet-conflict-said {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+  text-transform: none;
+  letter-spacing: 0;
+  text-wrap: pretty;
+}
+
+/* The note's own Copy verb, said again — same face, same size, same muted →
+   ink on press, same word. It carries no mark: the copy mark is already on
+   screen a few lines below in the verb strip, and two identical glyphs
+   meaning two different pieces of text is one accessory too many. */
+.sheet-conflict-verb {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+/* Three answers in a row (UX-5): a word's width apart, nothing drawn between. */
+.sheet-conflict-verb + .sheet-conflict-verb {
+  margin-left: 1.5em;
+}
+
+.sheet-conflict-verb:hover,
+.sheet-conflict-verb:active,
+.sheet-conflict-verb[data-on="true"] {
+  color: var(--ink);
+}
+

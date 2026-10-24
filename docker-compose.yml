@@ -1,0 +1,55 @@
+# spår, one container: the app and its server on one port, everything kept in
+# one volume. docs/self-hosting.md walks through it; docs/server-api.md lists
+# every setting.
+#
+#   docker compose up -d
+#   docker compose logs -f spar
+#
+# The port is published on this machine's loopback only. Browsers allow the
+# service worker (offline use, installing the app) and Web Push (reminders that
+# ring) only over HTTPS, or on localhost itself — so to reach spår from a phone
+# or another computer, put an HTTPS reverse proxy in front of 127.0.0.1:8080
+# (Caddy, nginx, Traefik, Tailscale Serve, a Cloudflare tunnel, ...) rather
+# than publishing the port to the network. docs/self-hosting.md has a Caddy
+# example.
+
+services:
+  spar:
+    image: ghcr.io/volccu/spar:latest
+    # Or build it from this checkout:
+    # build: .
+    container_name: spar
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - spar-data:/data
+    environment:
+      # The host name the instance is reached by. Set it: every other Host is
+      # refused, so a web page cannot reach the server through a DNS-rebound
+      # name of its own (and, on a fresh instance, create the first account).
+      SPAR_ALLOWED_HOSTS: "notes.example.com"
+      # Who may make an account after the first (the first is always allowed
+      # and becomes the admin): closed, invite or open.
+      SPAR_SIGNUP: "closed"
+      # The contact push services see on every reminder. The admin's email
+      # when left out.
+      SPAR_VAPID_SUBJECT: "mailto:you@example.com"
+      # Behind a reverse proxy that sets X-Forwarded-For / -Proto / -Host, so
+      # the session cookie is marked Secure and rate limits see real clients.
+      # Leave it off when nothing sits in front of the container.
+      SPAR_TRUST_PROXY: "1"
+      # File storage per account, in MiB (0 = no cap).
+      # SPAR_STORAGE_CAP_MB: "2048"
+
+      # ---- Or: the same image with your own Supabase project instead ----
+      # The app is served from here, and syncs with Supabase; this container
+      # then runs no API and writes nothing to /data. See "Bring your own
+      # Supabase" in docs/self-hosting.md.
+      # SPAR_BACKEND: "supabase"
+      # SPAR_SUPABASE_URL: "https://your-project.supabase.co"
+      # SPAR_SUPABASE_KEY: "sb_publishable_..."   # the publishable key, never the secret one
+      # SPAR_VAPID_PUBLIC_KEY: "B..."              # the public half of the send-reminders key pair
+
+volumes:
+  spar-data:

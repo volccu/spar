@@ -1,0 +1,253 @@
+/* --- grid ------------------------------------------------------------------
+   No gutters, no margins, no gap. Cards tile edge to edge and share their
+   rules, so the screen is all note and the grid reads as one ruled sheet
+   rather than a tray of floating tiles. Every pixel of gutter was a pixel not
+   showing a note, and on a phone that added up to a whole row.
+   -------------------------------------------------------------------------- */
+
+.scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* The grid's width must not depend on how many notes are in it.
+     ---------------------------------------------------------------------
+     Without this the scrollbar is part of the layout on a desktop: a search
+     narrowing 241 notes to three takes the board from scrollable to not, the
+     bar disappears, and every card on screen steps ~15px sideways — a
+     horizontal shift of the whole board for a change that was meant to be
+     about which notes are in it. Reserved always, so the column is the same
+     width whatever is in it. It costs nothing on a phone, where overlay
+     scrollbars reserve no gutter at all. */
+  scrollbar-gutter: stable;
+  padding: 0;
+  padding-bottom: calc(var(--bar-h) + 28px);
+  /* A card focused from the keyboard scrolls into view above the capture bar,
+     not under it: its footer (flag, reminder, age) stays readable
+     (review UX-B-08). */
+  scroll-padding-bottom: calc(var(--bar-h) + env(safe-area-inset-bottom) + 8px);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* One deck of cards, which is what travels sideways when you change board.
+   It holds the grid and the empty state both, so an empty board arrives the
+   same way a full one does. */
+.deck {
+  will-change: transform;
+}
+
+/* The line past the last mounted card on a long board (lib/useDeckGrowth.ts):
+   nothing to see, only something to watch come near. */
+.deck-more {
+  height: 1px;
+}
+
+/* The sweep's one warning, and it is a standing fact rather than an offer —
+   the undo offer (.undo) is self-expiring and action-oriented, which
+   this deliberately is not. Words, no icon, no colour: the same vocabulary
+   "offline" and "error" already speak in rather than a drawn mark. */
+.trash-warn {
+  padding: 12px 13px 0;
+  color: var(--muted);
+}
+
+/* Every row is exactly one card tall, stated here rather than left to whatever
+   the tallest card in it happens to be. That is what lets a card grow on hover
+   without the grid moving: a taller card overflows its row instead of
+   stretching it, and every other card stays where the eye left it.
+
+   **Period dividers across the grid were built here and withdrawn on sight**
+   ("today", "this week", "this month", "earlier", one full-width rule wherever
+   the board's edit-order crossed into the next). They read the ordering out
+   loud, which sounds like a gain and is not: the cards tile edge to edge with
+   no gutters precisely so the screen is *all note*, and cutting that wall into
+   labelled sections spends rows on furniture and breaks the one block of notes
+   into pieces. It also cost this very rule — the dividers needed
+   `grid-auto-rows: min-content`, which un-pins the row the peek depends on.
+   The stamp in each card's footer already says when, for anyone asking.
+   This will be proposed again; that is the answer. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: var(--card-h);
+  gap: 0;
+}
+
+@media (min-width: 700px) {
+  :root {
+    /* One more line of the same line box, and a column wide enough that the
+       measure stays comfortable rather than stretching. */
+    --card-lines: 9;
+    --card-h: 230px;
+  }
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+/* --- card ----------------------------------------------------------------- */
+
+/* Only right and bottom rules: neighbours supply the other two, so tiled cards
+   never draw a doubled 2px line, and the outermost edges are the screen. */
+.card {
+  position: relative;
+  height: var(--card-h);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* 8 at the floor, matching the footer's 8 above its words, so the stamp and
+     the marks sit in the middle of the band under the rule instead of 2px
+     high in it (review UI-23). The 2px moved into the footer; the card is
+     exactly as tall as it was. */
+  padding: 11px 13px 8px;
+  background: var(--card);
+  border: 0;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  text-align: left;
+  cursor: var(--cursor-pointer);
+  overflow: hidden;
+  transition: opacity 220ms var(--ease-enter);
+  /* The one gesture on a card that the browser must not be allowed to take
+     away mid-way is the merge drag, and until this line the card said nothing
+     about who owns a touch. Left at `auto` the browser watches the first few
+     pixels of every touch and, the moment it decides the finger is scrolling,
+     takes the pointer and sends `pointercancel` — which is a gesture *stolen*,
+     not a gesture finished, and NoteCard used to treat the two the same.
+
+     `pan-y` is the whole answer and `none` is not: the grid is nothing but
+     cards, so a card that refused the browser's own scroll would be a board
+     that cannot be scrolled at all — the wrong trade by a mile. What `pan-y`
+     gives up is a merge drag carried *vertically* off its card, which the
+     browser still claims as a scroll; what it buys is that a sideways drag —
+     the one that lands on another card in the same row — is now the app's for
+     as long as the finger is down. Horizontal paging is unaffected: that lives
+     on `.scroll` as touch handlers driving `.deck`'s transform, and
+     `touch-action` governs only the browser's own scrolling, never whether an
+     ancestor hears the touch. It also stops a sideways drag from being read as
+     an overscroll or a back-swipe, which is what `auto` allowed.
+
+     The sheet says the same thing one layer up (`.sheet`, `touch-action:
+     pan-y`) for the same reason and in the same words. */
+  touch-action: pan-y;
+  /* Off-screen cards skip layout and paint entirely. The grid makes this
+     unusually safe: every row is pinned at var(--card-h), so the intrinsic
+     size below is the height the card already has and nothing shifts as
+     cards enter the viewport. The DOM stays intact throughout — useGridReflow
+     still measures every card's rect and reads every .card-body's text, and
+     jsdom does not implement content-visibility at all, so no test can see
+     this rule either way; the peek rule's override below is load-bearing. */
+  content-visibility: auto;
+  contain-intrinsic-block-size: var(--card-h);
+}
+
+/* A pressed card does nothing at all. It used to shift a pixel down and right,
+   which is the standard "button goes in" cue and is exactly wrong here: the
+   cards share their rules with their neighbours, so moving one opened a
+   hairline gap on two sides and closed one on the other two. In a grid with no
+   gutters the only thing that could safely change was the ink — so the press
+   inverted the card instead, and that turned out to be wrong too: a card is
+   not a button, the tap already opens the note, and a scroll begun on a card
+   held the flash for as long as the finger was down. Nothing marks a press
+   now. Only selection inverts. */
+
+/* Keyboard focus is the same statement made quietly: all four edges in full
+   ink, where a resting card draws two in the dim rule. Only for keyboard
+   users — :focus-visible never fires for a tap or a click. */
+.card:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+  z-index: 1;
+}
+
+/* Priority is a flag, and on a card it stands at the head of the footer row.
+
+   It was a 9px square flush in the card's top-left corner for as long as the
+   app has had a priority, and the corner was right for what it was: furniture
+   scale, belonging to the card the way the card's own rules do. A glyph is a
+   different thing, and a glyph in that corner floats over the first line —
+   which is the exact failure ("an element placed *near* the text") the square
+   was flush in the corner to avoid. So the drawing changed and the place had
+   to change with it, to the one row on a card that already holds marks about
+   the note, at the one tier they are all drawn at.
+
+   Full ink, not the row's muted: a thin mark dimmed is a thin mark you cannot
+   see (DESIGN), and this is the only thing in that row that somebody decided
+   rather than merely wrote. */
+.card-priority,
+.card-todo {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink);
+}
+
+/* Archived, and only archived. `data-filed` was here too: a filed note on
+   All lost its rules to dashes and its words to --muted, which is the app
+   dimming what the user wrote in order to report a fact about filing — the
+   one thing this app's card face may never do (see the tag-line rule above).
+   The folder mark in the card's footer (`.card-filed`, NoteCard.tsx) says it
+   now. `data-filed` stays on the element: it is what that mark is drawn from
+   and what the tests read. */
+.card[data-archived="true"] {
+  background: transparent;
+  border-right-style: dashed;
+  border-bottom-style: dashed;
+  color: var(--muted);
+}
+
+/* The words too: `.card-body` and a Links row's title set --ink of their own,
+   so the card's --muted never reached them and only the dashes said
+   "archived" (audit 2026-10-24, UX-003). A search hit inside still stands up
+   to --ink (`[data-dim] [data-hit]`, later and as heavy), and the peek below
+   lifts the whole card back. */
+.card[data-archived="true"] :is(.card-body, .card-row-title) {
+  color: var(--muted);
+}
+
+/* --- the peek --------------------------------------------------------------
+   Rest the pointer on a cut card and it runs on down over its neighbours. It
+   grows out of its row, never stretches it — `grid-auto-rows` above pins the
+   row, `align-self: start` keeps the card's top where it was, and `height:
+   auto` lets the box find the length of the text.
+
+   It is a lifted panel while it is out, so it draws all four rules instead of
+   the two it shares with its neighbours — as an outline drawn inwards, because
+   adding a real left and top border would push every line of the card a pixel
+   across. Opaque card surface, so an archived card, which is normally
+   transparent, does not read through onto whatever it has grown over. Reduced
+   motion loses the clip, not the peek: the card still grows, it just arrives.
+   -------------------------------------------------------------------------- */
+.card[data-peek="true"] {
+  align-self: start;
+  height: auto;
+  min-height: var(--card-h);
+  /* Stops at the write bar (review UI-B-01): `--peek-room` is the pixels from
+     the card's top to the bar's, measured when the rest completes, and the face
+     was cut to the whole lines that fit (`peekLinesFor`). Never under the
+     card's own height. */
+  max-height: max(var(--card-h), var(--peek-room, 100vh));
+  z-index: 4;
+  overflow: visible;
+  background: var(--card);
+  outline: 1px solid var(--muted);
+  outline-offset: -1px;
+  /* It grows past the intrinsic size the skip rule on `.card` promises —
+     culling it mid-grow would clip the one card the pointer is resting on, so
+     a peeked card is always painted. */
+  content-visibility: visible;
+}
+
+/* The pointer is resting *on* this card, so it is the one being read. Keep its
+   normal surface, with a quiet rule that says "this one" without shouting.
+   No dim on neighbours — the pointer itself is enough to guide the eye. */
+.card[data-peek="true"][data-archived="true"],
+.card[data-peek="true"][data-archived="true"] :is(.card-body, .card-row-title):not([data-dim="true"]) {
+   color: var(--ink);
+}
+
+/* An idea card carries no extra rule. It had a 3px double border along the
+   bottom, which in the dark scheme is a bright bar drawn across the foot of the
+   card — the loudest thing on the board, spent on saying what the card's own
+   face already says. The face *is* the difference: every other card is words,
+   an idea card is a canvas. Nothing needs to be added to that. */
+

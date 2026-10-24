@@ -1,0 +1,103 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install web dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Lint (root src/tests + web/src + server) and typecheck the server
+        run: npm run lint
+
+      - name: Root tests (Phase 0 CLI pipeline)
+        run: npm test
+
+      - name: Build web app
+        run: npm run build:web
+
+      - name: Web tests
+        # `test:web` itself, with a JSON report beside the usual output.
+        run: npm --prefix web test -- --reporter=default --reporter=json --outputFile.json=test-report.json
+
+      # No single web test may take more than 8 s on its own (audit CODE-5): the
+      # deploy hook fails a deploy at 15 s, and this catches the creep first. A
+      # test over the limit under the suite's load has its file run again alone,
+      # so a busy runner cannot fail it. CI only, never the deploy hook. See
+      # docs/browser-checks.md.
+      - name: No web test over 8 seconds
+        run: node web/scripts/slow-tests.mjs web/test-report.json --limit 8000
+
+      # The spår server (server/). None of this is part of the deploy hook,
+      # which builds and tests web/ only.
+      - name: Server tests
+        run: npm run test:server
+
+      - name: Build the server bundle
+        run: npm run build:server
+
+      - name: Conformance suite against the spår server (strict, in-process)
+        run: npm run test:conformance:server
+
+      # The browser checks (review STD-03): axe, screenshots, search speed, copy
+      # and undo, against the demo build. CI only: the deploy hook never runs
+      # them, so a slow or flaky browser cannot hold up a deploy. See
+      # docs/browser-checks.md.
+      - name: Install the browser for the browser checks
+        run: npx playwright install --with-deps chromium firefox
+        working-directory: web
+
+      - name: Browser checks (demo build, no backend)
+        run: npm run test:e2e
+
+      - name: Keep the pictures and the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-baselines
+          path: |
+            web/e2e/baselines
+            web/e2e/report
+            web/e2e/results
+          if-no-files-found: ignore
+
+  # A version tag releases the public image and the demo, and only once every
+  # check above has passed on that same commit (audit CODE-3). They used to start
+  # from the tag on their own, beside this workflow, so a red server suite still
+  # shipped. Both are called from here, so `github.ref` inside them is still the
+  # tag, which is what names the image.
+  image:
+    needs: check
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/image.yml
+
+  demo:
+    needs: check
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/demo.yml
+    secrets: inherit

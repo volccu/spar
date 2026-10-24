@@ -1,0 +1,508 @@
+/* --- Import from Google Keep ------------------------------------------------
+   KeepImport.tsx. The About page's layer and column, whole — the same `.about`
+   classes — because it is the same kind of screen: read before it is worked,
+   the reading face saying what happens, the machine face counting. What it adds
+   is only what the colophon never needed: buttons side by side, a row per
+   Keep label with its two fields, and a list of what was left behind.
+   -------------------------------------------------------------------------- */
+.keep-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+
+.about-body .keep-lead {
+  margin-top: 1.2em;
+}
+
+/* The labels line as it will be written — the note's own words, so the
+   reading face, a step down, as a quotation from the note rather than a
+   sentence of the page. */
+.keep-example {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.keep-labels {
+  margin-bottom: 0.4em;
+}
+
+.keep-label {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.keep-label-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+}
+
+.keep-label-head .mono {
+  color: var(--muted);
+  line-height: var(--lh-read);
+}
+
+/* One line under a label's chooser when its board name needs saying (review
+   GAP-04): the reading face, muted, an aside rather than a warning. */
+.about-body .keep-label-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+}
+
+/* The switch for every label at once stands over the rows it sets, so the
+   rule under it is the edge weight rather than the rows' soft one. */
+.keep-label-all {
+  border-bottom-color: var(--rule);
+}
+
+/* The two fields are the reminder panel's picker again: a hairline box a
+   thumb tall, the ground behind it, the browser's own list drawn dark by
+   `color-scheme`. */
+.keep-label select,
+.keep-label input {
+  min-width: 0;
+  min-height: var(--hit);
+  padding: 4px 6px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--t-text);
+}
+
+.keep-label select:focus,
+.keep-label input:focus {
+  outline: 1px solid var(--ink);
+}
+
+/* What did not come across: the file's name in the machine face — it is the
+   Takeout's name for it, data — and why, in the page's quiet voice. */
+.about-body .keep-left {
+  margin-top: 0.6em;
+  margin-bottom: 0.8em;
+  padding-left: 0;
+  list-style: none;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+}
+
+.keep-left li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  overflow-wrap: anywhere;
+}
+
+.keep-left-name {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-data);
+}
+
+/* The empty Inbox's offers (EmptyBoard.tsx, and the demo's in
+   demo/SampleOffer.tsx): below the words, a thumb tall, one on top of the
+   other at the paragraph's own width, so the two read as a pair of answers to
+   the sentence above them rather than as two stickers of different lengths.
+
+   **In the words' face, not the machine's** (2026-09-29, the owner found the
+   old ones cheap). They were muted mono caps in a hairline box, and uppercase
+   mono is the app's machine voice — counts, stamps, state. These are not the
+   machine reporting anything: they are the invitation the line above them
+   makes, finished. So they take that line's face and size, upright rather
+   than italic because they are the thing to do rather than the aside about
+   it, in sentence case like every other label, each with the mark the same
+   action wears elsewhere. The type scale gains nothing; this is --t-text.
+
+   **The first is one step up the ramp, and that is all the hierarchy there
+   is.** No fill, no colour, no weight: the first offer's edge is --muted
+   where the second's is --rule, and its words are --ink where the second's
+   are --muted. Under the pointer either raises, as furniture does; pressed,
+   either inverts, the same flip a menu row makes, and the only moment either
+   is light.
+
+   **Each label is one line, beside its mark** (review UI-19, 2026-10-01). At
+   the paragraph's 30ch the label was centred in what the mark left over and
+   broke onto two cramped lines. The offers now reach out into the empty
+   state's own 16px side padding — the italic line keeps its measure — and
+   the mark and label sit together from the left edge, unbroken. */
+.empty-offer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: calc(100% + 32px);
+  min-height: var(--hit);
+  margin: 24px -16px 0;
+  padding: 10px 16px;
+  white-space: nowrap;
+  text-align: left;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  font-family: var(--body);
+  font-size: var(--t-text);
+  font-style: normal;
+  line-height: var(--lh-chrome);
+  cursor: var(--cursor-pointer);
+}
+
+.empty-offer + .empty-offer {
+  margin-top: 8px;
+}
+
+.empty-offer-first {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+
+@media (hover: hover) {
+  .empty-offer:hover:not(:disabled) {
+    background: var(--raised);
+    color: var(--ink);
+  }
+}
+
+.empty-offer:active:not(:disabled) {
+  background: var(--invert);
+  color: var(--paper);
+  border-color: var(--invert);
+}
+
+/* The sample notes being written: the press has been heard and a second one
+   would do nothing, so the offer drops to the quieter one's tones until it
+   either unmounts (the board is full) or comes back to be pressed again. */
+.empty-offer:disabled {
+  color: var(--muted);
+  border-color: var(--rule);
+  cursor: var(--cursor-default);
+}
+
+/* Where the demo's notes live, said once under the offers in the machine's
+   voice — the same words the desktop header's quiet button says (review
+   GD-10). Not a button: a stamp. */
+.empty-stamp {
+  display: block;
+  margin-top: 18px;
+  color: var(--muted);
+  font-style: normal;
+}
+
+/* **The way into a mode has no style of its own any more.** `.sort-entry`
+   was a 40px line across the top of the board — one class serving both modes,
+   plus a `[data-hidden]` rule that kept its box while a search emptied it, so
+   the grid did not jump. On 2026-09-25 the owner asked for that line in the
+   menu, and a row in the menu is a `.selpanel-btn` like every other row there.
+   Both problems the class solved went with it: there is nothing on the board
+   to leave a gap, and nothing to hide while a search runs. */
+
+/* ---------------------------------------------------------------------------
+   The Ticker
+   ---------------------------------------------------------------------------
+   One list at a time, and the boxes are the buttons.
+
+   The Sorter's shape said about ticking instead of filing, so it is built out
+   of the Sorter's parts: a full-screen layer of the app's own kind, growing its
+   clip out of the line that started it, three bands top to bottom, and the list
+   in the middle taking whatever height is left. Where the Sorter's foot is a
+   wall of destinations, this one is a count and a single way to finish — there
+   is only one thing to do with a list that is done.
+   -------------------------------------------------------------------------- */
+.ticker {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+/* The layer holds the focus itself when it opens, so Escape and the arrows have
+   somewhere to land. Not a control, so no ring — see `.sorter:focus`, which
+   this is a copy of and for the same reason. */
+.ticker:focus {
+  outline: none;
+}
+
+.ticker-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 6px 10px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.ticker-at {
+  flex: 1 1 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--track-data);
+  text-transform: uppercase;
+}
+
+/* Next, and the way out: both quiet, both a thumb's worth, in the band that
+   reports rather than the band that acts. */
+.ticker-skip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit);
+  padding: 0 14px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.ticker-skip:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.ticker-done {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.ticker-done:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* The list. Scrolls if it is long — a list you cannot see the end of is one you
+   cannot finish. */
+.ticker-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 0 16px;
+}
+
+/* An item is a target before it is a line of text: the full width of the
+   screen and a thumb's worth tall, because the whole point of this mode is
+   that a box is easy to hit. Reading size in the body face — these are the
+   user's own words and they are read here, not merely identified. */
+.ticker-item {
+  display: flex;
+  /* The box sits on its words' baseline, not at the top of the line, where
+     the smaller mono box floated 5px high (review 2026-10-04, UI-A-05). */
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--hit);
+  padding: 8px 16px;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  cursor: var(--cursor-pointer);
+  text-align: left;
+  font-family: var(--body);
+  font-size: var(--t-read);
+  line-height: var(--lh-item);
+}
+
+.ticker-item:active {
+  background: var(--raised);
+}
+
+/* A ticked item steps back to --muted and takes the line the open note and the
+   card face both draw through a done item. Three surfaces, one appearance. */
+.ticker-item[data-done] {
+  color: var(--muted);
+}
+
+/* The box is the marker's own characters, set in the machine face at the size
+   the open note sets them (`.check-hit`) — the letter-spacing is zeroed there
+   too, because "[ ]" tracked out is a bracket, a space and a bracket rather
+   than a box. */
+.ticker-box {
+  flex: 0 0 auto;
+  font-size: var(--t-text);
+  letter-spacing: 0;
+  /* `.mono` capitalises, and a ticked box printed [X] where the note says [x]. */
+  text-transform: none;
+  color: var(--ink);
+}
+
+.ticker-item[data-done] .ticker-box {
+  color: var(--muted);
+}
+
+.ticker-words {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* Everything in the note that is not an item — the line saying what the list is
+   for, most often. Quieter than the items, because it is not the work. */
+.ticker-prose {
+  margin: 0;
+  padding: 8px 16px;
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: var(--t-read);
+  line-height: var(--lh-read);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* The note's name, at the open note's weight and the items' tone. */
+.ticker-heading {
+  color: var(--ink);
+}
+
+/* What is left, and the one way to finish. */
+.ticker-foot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px calc(10px + env(safe-area-inset-bottom)) 16px;
+  border-top: 1px solid var(--rule);
+}
+
+/* A wide window gathers both bands to the note's own column, as the Tidy up
+   head is (`88-sorter.css`). After the two rules above, never before them: a
+   shorthand `padding` that comes later wins and spreads the bands to the edges. */
+@media (min-width: 700px) {
+  .ticker-head,
+  .ticker-foot {
+    padding-left: max(var(--s-6), calc((100% - 33 * var(--t-read)) / 2));
+    padding-right: max(var(--s-3), calc((100% - 33 * var(--t-read)) / 2));
+  }
+}
+
+.ticker-left {
+  flex: 1 1 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.ticker-archive {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--hit);
+  padding: 0 14px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-chrome);
+  transition: color var(--strike-ms) var(--ease-enter);
+}
+
+/* While a box is still open the way out is quiet; the last tick steps it up one
+   tone, so the screen points at what comes next (`Ticker`, `data-ready`). */
+.ticker-archive[data-ready] {
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-archive {
+    transition: none;
+  }
+}
+
+.ticker-archive:active {
+  background: var(--raised);
+}
+
+/* Untick all and Clear done (`ListVerbs`), between the count and Archive: a
+   mark each, a thumb's worth square, quiet at rest like Next and the way out
+   in the head band, and raised while pressed — furniture, so never an ink
+   fill. Marks and not words because the foot is one row on a 360px phone and
+   Archive's word already takes the room a second and third word would need. */
+.ticker-verb {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.ticker-verb:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* Said in words (the foot has the room): a phone gives the two a row above the
+   count and Archive, a wide window keeps them in the one row. */
+.ticker-verbs {
+  flex: 1 0 100%;
+  order: -1;
+  display: flex;
+  gap: var(--s-4);
+}
+
+.ticker-verbs .ticker-verb {
+  width: auto;
+  gap: var(--s-4);
+  padding: 0 var(--s-5);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-chrome);
+}
+
+@media (min-width: 700px) {
+  .ticker-verbs {
+    display: contents;
+  }
+}
+
+/* A pointer resting on a control raises it, as the tabs, panel rows and Tidy
+   up's folders already do — the open note's bar, the two modes' head and foot
+   controls (review 2026-10-04, UI-C-06). Not for touch: there it would stick
+   after a tap. `:disabled` stays still. */
+@media (hover: hover) and (pointer: fine) {
+  .iconbtn:hover:not(:disabled),
+  .sorter-done:hover:not(:disabled),
+  .sorter-skip:hover,
+  .ticker-skip:hover,
+  .ticker-done:hover,
+  .ticker-archive:hover,
+  .ticker-verb:hover {
+    background: var(--raised);
+    color: var(--ink);
+  }
+
+  /* An item keeps its own tone — a ticked one stays muted. */
+  .ticker-item:hover {
+    background: var(--raised);
+  }
+}

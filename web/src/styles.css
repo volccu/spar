@@ -1,0 +1,28 @@
+/* ===========================================================================
+   spår — the stylesheet's entry
+
+   The stylesheet is split into area files under ./styles/, imported here in
+   the order the rules used to run down one file. The numbers keep that order
+   plain, and the order IS the cascade: a later file may win a tie against an
+   earlier one, so never reorder these lines, and add a file by its number.
+   Vite inlines every @import into the one stylesheet the browser receives.
+   Tests read the whole thing through src/test/readStyles.ts.
+   ======================================================================== */
+
+@import "./styles/00-foundation.css";
+@import "./styles/10-shell.css";
+@import "./styles/20-boards-and-shortcuts.css";
+@import "./styles/30-grid-and-card.css";
+@import "./styles/40-canvas.css";
+@import "./styles/50-card-faces-links-wall.css";
+@import "./styles/60-capture.css";
+@import "./styles/70-note-view-and-motion.css";
+@import "./styles/75-note-reading.css";
+@import "./styles/76-files-viewer-code.css";
+@import "./styles/80-empty-mascot-selection.css";
+@import "./styles/82-dialogs-and-undo.css";
+@import "./styles/84-sync-signin-phone-shelf.css";
+@import "./styles/88-sorter.css";
+@import "./styles/90-about-and-settings.css";
+@import "./styles/95-keep-import.css";
+@import "./styles/99-hover-tip.css";
