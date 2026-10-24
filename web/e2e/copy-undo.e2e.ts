@@ -25,7 +25,7 @@ async function expectNoSyncTalk(page: Page, where: string) {
 async function ready(page: Page) {
   await openDemoWithSamples(page);
   await page.reload();
-  await page.getByRole("button", { name: /^Start here/ }).waitFor();
+  await page.getByRole("button", { name: /^call dentist/ }).waitFor();
   await waitForNoUndo(page);
 }
 
@@ -36,7 +36,7 @@ test("About, an open note with a reminder, and the empty-trash dialog say nothin
   await expect(page.getByRole("dialog", { name: /About/ })).toBeVisible();
   await expectNoSyncTalk(page, "About");
   await page.reload();
-  await page.getByRole("button", { name: /^Start here/ }).waitFor();
+  await page.getByRole("button", { name: /^call dentist/ }).waitFor();
 
   // A note that has a reminder, opened.
   await page.getByRole("button", { name: /^call dentist/ }).click();
@@ -53,7 +53,7 @@ test("About, an open note with a reminder, and the empty-trash dialog say nothin
 
 test("deleting a note offers an undo, and the undo puts the note back", async ({ page }) => {
   await ready(page);
-  const note = page.getByRole("button", { name: /^Start here/ });
+  const note = page.getByRole("button", { name: /^call dentist/ });
   await note.click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(note).toHaveCount(0);
@@ -65,7 +65,7 @@ test("deleting a note offers an undo, and the undo puts the note back", async ({
 
 test("archiving a note offers an undo", async ({ page }) => {
   await ready(page);
-  await page.getByRole("button", { name: /^Start here/ }).click();
+  await page.getByRole("button", { name: /^call dentist/ }).click();
   await page.getByRole("button", { name: "Archive", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Undo/ })).toBeVisible();
 });

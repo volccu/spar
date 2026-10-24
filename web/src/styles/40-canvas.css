@@ -348,8 +348,8 @@
 /* The line a fresh merge opens with (review 2026-10-01, UX-26): hung under
    the canvas bar, over the top of the canvas, so its arriving and going moves
    nothing — the capture line's shape, said at the other end of the screen.
-   The bar's furniture: `--card` ground, a `--rule` hairline, mono words in
-   `--muted`. It catches no touch; the first touch of the canvas takes it. */
+   The bar's furniture: `--card` ground, a `--rule` hairline, a sentence of
+   advice (`.advice`: reading face, italic, `--muted`; review UX-05). It catches no touch; the first touch of the canvas takes it. */
 .canvas-merged {
   position: absolute;
   top: 100%;

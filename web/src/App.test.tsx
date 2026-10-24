@@ -311,12 +311,12 @@ describe("App", () => {
     );
     // The folder names itself the way a board tab does: the place in the
     // display face, the count beside it in the machine face.
-    expect(document.querySelector(".canvas-title")?.textContent).toBe("Idea");
+    expect(document.querySelector(".canvas-title")?.textContent).toBe("notes");
     expect(document.querySelector(".canvas-count")?.textContent).toBe("3");
     expect(document.querySelectorAll(".spatial-note")).toHaveLength(3);
     // A fresh merge says what happened and where the way back is (UX-26).
-    expect(document.querySelector(".canvas-merged")?.textContent).toMatch(
-      /^Merged into an idea · .* to un-merge$/,
+    expect(document.querySelector(".canvas-merged")?.textContent).toBe(
+      "Joined 3 notes. They are now one idea in Inbox. Hold an empty spot to separate them.",
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Close idea" }));
@@ -2170,14 +2170,14 @@ describe("App", () => {
     // The Inbox is not offered the scope.
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await screen.findByLabelText("Search notes");
-    expect(screen.queryByRole("button", { name: /^Only in/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Only here/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Close search" }));
 
     await goToBoard(/zzzscopeboard/i);
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     const field = (await screen.findByLabelText("Search notes")) as HTMLInputElement;
     expect(field.placeholder).toBe("Search everything");
-    const scope = screen.getByRole("button", { name: "Only in zzzscopeboard" });
+    const scope = screen.getByRole("button", { name: "Only here, in zzzscopeboard" });
     expect(scope.getAttribute("aria-pressed")).toBe("false");
 
     // Everywhere, by default.
@@ -2208,7 +2208,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await screen.findByLabelText("Search notes");
     expect(
-      screen.getByRole("button", { name: "Only in zzzscopeboard" }).getAttribute("aria-pressed"),
+      screen.getByRole("button", { name: "Only here, in zzzscopeboard" }).getAttribute("aria-pressed"),
     ).toBe("false");
   });
 
@@ -2228,7 +2228,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     const field = (await screen.findByLabelText("Search notes")) as HTMLInputElement;
     expect(field.placeholder).toBe("Search everything");
-    const scope = screen.getByRole("button", { name: "Only in Links" });
+    const scope = screen.getByRole("button", { name: "Only here, in Links" });
     expect(scope.getAttribute("aria-pressed")).toBe("false");
     fireEvent.change(field, { target: { value: "zzzlinkscope" } });
     expect(await screen.findByText("2 found")).toBeTruthy();

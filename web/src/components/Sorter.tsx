@@ -281,13 +281,12 @@ interface Props {
   /** Where the focus goes when it shuts. */
   restoreTo: React.RefObject<HTMLButtonElement | null>;
   /**
-   * The undo mark, while one is offered. The capture bar is its home on the
-   * board and the bar is not drawn here, so it stands in the face instead —
-   * floated at the top of the note or the summary, so the words run round it
-   * and it covers nothing. The head band has no room for it on a phone, and
-   * floating it over that band put it on the ✕ (review 2026-10-01, UX-01).
+   * The header's creature, visiting the head band at its left end, with what it
+   * says: this run's undo offers, in its speech bubble as on the board
+   * (`ModeCreature`; review 2026-10-24, UX-02). The capture bar is not drawn
+   * here, so the creature is where an offer is said.
    */
-  undo?: ReactNode;
+  creature?: ReactNode;
 }
 
 /**
@@ -355,7 +354,7 @@ export function Sorter({
   nameMax,
   origin,
   restoreTo,
-  undo,
+  creature,
 }: Props) {
   const [creating, setCreating] = useState(false);
   /** How many notes each folder held when the mode opened. Read once, so the
@@ -439,17 +438,6 @@ export function Sorter({
     },
     onEnd: () => setEnded(true),
   });
-
-  /**
-   * The position whose note has had an undo mark beside it. The mark is 121px
-   * with its word, 44px after 2.5s and gone at 8s, and a float re-wrapped the
-   * note's lines at each step, mid-decision. So the corner keeps one fixed box
-   * from the mark's arrival until the note changes (review 2026-10-04,
-   * UI-C-01): `.undo-slot-face` is a fixed width, and when the mark has gone
-   * an empty box of the same size stays in its place.
-   */
-  const [heldAt, setHeldAt] = useState<number | null>(null);
-  if (undo && heldAt !== at) setHeldAt(at);
 
   /** Read at unmount, when the closed-over state would be a render old. */
   const leftNow = useRef<string[]>([]);
@@ -1091,9 +1079,14 @@ export function Sorter({
           the bin instead (2026-09-04 audit, F13). The phone's short path to
           Leave is the swipe, not this button. */}
       <div className="sorter-head">
-        <span className="sorter-at mono">
-          {ended ? "Done" : `${Math.min(at + 1, pile.length)} of ${pile.length}`}
-        </span>
+        {/* The creature stands here as it does in the header, its bubble beside
+            it, and the count at the far end of the same row. */}
+        <div className="sorter-head-row">
+          {creature}
+          <span className="sorter-at mono">
+            {ended ? "Done" : `${Math.min(at + 1, pile.length)} of ${pile.length}`}
+          </span>
+        </div>
         {/* One group, so on a phone too narrow for the count and every control
             in one row it is the controls that drop under the count, together,
             the cross still last at the right edge — never the count squeezed
@@ -1170,16 +1163,18 @@ export function Sorter({
               </button>
             </>
           )}
-          <button
-            type="button"
-            className="sorter-done"
-            aria-label="Stop tidying up"
-            title="Stop tidying up"
-            onClick={stop}
-          >
-            <IconClear />
-          </button>
         </div>
+        {/* The way out stands where every full-screen exit does, the header
+            cog's spot (`.sorter-exit`, review 2026-10-24, UI-02). */}
+        <button
+          type="button"
+          className="sorter-done sorter-exit"
+          aria-label="Stop tidying up"
+          title="Stop tidying up"
+          onClick={stop}
+        >
+          <IconClear />
+        </button>
       </div>
 
       {ended ? (
@@ -1190,11 +1185,13 @@ export function Sorter({
            answer. Deliberately a report and not a celebration (DESIGN.md §1) —
            counted lines in the machine face, no total, no praise. */
         <div className="sorter-end" ref={faceRef}>
-          {undo}
           <p className="sorter-end-head">
             {stopped
               ? `${answered} of ${pile.length} done`
-              : pile.length === 1
+              : // Every note left where it was is not a job finished: say what happened (review 2026-10-24, UX-12).
+                tally.left === pile.length
+                ? `Went through ${pile.length}. None filed.`
+                : pile.length === 1
                 ? "1 note done"
                 : `All ${pile.length} done`}
           </p>
@@ -1233,7 +1230,6 @@ export function Sorter({
             {/* The open note's own reading column, centred, so a long line is not
                 1400px of text on a desktop (review 2026-10-01, UI-14). */}
             <div className="sorter-read">
-              {undo ?? (heldAt === at ? <span className="undo-slot-face" aria-hidden /> : null)}
               {/* What this note was already answered with, while that answer
                   holds — Back is how a reader reaches it, and the screen has to
                   say what Leave will now undo. */}

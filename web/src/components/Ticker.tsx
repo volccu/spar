@@ -33,9 +33,10 @@ interface Props {
   origin: DOMRect | null;
   /** Where the focus goes when it shuts. */
   restoreTo: React.RefObject<HTMLButtonElement | null>;
-  /** The undo mark, while one is offered — a cell of the head band, beside the
-   *  count, where it covers nothing (review 2026-10-01, UX-01). */
-  undo?: ReactNode;
+  /** The header's creature, visiting the head band at its left end, with what it
+   *  says: this run's undo offers, in its speech bubble as on the board
+   *  (`ModeCreature`; review 2026-10-24, UX-02, the owner's yes for Tick off). */
+  creature?: ReactNode;
 }
 
 /**
@@ -72,7 +73,7 @@ export function Ticker({
   onClose,
   origin,
   restoreTo,
-  undo,
+  creature,
 }: Props) {
   const { at, layerRef, faceRef, close, advance, step, trapTab, onTouchStart, onTouchEnd } =
     useModeLayer({ count: pile.length, origin, onClose, restoreTo });
@@ -177,10 +178,12 @@ export function Ticker({
       onTouchEnd={onTouchEnd}
     >
       <div className="ticker-head">
-        <span className="ticker-at mono">{`${Math.min(at + 1, pile.length)} of ${pile.length}`}</span>
-        {undo}
+        <div className="ticker-head-row">
+          {creature}
+          <span className="ticker-at mono">{`${Math.min(at + 1, pile.length)} of ${pile.length}`}</span>
+        </div>
         {/* Next list. Navigation rather than a decision about this one, so it
-            stands in the head band beside the count and not among the boxes —
+            stands in the head band, under the creature, and not among the boxes —
             the same place, and the same argument, as the Sorter's Skip. */}
         <button type="button" className="ticker-skip mono" onClick={advance}>
           Next

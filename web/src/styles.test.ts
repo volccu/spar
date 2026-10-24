@@ -491,6 +491,35 @@ describe("a band on the edge of a full-screen layer pays the system's inset", ()
 });
 
 /**
+ * Closing a full-screen page or mode is the same place every time: the header
+ * cog's spot (review 2026-10-24, UI-02). One rule holds it for About, Settings
+ * and the Keep import (`.about-close`), Tidy up and Tick off; the picture
+ * viewer's own rule reads the same two tokens.
+ */
+describe("every exit mark stands in one place", () => {
+  const rule = (selector: string) => {
+    const at = code.lastIndexOf(`\n${selector} {`);
+    expect(at, `${selector} is declared`).toBeGreaterThan(-1);
+    return code.slice(at, code.indexOf("}", at));
+  };
+
+  it("positions About, Tidy up and Tick off by the one shared rule", () => {
+    const shared = rule(".about-close,\n.sorter-exit,\n.ticker-done");
+    expect(shared).toContain("top: calc(var(--exit-top) + env(safe-area-inset-top))");
+    expect(shared).toContain("right: var(--exit-right)");
+    for (const own of [".about-close", ".sorter-done", ".ticker-done"]) {
+      expect(rule(own), `${own} leaves its place to the shared rule`).not.toMatch(/\b(top|right|left|bottom):/);
+    }
+  });
+
+  it("gives the picture viewer's mark the same two tokens", () => {
+    const own = rule(".lightbox-close");
+    expect(own).toContain("top: calc(var(--exit-top) + env(safe-area-inset-top))");
+    expect(own).toContain("right: var(--exit-right)");
+  });
+});
+
+/**
  * A bottom-right panel is anchored `right: 0` and sized by its contents, and
  * its rows are `nowrap`. The board chooser's rows are folder names of up to
  * `BOARD_NAME_MAX` (40), which in tracked mono plus the row's own mark, gap,
@@ -499,6 +528,20 @@ describe("a band on the edge of a full-screen layer pays the system's inset", ()
  * marks and the first characters of every name with it, and nothing could
  * scroll to them: the overflow was past the viewport, not inside a box.
  */
+describe("Tidy up on a desktop stands the destinations under the note", () => {
+  it("does it for a wide window with a mouse only, on the app's one width", () => {
+    // The phone and any touch screen keep them on the floor (review 2026-10-24, PL-06).
+    const at = code.indexOf("@media (min-width: 700px) and (hover: hover) and (pointer: fine) {\n  .sorter-card {");
+    expect(at).toBeGreaterThan(-1);
+    const block = code.slice(at, code.indexOf("\n}\n", at));
+    expect(block).toContain("flex: 0 1 calc(10 * var(--lh-read) * var(--t-read))");
+    expect(block).toContain("margin-top: auto");
+    expect(block).toContain("margin-bottom: auto");
+    // The card's own rule still fills the screen's height elsewhere.
+    expect(code).toMatch(/\n\.sorter-card \{[^}]*flex: 1 1 auto;/);
+  });
+});
+
 describe("a panel never grows off the screen it is drawn on", () => {
   function block(selector: string): string {
     const at = code.indexOf(`\n${selector} {`);
@@ -2152,11 +2195,11 @@ describe("the About page's wordmark is the header's", () => {
     const head = rule(".topbar");
     const about = rule(".about-head");
     // The same gap, and the same padding on the three edges the Close button
-    // does not share.
+    // does not share (the right edge keeps the exit mark's place free).
     expect(about).toContain("gap: var(--head-gap);");
     expect(head).toContain("gap: var(--head-gap);");
     expect(about).toContain(
-      "padding: calc(var(--head-top) + env(safe-area-inset-top)) 6px var(--head-bottom) var(--head-x);",
+      "padding: calc(var(--head-top) + env(safe-area-inset-top)) var(--exit-clear) var(--head-bottom) var(--head-x);",
     );
     expect(head).toContain(
       "padding: calc(var(--head-top) + env(safe-area-inset-top)) var(--head-x) var(--head-bottom);",

@@ -231,8 +231,12 @@ const built = existsSync(join(DIST, "sw.js")) && existsSync(ASSETS);
  * offline when it says it is not, Tidy up's Open, the robot growing in. The
  * weather and the phone's drop drawer are chunks of their own. Measured 188.50
  * on the PC; ~2 KiB of room kept, as PERF-7 asked.
+ * Raised to 192.8 on 2026-10-24 for the review's 41 approved fixes, on paths that
+ * run with the board: the selection's Cancel and Clear reminder, Ctrl-click and
+ * Space picking a card, the carry's tag, search's "Did you mean", the robot in
+ * Tidy up and Tick off. Measured 190.82 on the PC; ~2 KiB of room kept.
  */
-const INDEX_GZIP_CEILING_KB = 190.7;
+const INDEX_GZIP_CEILING_KB = 192.8;
 
 const jsChunks = () =>
   readdirSync(ASSETS).filter((name) => name.endsWith(".js") || name.endsWith(".mjs"));
@@ -384,7 +388,7 @@ describe("build invariants", () => {
     expect(chunks.some((name) => /^sampleNotes-/.test(name))).toBe(false);
     for (const name of chunks) {
       const code = readFileSync(join(ASSETS, name), "utf8");
-      for (const words of ["Try it with sample notes", "this browser only", "the demo has none", "Lisbon in May", "Keep using spår"]) {
+      for (const words of ["Try it with sample notes", "this browser only", "the demo has none", "Lisbon in May", "Keep using spår", "Remove the sample notes", "Hold a note to pick it"]) {
         expect(code, `${name} says "${words}"`).not.toContain(words);
       }
     }

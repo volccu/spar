@@ -129,3 +129,41 @@ describe("undoing a move that made its board", () => {
     expect(leaveBoard).not.toHaveBeenCalled();
   });
 });
+
+/** Review 2026-10-24, UX-14: a pile of passed reminders is cleared in one go, and offered back. */
+describe("clearing the reminders of a selection", () => {
+  const ringing = { reminder_at: "2026-10-20T09:00:00.000Z", reminder_repeat: null };
+  const repeating = { reminder_at: "2026-10-20T09:00:00.000Z", reminder_repeat: "week" as const };
+
+  it("clears the time and the rule of every picked note that has one, and pushes an undo", () => {
+    const { result, notesRef } = rig(
+      [note({ id: "a", ...ringing }), note({ id: "b", ...repeating }), note({ id: "c" })],
+      ["a", "b", "c"],
+    );
+    expect(result.current.undo.undos).toHaveLength(0);
+    act(() => result.current.verbs.doClearReminder());
+    expect(notesRef.current.map((n) => [n.reminder_at, n.reminder_repeat])).toEqual([
+      [null, null],
+      [null, null],
+      [null, null],
+    ]);
+    expect(result.current.undo.undos).toHaveLength(1);
+    expect(result.current.undo.offer?.message).toBe("Cleared 2 reminders");
+  });
+
+  it("brings each note's own time and rule back on undo, and leaves the note without one alone", () => {
+    const { result, notesRef } = rig(
+      [note({ id: "a", ...ringing }), note({ id: "b", ...repeating }), note({ id: "c" })],
+      ["a", "b", "c"],
+    );
+    act(() => result.current.verbs.doClearReminder());
+    act(() => {
+      result.current.undo.undoLast();
+    });
+    expect(notesRef.current.map((n) => [n.reminder_at, n.reminder_repeat])).toEqual([
+      [ringing.reminder_at, null],
+      [repeating.reminder_at, "week"],
+      [null, null],
+    ]);
+  });
+});

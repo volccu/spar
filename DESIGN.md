@@ -672,7 +672,7 @@ needed. The masthead is on the 8px grid: a 56px creature box, 8px above and 16px
 
 **A list item in the open note is on `--lh-read` with nothing between items**: the reader must break
 lines exactly as the textarea does, and the textarea has one leading and no gaps. The grouping
-survives on cards, in `--card-item-lh` and `--card-item-gap` below.
+survives on the checklist face, in `--card-item-lh` and `--card-item-gap` below; a list in a card's text keeps the card leading.
 
 **Counts and boxes are mono set untracked** — board counts, the canvas's count, `[ ]` and the
 Ticker's boxes. A number or a box is read as a shape, and spacing it out loosens the column it
@@ -733,7 +733,10 @@ rather than dimming. It is a few words wide, mouse-only, and momentary — and i
 **Why chrome raises instead of inverting.** Inversion is how a *note* says something was done to
 it, and that has to stay unmistakable; furniture inverting made it the loudest thing on screen.
 
-**Never take a chrome control back to an ink fill. Never spread `--raised` to a card.**
+**Never take a chrome control back to an ink fill. Never spread `--raised` to a card.** A dialog's
+two answers (Cancel and the confirming word, Delete for good included) are one plain outlined
+button each, the same weight (2026-10-24, owner approved, review UI-17): the word is enough, and
+the answer that cannot be taken back is never the loudest thing on the screen.
 
 Fixed state rules:
 
@@ -836,6 +839,12 @@ same element, and the paths inherit the computed value.
 **Never hard-code a width on a mark.** 14 is a ceiling, not a preference: `.card-foot` is a fixed
 22px box, so a larger footer mark grows every card on the board. Its words sit mid-band: 8px above
 them under the rule, 8px below to the card's edge.
+
+**A mark the browser draws inside a field is not ours to leave** (2026-10-24, owner approved, review
+UI-05): the date field's calendar and the search field's clear are bold pure white, which is no tone
+of the ramp. Each keeps the browser's own button, so a tap does what it did, and is redrawn as the
+set's own outline mark cut out of `--muted` (`::-webkit-calendar-picker-indicator`,
+`::-webkit-search-cancel-button`; Chromium's pseudo-elements, another browser draws its own).
 
 **Curves are allowed on glyphs and nowhere else.** Heroicons and Lucide draw with round caps and
 joins and are kept as drawn. Rules and borders stay hard.
@@ -1070,8 +1079,11 @@ paper at 0.62.
 ### The Sorter
 
 One note, and the folders under the thumb. Three bands, top to bottom: where you are in the pile,
-the note, and where it can go. The note takes whatever height is left, which is what keeps the
-destinations on the floor of every size of screen without a measured number anywhere.
+the note, and where it can go. On a touch screen the note takes whatever height is left, which is
+what keeps the destinations on the floor, under the thumb, without a measured number anywhere. A wide
+window worked with a mouse stands them right under the note instead, the pile in the middle of the
+screen (2026-10-24, review PL-06): the note keeps one height, ten lines, so the destinations never
+move between notes, and a long note scrolls inside it.
 
 - The note is set exactly as it is read anywhere else — body face, `--t-read`, `--lh-read` — in
   the open note's own centred column (`calc(33 * var(--t-read))`), and scrolls if it is long. A note
@@ -1087,12 +1099,22 @@ destinations on the floor of every size of screen without a measured number anyw
 - **Destinations are targets before they are words:** 44px, the name in the display face because a
   folder is a named place, the count in the machine face because it is data. They are separated by
   1px of `--rule-soft` showing through, the same hairline grid the cards use.
-- **Keep, Important, To-do and Back sit in the head band beside the count**, Keep a `--muted` word. They are not places, so they
+- **Keep, Important, To-do and Back sit in the head band's second row, under the creature and the count**, Keep a `--muted` word. They are not places, so they
   are not among the destinations: a non-place at the foot is where a thumb aiming for it lands in
   the bin. Nothing at the foot should be easier to hit than a folder, and nothing sits past Delete.
-- The capture bar is **not drawn at all** while this runs, and the undo mark stands at the top of
-  the note, floated so the words run round it — the foot is all destinations, and the head band
-  has no room on a phone (floated over the band, it covered the ✕).
+- **Every full-screen page and mode keeps its exit mark where the header's cog stands:** 14 from the
+  top, 6 from the right, a thumb's square (`--exit-top`, `--exit-right`; review 2026-10-24, UI-02),
+  and its head band keeps `--exit-clear` free beside it. About, Settings, the imports, Tidy up, Tick
+  off and the picture viewer close from the same spot, so closing one and opening the next never
+  sends the eye looking.
+- The capture bar is **not drawn at all** while this runs, and **the header's creature visits the
+  head band**, at its left end where it stands in the header, with its speech bubble: an undo offer
+  is said there exactly as on the board ("Poof. Deleted 1 note · Undo", its outline drawn on over
+  the eight seconds). The header's own is away while it is there, so there is still one creature
+  (2026-10-24, owner approved, review UX-02). **Tick off has the same**: the creature in its head
+  band, its undo offers said in the bubble, Next under it. The offer is not floated over the note, which it
+  covered, and not over the head band, where it covered the ✕. The count stands at the far end of
+  the creature's row, and the ✕ where every exit stands.
 
 ---
 
@@ -1210,8 +1232,8 @@ Everything is skipped under `prefers-reduced-motion`, which `animates()` folds i
   cards by clip, once, under 400ms. All are tone or clip, none is a hue, all go under reduced
   motion.
 - **The undo countdown** is, on the board, **the bubble's own outline drawn on in ink**, from the
-  top-left corner clockwise over the eight seconds, linear, and then the bubble goes. In a mode (Tidy up, Tick off, the open
-  note) and on a short screen it is **the offer's own border being drawn on**, clockwise from the
+  top-left corner clockwise over the eight seconds, linear, and then the bubble goes. In the open
+  note and on a short screen it is **the offer's own border being drawn on**, clockwise from the
   top — one word, the verb, for its first 2.5 seconds, and then the arrow alone. Both are the same
   clock, and both are left undrawn under reduced motion.
 

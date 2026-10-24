@@ -131,6 +131,8 @@ interface Props {
   /** Standing on Todos, where a capture is marked as a to-do — only the empty
    *  field's words read it (`writeHint`). */
   onTodos?: boolean;
+  /** The board row stands down at the foot while writing: say where the words go. */
+  nameBoard?: boolean;
   /** A name typed into the chooser that matched no board — makes it. */
   onCreateBoard: (name: string) => UserBoard;
   /**
@@ -298,6 +300,7 @@ export function CaptureBar({
   offerInbox = false,
   here = null,
   onTodos = false,
+  nameBoard = false,
   onCreateBoard,
   fieldRef,
   registerLayer,
@@ -753,8 +756,11 @@ export function CaptureBar({
     }
     if (!trimmed) return;
     // To-do pressed on several lines is a list to tick (`asChecklist`); the
-    // press is the asking, so nothing changes on a capture without it.
-    onCapture(choice.todo ? asChecklist(trimmed) : trimmed, choice);
+    // press is the asking, so nothing changes on a capture without it. The one
+    // other asking is the board itself: a line written on Todos, with no other
+    // board chosen, starts as a box.
+    const onTodosBoard = onTodos && choice.board === undefined && !trimmed.includes("\n");
+    onCapture(choice.todo || onTodosBoard ? asChecklist(trimmed, onTodosBoard) : trimmed, choice);
     put("");
   }
 
@@ -907,21 +913,24 @@ export function CaptureBar({
             aria-label="Close add menu"
             onClick={() => setAttaching(false)}
           />
-          <div className="selpanel selpanel-right selpanel-over" role="menu" aria-label="Add">
+          <div className="selpanel selpanel-right selpanel-over capture-add" role="menu" aria-label="Add">
             {/* Position is the only emphasis, and nearest the thumb wins —
                 attaching keeps the bottom row as the established habit; the
-                sketch stands above it. */}
-            <Action
-              role="menuitem"
-              keepFocus
-              label="Draw"
-              onClick={() => {
-                setAttaching(false);
-                onDraw();
-              }}
-            >
-              <IconPencil />
-            </Action>
+                sketch stands above it. A sketch is a note of its own, so it is
+                offered only while nothing is being written. */}
+            {!ready && (
+              <Action
+                role="menuitem"
+                keepFocus
+                label="Draw"
+                onClick={() => {
+                  setAttaching(false);
+                  onDraw();
+                }}
+              >
+                <IconPencil />
+              </Action>
+            )}
             {/* One row, and it takes anything a note can carry — pictures,
                 PDFs, audio, whatever. Nearest the thumb, because it is the one
                 that gets used. */}
@@ -1171,6 +1180,16 @@ export function CaptureBar({
             what they typed. It is `pointer-events: none` in the stylesheet, so
             it never intercepts the tap that focuses the field underneath. */}
         {text.length === 0 && <Hotkey keyName={CAPTURE_KEY} />}
+        {/* Where the words will go, while the board row at the foot has stood
+            down for the keyboard (review 2026-10-24, UX-11): the one place
+            that named the board was the row, and the placeholder that would
+            is replaced by the first letter. In the field's top margin, where
+            no word of the first line stands. */}
+        {nameBoard && ready && (
+          <span className="capture-dest mono" aria-hidden="true">
+            In {boardName ?? (onTodos ? "Todos" : "Inbox")}
+          </span>
+        )}
         {text.length > 0 && (
           <button
             type="button"
@@ -1211,6 +1230,20 @@ export function CaptureBar({
            Tab from the field, in the same order. */
         <>
           <div ref={marks} className="capture-marks" role="group" aria-label="Save as">
+            {/* Add stays while there are words, so a picture can join them
+                before Save (review 2026-10-24, PL-04). The same menu and the
+                same waiting files as the empty bar's corner. */}
+            <button
+              type="button"
+              className="capture-icon capture-mark"
+              aria-label="Add"
+              title="Add"
+              aria-expanded={attaching}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setAttaching((v) => !v)}
+            >
+              <IconPlus tier="inline" />
+            </button>
             <button
               type="button"
               className="capture-icon capture-mark"
@@ -1276,6 +1309,14 @@ export function CaptureBar({
             >
               <IconReminder on={choice.reminder !== null} tier="inline" />
             </button>
+            {/* When it will ring, said beside the clock (review 2026-10-24,
+                UX-10): the name above carries it for a reader, this is for the
+                eye, so a Tonight picked for a Tomorrow shows before Save. */}
+            {choice.reminder && (
+              <span className="capture-when mono" aria-hidden="true">
+                {presetWhen(choice.reminder)}
+              </span>
+            )}
             {shareOffer && (
               <button
                 type="button"

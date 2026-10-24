@@ -103,15 +103,11 @@
   padding-bottom: 0;
 }
 
-.dialog-confirm {
-  background: var(--invert);
-  color: var(--paper);
-  border-color: var(--ink);
-}
-
-.dialog-confirm:active {
-  background: var(--paper);
-  color: var(--ink);
+/* Both answers are the same plain outlined button, in the same weight: the
+   word on it is enough, and the dangerous answer is not the loudest thing on
+   the screen (review UI-17). Pressed, chrome raises. */
+.dialog-actions .btn:active {
+  background: var(--raised);
 }
 
 @media (max-width: 699px) {
@@ -141,6 +137,14 @@
    -------------------------------------------------------------------------- */
 .fmtrow {
   display: flex;
+  border-top: 1px solid var(--rule-soft);
+}
+
+/* The row under it is not the panel's first button (`.selpanel-btn:first-of-type`
+   takes the top rule off the first one among its siblings, and the format
+   row's buttons are inside a div), so it keeps its rule: every row is divided
+   alike, and the row is as tall as the ones below it (review UI-06). */
+.fmtrow + .selpanel-btn {
   border-top: 1px solid var(--rule-soft);
 }
 
@@ -424,32 +428,6 @@
 .undo-slot-bar .undo {
   min-width: var(--bar-h);
   height: 100%;
-}
-
-/* The Sorter: floated at the top of the note, so the words run round it. The
-   head band has no room for it on a phone, and the foot is all destinations. */
-.undo-slot-face {
-  float: right;
-  /* A fixed box, the width of the mark with its word and its height: the
-     note's lines break the same whether the word is up, settled to the arrow,
-     or gone (review 2026-10-04, UI-C-01). */
-  width: 132px;
-  min-height: var(--hit);
-  justify-content: flex-end;
-  margin: 0 0 8px 12px;
-}
-
-/* ...and at the end of the pile, in the summary's empty top corner. The
-   summary is a centred column, so a float would be a row of its own there and
-   the column would jump when it went. */
-.sorter-end > .undo-slot-face {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  float: none;
-  width: auto;
-  min-height: 0;
-  margin: 0;
 }
 
 /* Over the open note, for the one kind of offer made from inside it — Untick

@@ -42,3 +42,13 @@ export async function loadSamples(): Promise<number> {
   const { loadSampleNotes } = await import("../demo/sampleNotes");
   return loadSampleNotes(store);
 }
+
+/**
+ * The sample notes out again, to the trash and offered back (`removeSampleNotes`).
+ * Answers how many notes were moved.
+ */
+export async function removeSamples(): Promise<number> {
+  if (!store) return 0;
+  const { removeSampleNotes } = await import("../demo/sampleNotes");
+  return removeSampleNotes(store);
+}

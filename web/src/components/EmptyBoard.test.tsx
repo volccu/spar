@@ -118,6 +118,28 @@ describe("an empty search with matches it did not look at", () => {
     expect(onSearchEverywhere).toHaveBeenCalledTimes(1);
   });
 
+  it("offers the nearest real word, and tapping it searches that word", () => {
+    const onSearchWord = vi.fn();
+    render(
+      <EmptyBoard
+        fetching={false}
+        searching
+        searchWords={1}
+        remindersOpen={false}
+        headerMood="idle"
+        board={inbox}
+        freshArchive={false}
+        oldNotesOut={0}
+        missed={{ inTrash: 0, outside: 0, scope: null, didYouMean: "definately" }}
+        onSearchWord={onSearchWord}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Did you mean definately?" }));
+    expect(onSearchWord).toHaveBeenCalledWith("definately");
+    // The offer is the advice: the generic hint does not stand beside it.
+    expect(screen.queryByText(/Try a shorter form/)).toBeNull();
+  });
+
   it("says the true thing about a quoted phrase, not to try fewer words", () => {
     empty({ searching: true, searchQuoted: true, searchWords: 2 });
     expect(screen.getByText(/Words in quotes must stand together/)).toBeTruthy();

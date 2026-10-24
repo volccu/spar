@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasPhrase, searchNotes, searchTerms, trashMatches } from "./search";
+import { didYouMean, hasPhrase, searchNotes, searchTerms, trashMatches } from "./search";
 import type { Attachment, Note } from "../types";
 import { linkPreview, note as base } from "../test/fixtures";
 
@@ -503,5 +503,41 @@ describe("trashMatches", () => {
     expect(trashMatches(notes, "garage")[0].status).toBe("trashed");
     expect(searchNotes(notes, "garage")).toEqual([]);
     expect(trashMatches(notes, "flat")).toEqual([]);
+  });
+});
+
+/** Review 2026-10-24, PL-07: results stay exact; a search that found nothing may offer one real word. */
+describe("didYouMean", () => {
+  const notes = [
+    note({ id: "a", body: "I will definately go to the market on Friday" }),
+    note({ id: "b", body: "definately maybe, also kitchen tiles" }),
+    note({ id: "c", body: "definitely not here", status: "trashed" }),
+  ];
+
+  it("offers the word the notes really hold, one letter away", () => {
+    expect(searchNotes(notes, "definitely")).toEqual([]);
+    expect(didYouMean(notes, "definitely")).toBe("definately");
+  });
+
+  it("corrects only the word that found nothing, and keeps the rest", () => {
+    expect(didYouMean(notes, "kitchen definitely")).toBe("kitchen definately");
+  });
+
+  it("never offers a word that only the trash holds", () => {
+    expect(didYouMean(notes, "definitelyy")).toBeNull();
+    const onlyTrash = [note({ id: "t", body: "zebra stripes", status: "trashed" })];
+    expect(didYouMean(onlyTrash, "zebrb")).toBeNull();
+  });
+
+  it("offers nothing when the search found something, for short words, or for a quoted phrase", () => {
+    expect(didYouMean(notes, "market")).toBeNull();
+    expect(didYouMean(notes, "kitchn")).toBe("kitchen");
+    expect(didYouMean(notes, "mrket")).toBe("market");
+    expect(didYouMean(notes, "tle")).toBeNull();
+    expect(didYouMean(notes, '"definitely maybe"')).toBeNull();
+  });
+
+  it("offers nothing when the fixed query would still find nothing", () => {
+    expect(didYouMean(notes, "kitchn friday")).toBeNull();
   });
 });

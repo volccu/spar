@@ -15,7 +15,7 @@ test.use({ viewport: PHONE, isMobile: true, hasTouch: true });
 test("first search letter answers within 200 ms on a 4x slower CPU", async ({ page, context }) => {
   await openDemoWithSamples(page);
   await page.reload();
-  await page.getByRole("button", { name: /^Start here/ }).waitFor();
+  await page.getByRole("button", { name: /^call dentist/ }).waitFor();
   await waitForNoUndo(page);
 
   const cdp = await context.newCDPSession(page);

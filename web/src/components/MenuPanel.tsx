@@ -14,7 +14,7 @@ import Cog6ToothIcon from "@heroicons/react/24/outline/Cog6ToothIcon";
 import { SEARCH_KEY } from "../lib/hotkeys";
 import { Hotkey } from "./Hotkey";
 import { Action } from "./shared/Action";
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useRestoreFocus } from "../lib/useRestoreFocus";
 import { shownRows, walkRows } from "../lib/rowKeys";
 import { DEMO } from "../lib/demo";
@@ -75,7 +75,7 @@ interface Props {
    * and a visitor who typed "test" first had no way back to them. Undefined
    * once they are loaded, and in every build but the demo's.
    */
-  onSampleNotes?: () => void;
+  onSampleNotes?: () => Promise<unknown>;
   onClose: () => void;
 }
 
@@ -105,6 +105,9 @@ export function MenuPanel({
 }: Props) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   useRestoreFocus();
+  // The sample notes take a moment to write: the row says so, and the menu
+  // closes when they are in (review UX-13).
+  const [adding, setAdding] = useState(false);
 
   useLayoutEffect(() => {
     if (panelRef.current) shownRows(panelRef.current, '[role="menuitem"]:not(:disabled)')[0]?.focus();
@@ -150,7 +153,15 @@ export function MenuPanel({
             its words. */}
         {DEMO ? (
           onSampleNotes ? (
-            <Action role="menuitem" label="Try it with sample notes" onClick={onSampleNotes}>
+            <Action
+              role="menuitem"
+              label={adding ? "Adding the sample notes…" : "Try it with sample notes"}
+              disabled={adding}
+              onClick={() => {
+                setAdding(true);
+                void onSampleNotes().finally(onClose);
+              }}
+            >
               <IconSamples />
             </Action>
           ) : null

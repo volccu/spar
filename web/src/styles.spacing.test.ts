@@ -31,11 +31,11 @@ const SPACING_LITERALS: Record<string, number> = {
   "75-note-reading.css": 14,
   "76-files-viewer-code.css": 55,
   "80-empty-mascot-selection.css": 27,
-  "82-dialogs-and-undo.css": 21,
+  "82-dialogs-and-undo.css": 19,
   "84-sync-signin-phone-shelf.css": 21,
-  "88-sorter.css": 23,
-  "90-about-and-settings.css": 10,
-  "95-keep-import.css": 34,
+  "88-sorter.css": 19,
+  "90-about-and-settings.css": 9,
+  "95-keep-import.css": 29,
   "99-hover-tip.css": 0,
 };
 

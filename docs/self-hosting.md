@@ -20,17 +20,23 @@ and sending changes.
 
 ### Run it
 
+There is no ready-made image to download: you build it from this repository, which takes a few
+minutes the first time.
+
 ```bash
+git clone https://github.com/volccu/spar.git
+cd spar
+docker build -t spar .
 docker run -d --name spar --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -v spar-data:/data \
   -e SPAR_ALLOWED_HOSTS=localhost \
-  ghcr.io/volccu/spar:latest
+  spar
 ```
 
-Open <http://localhost:8080>. The image is built for `linux/amd64` and `linux/arm64` (a Raspberry
-Pi 4 or 5 with a 64-bit system works). Tags: `latest`, each release's version (`0.4.1`) and its
-minor line (`0.4`); pin one of the last two for anything you depend on.
+Open <http://localhost:8080>. The image is built on the machine that runs it, so a Raspberry Pi 4
+or 5 with a 64-bit system works too. To stay on a release, check out its tag (`git checkout v1.0.0`)
+before building.
 
 The port is published on the machine's **loopback only**. That is deliberate: browsers allow the
 parts of spår that make it an app — the service worker (opening offline, installing it to a home
@@ -43,10 +49,10 @@ added to the Home Screen; [`ios.md`](ios.md) has the steps.
 
 [`docker-compose.yml`](../docker-compose.yml) at the top of the repository is a complete example:
 the one service, a named volume for `/data`, the port on loopback, and the settings worth setting.
-Copy it, change `notes.example.com` and the contact address, and:
+Change `notes.example.com` and the contact address in it, and from the repository folder:
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 docker compose logs -f spar
 ```
 
@@ -186,8 +192,9 @@ of the row you want and send it back with `PUT /api/prefs` while signed in as th
 ### Upgrades
 
 ```bash
-docker compose pull && docker compose up -d
-# or: docker pull ghcr.io/volccu/spar:<version>, then recreate the container with the same volume
+git pull
+docker compose up -d --build
+# or: docker build -t spar ., then recreate the container with the same volume
 ```
 
 The database schema is versioned and migrated forward on start, so an upgrade needs nothing but the
@@ -195,13 +202,9 @@ new image — **but take a backup first**: an older version refuses to open a da
 has migrated, so going back means restoring that backup. [`CHANGELOG.md`](../CHANGELOG.md) says what each release changes. Installed apps pick
 up the new version by themselves the next time they are opened and offer to update.
 
-### Building the image yourself
+### How the image is built
 
-```bash
-docker build -t spar .
-```
-
-The build compiles the app with `VITE_RUNTIME_CONFIG=1` and no project baked in, bundles the server,
+`docker build -t spar .` (or `docker compose up -d --build`) compiles the app with `VITE_RUNTIME_CONFIG=1` and no project baked in, bundles the server,
 and installs its one native dependency (`better-sqlite3`) for the image's own platform. For another
 platform, use Buildx: `docker buildx build --platform linux/arm64 -t spar .`.
 

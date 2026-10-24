@@ -202,6 +202,27 @@ const MARKER_RE = /^([ \t]*)(?:[-*–]|\d{1,3}[.)])[ \t]+/;
 const NAME_MAX = 30;
 
 /**
+ * The title a list's first line carries, or null: short, no list marker, not a
+ * box, not a `#` line, and either ended with a colon (dropped) or set off by a
+ * blank line without ending a sentence. `asChecklist` writes it as a name and
+ * the card's checklist face (`deriveFace`) draws it over the boxes, so a list
+ * typed by hand and one the To-do mark made read alike.
+ */
+export function listTitle(lines: string[]): string | null {
+  const first = (lines[0] ?? "").trim();
+  const colon = first.endsWith(":");
+  const name = colon ? first.slice(0, -1).trimEnd() : first;
+  const titled =
+    name !== "" &&
+    name.length <= NAME_MAX &&
+    !first.startsWith("#") &&
+    !BOXED_RE.test(lines[0]) &&
+    !MARKER_RE.test(lines[0]) &&
+    (colon || ((lines[1] ?? "").trim() === "" && !/[.!?]$/.test(first)));
+  return titled ? name : null;
+}
+
+/**
  * A capture of several lines, made into a list to tick — **only because the
  * user pressed To-do on it** (review 2026-10-01, UX-05).
  *
@@ -228,21 +249,18 @@ const NAME_MAX = 30;
  * with a colon ("Shopping:", the colon dropped) or (b) has a blank line right
  * under it. In (b) a first line that ends a sentence is not a name. Only the
  * rest is boxed.
+ *
+ * A single line is boxed only with `oneLine`, which is the capture bar on
+ * Todos (review 2026-10-24, UX-16): a to-do written there starts with its
+ * box. It is never read as a name.
  */
-export function asChecklist(text: string): string {
+export function asChecklist(text: string, oneLine = false): string {
   const lines = text.split("\n");
   const filled = lines.filter((l) => l.trim() !== "").length;
-  if (filled < 2) return text;
+  if (filled < 2 && !(oneLine && filled === 1)) return text;
   if (lines.some((l) => BOXED_RE.test(l))) return text;
-  const first = lines[0].trim();
-  const colon = first.endsWith(":");
-  const name = colon ? first.slice(0, -1).trimEnd() : first;
-  const names =
-    name !== "" &&
-    name.length <= NAME_MAX &&
-    !first.startsWith("#") &&
-    !MARKER_RE.test(lines[0]) &&
-    (colon || (lines[1].trim() === "" && !/[.!?]$/.test(first)));
+  const name = filled < 2 ? null : listTitle(lines);
+  const names = name !== null;
   return lines
     .map((line, i) => {
       if (line.trim() === "") return line;

@@ -1439,12 +1439,12 @@ export function mascotTap(strength = 1) {
  * header's, or the empty board's while that one is the creature on screen.
  * Each walks `instances` for the reasons `mascotNotice` gives.
  *
- * A moment that happens where no creature can be seen (inside Tidy up, under
- * the open note on a phone) is kept for `keepMs` and played the moment one
- * can: the last box ticked, then Back, and the creature nods as the board
- * comes back. Past that it is for nothing and is dropped.
+ * A moment that happens where no creature can be seen (under the open note on
+ * a phone) is kept for `keepMs` and played the moment one can: a picture is
+ * shared in behind the note, then Back, and the flash plays as the board comes
+ * back. Past that it is for nothing and is dropped.
  */
-function whenSeen(run: (mascot: SparMascot) => void, keepMs: number) {
+export function whenSeen(run: (mascot: SparMascot) => void, keepMs: number) {
   const tryNow = () => {
     const seen = [...instances].filter((mascot) => mascot.seen());
     seen.forEach(run);

@@ -33,26 +33,26 @@ async function ready(page: Page) {
   await page.goto("about:blank");
   await openDemoWithSamples(page);
   await page.reload();
-  await card(page, /^Start here/).waitFor();
+  await card(page, /^call dentist/).waitFor();
   await waitForNoUndo(page);
 }
 
 test("@core every flow ends on the app's first entry, and one Back then leaves", async ({ page }) => {
   await ready(page);
 
-  await card(page, /^Start here/).click();
+  await card(page, /^call dentist/).click();
   await expect(noteDialog(page)).toBeVisible();
   await page.getByRole("button", { name: "Close note" }).click();
   await expect(noteDialog(page)).toHaveCount(0);
   await expectFirstEntry(page, "a note closed by its own button");
 
-  await card(page, /^Start here/).click();
+  await card(page, /^call dentist/).click();
   await expect(noteDialog(page)).toBeVisible();
   await back(page);
   await expect(noteDialog(page)).toHaveCount(0);
   await expectFirstEntry(page, "a note closed by Back");
 
-  await card(page, /^Start here/).click();
+  await card(page, /^call dentist/).click();
   await expect(noteDialog(page)).toBeVisible();
   await noteDialog(page).getByRole("button", { name: "Boards" }).click();
   await page.getByRole("tab", { name: /^Archive/ }).first().click();
@@ -68,7 +68,7 @@ test("@core every flow ends on the app's first entry, and one Back then leaves",
 
   // A note closed and the next one opened in the very next task, before the
   // first Back is answered: the new note stays, on one entry.
-  await card(page, /^Start here/).click();
+  await card(page, /^call dentist/).click();
   await expect(noteDialog(page)).toBeVisible();
   await page.evaluate(async () => {
     (document.querySelector('[aria-label="Close note"]') as HTMLElement).click();
@@ -76,7 +76,7 @@ test("@core every flow ends on the app's first entry, and one Back then leaves",
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
     const next = [...document.querySelectorAll<HTMLElement>("button.card")].find((b) =>
-      b.getAttribute("aria-label")?.startsWith("Printer ink"),
+      b.getAttribute("aria-label")?.startsWith("printer ink"),
     );
     next?.click();
   });
@@ -88,7 +88,7 @@ test("@core every flow ends on the app's first entry, and one Back then leaves",
   // Reloaded while standing on an entry of ours: the layer is gone, so is it.
   await page.evaluate(() => history.pushState({ spar: "layer" }, ""));
   await page.reload();
-  await card(page, /^Start here/).waitFor();
+  await card(page, /^call dentist/).waitFor();
   await expectFirstEntry(page, "reloaded onto a left-over layer entry");
 
   // And from the board, one Back is out of the app.

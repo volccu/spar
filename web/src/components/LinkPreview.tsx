@@ -6,6 +6,8 @@ interface Props {
   preview: LinkPreviewData;
   compact?: boolean;
   interactive?: boolean;
+  /** The card already says these words above the box: show the site and the address only. */
+  untitled?: boolean;
 }
 
 /**
@@ -37,7 +39,7 @@ function LinkThumb({ preview }: { preview: LinkPreviewData }) {
   );
 }
 
-function Content({ preview, compact }: { preview: LinkPreviewData; compact: boolean }) {
+function Content({ preview, compact, untitled }: { preview: LinkPreviewData; compact: boolean; untitled: boolean }) {
   return (
     <>
       <LinkThumb preview={preview} />
@@ -53,7 +55,7 @@ function Content({ preview, compact }: { preview: LinkPreviewData; compact: bool
               says it (`NoteCard`), so a card never says it twice. */}
           {!compact && preview.gone && <span className="link-preview-gone"> · gone</span>}
         </span>
-        <strong className="link-preview-title">{preview.title}</strong>
+        {!untitled && <strong className="link-preview-title">{preview.title}</strong>}
         {preview.description && (
           <span className="link-preview-description">{preview.description}</span>
         )}
@@ -64,7 +66,7 @@ function Content({ preview, compact }: { preview: LinkPreviewData; compact: bool
 }
 
 /** A local-first unfurl: it never needs a remote metadata request to render. */
-export function LinkPreview({ preview, compact = false, interactive = false }: Props) {
+export function LinkPreview({ preview, compact = false, interactive = false, untitled = false }: Props) {
   const className = `link-preview${compact ? " link-preview-compact" : ""}${
     interactive ? " link-preview-interactive" : ""
   }`;
@@ -77,13 +79,13 @@ export function LinkPreview({ preview, compact = false, interactive = false }: P
         rel="noreferrer noopener"
         onClick={(e) => leaveForLink(e, preview.href)}
       >
-        <Content preview={preview} compact={compact} />
+        <Content preview={preview} compact={compact} untitled={untitled} />
       </a>
     );
   }
   return (
     <div className={className} aria-hidden>
-      <Content preview={preview} compact={compact} />
+      <Content preview={preview} compact={compact} untitled={untitled} />
     </div>
   );
 }

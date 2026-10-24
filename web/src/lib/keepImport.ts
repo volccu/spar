@@ -612,10 +612,15 @@ export interface ImportResult {
   imported: number;
   archived: number;
   filed: number;
+  /** Of those, the notes that went to the Archive from a board: counted in `archived` once. */
+  archivedFiled: number;
   important: number;
   /** Active notes the Inbox will not show because its line is drawn after
    *  them (the first-open question's "Leave them"). */
   beforeInboxLine: number;
+  /** Active, unfiled to-dos and bare links: they wait on Todos and Links, not in the Inbox. */
+  onTodos: number;
+  onLinks: number;
   /** Notes with nothing left in them once their files were left behind. */
   empty: number;
   /** Notes an earlier import made that were in the trash and are back, under
@@ -759,6 +764,41 @@ export function undoImport(batch: ImportBatch, store: ImportStore): number {
   return moved.length;
 }
 
+/** Where the notes of one import went, as one line: "4 in the Inbox, 1 in the Archive". */
+export function whereTheyWent(
+  result: Pick<
+    ImportResult,
+    "inInbox" | "filed" | "archived" | "archivedFiled" | "beforeInboxLine" | "onTodos" | "onLinks"
+  >,
+): string {
+  return (
+    [
+      [result.inInbox, "in the Inbox"],
+      [result.filed - result.archivedFiled, "in boards"],
+      [result.archived, "in the Archive"],
+      [result.beforeInboxLine, "on All"],
+      [result.onTodos, "on Todos"],
+      [result.onLinks, "on Links"],
+    ] as const
+  )
+    .filter(([n]) => n > 0)
+    .map(([n, where]) => `${n} ${where}`)
+    .join(", ");
+}
+
+/** The board "Show my notes" opens: null for the Inbox, else the first board the
+ *  import made, else All when notes older than the Inbox's line went there
+ *  (All shows the to-dos too), else Todos, else Links. */
+export function whereToShow(
+  result: Pick<ImportResult, "inInbox" | "onTodos" | "onLinks"> & Partial<Pick<ImportResult, "beforeInboxLine">>,
+  made: UserBoard[],
+): string | null {
+  if (result.inInbox > 0) return null;
+  if (made[0]) return made[0].id;
+  if ((result.beforeInboxLine ?? 0) > 0) return "recent";
+  return result.onTodos > 0 ? "todos" : result.onLinks > 0 ? "links" : null;
+}
+
 /** One chunk handed to the store: each note and the files to attach to it. */
 export type ImportChunk = { note: Note; files: File[] }[];
 
@@ -854,8 +894,11 @@ export async function runImport(
     imported: 0,
     archived: 0,
     filed: 0,
+    archivedFiled: 0,
     important: 0,
     beforeInboxLine: 0,
+    onTodos: 0,
+    onLinks: 0,
     empty: plan.empty,
     revived: 0,
     inInbox: 0,
@@ -910,12 +953,15 @@ export async function runImport(
       result.files += note.attachments.length;
       if (note.status === "archived") result.archived += 1;
       if (note.board_id) result.filed += 1;
+      if (note.board_id && note.status === "archived") result.archivedFiled += 1;
       if (note.priority > 0) result.important += 1;
       // The Inbox's own test with its line taken away, against the test with
       // it: a to-do or a bare link was never going to wait in the Inbox, so
       // it is not a note the line is keeping out.
-      if (note.status === "active" && !note.board_id && !isTodoNote(note) && !linksOnly(note)) {
-        if (Date.parse(note.created_at) < since) result.beforeInboxLine += 1;
+      if (note.status === "active" && !note.board_id) {
+        if (isTodoNote(note)) result.onTodos += 1;
+        else if (linksOnly(note)) result.onLinks += 1;
+        else if (Date.parse(note.created_at) < since) result.beforeInboxLine += 1;
         else result.inInbox += 1;
       }
       result.made.push({ id: note.id, status: note.status });

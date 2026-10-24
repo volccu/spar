@@ -75,7 +75,7 @@ describe("un-merging an idea", () => {
     // The canvas's own menu, beside Dissolve. It asks nothing: nothing is
     // thrown away, and the undo is right there.
     fireEvent.contextMenu(document.querySelector<HTMLElement>(".canvas-surface")!);
-    fireEvent.click(await screen.findByRole("menuitem", { name: /^un-merge$/i }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^separate$/i }));
     expect(screen.queryByRole("button", { name: "Dissolve" })).toBeNull();
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Idea canvas" })).toBeNull());
@@ -102,7 +102,7 @@ describe("un-merging an idea", () => {
 
     // One undo, and the merge stands again: the sources leave the folder for
     // the idea they were in, which was filed there with them.
-    fireEvent.click(screen.getByRole("button", { name: /^Undo: Un-merged into 2/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Undo: Separated into 2/ }));
     await goToBoard(/Unmerged/i);
     await waitFor(() => expect(cards()).toHaveLength(1));
     for (const id of srcIds) expect(cards()[0].dataset.id).not.toBe(id);

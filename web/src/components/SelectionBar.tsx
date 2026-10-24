@@ -17,6 +17,7 @@ import {
   IconFolder,
   IconMerge,
   IconPriority,
+  IconReminder,
   IconRestore,
   IconSelectAll,
   IconTodo,
@@ -30,6 +31,8 @@ interface Props {
   allTodo: boolean;
   /** Every picked note already carries priority, so the row clears it. */
   allPriority?: boolean;
+  /** At least one picked note has a reminder, so the panel offers to clear it. */
+  anyReminder?: boolean;
   /** In the trash, the verbs change: put back, or destroy now. */
   inTrash: boolean;
   /** The board chooser is open, swapping the panel's rows for its own. */
@@ -61,6 +64,7 @@ interface Props {
   onMerge: () => void;
   onPriority: () => void;
   onTodo: () => void;
+  onClearReminder?: () => void;
   onArchive: () => void;
   onDelete: () => void;
   onRestore: () => void;
@@ -150,6 +154,7 @@ export function SelectionBar({
   anyArchived,
   allTodo,
   allPriority = false,
+  anyReminder = false,
   inTrash,
   moving,
   anyFiled,
@@ -167,6 +172,7 @@ export function SelectionBar({
   onMerge,
   onPriority,
   onTodo,
+  onClearReminder,
   onArchive,
   onDelete,
   onRestore,
@@ -336,6 +342,13 @@ export function SelectionBar({
             <Action label="To-do" pressed={allTodo} onClick={onTodo} announce>
               <IconTodo on={allTodo} tier="inline" />
             </Action>
+            {/* Offered only while a picked note has a reminder: the way to
+                clear a pile of passed ones in one go (review 2026-10-24, UX-14). */}
+            {anyReminder && onClearReminder && (
+              <Action label="Clear reminder" onClick={onClearReminder} announce>
+                <IconReminder tier="inline" />
+              </Action>
+            )}
             <Action
               label={count < 2 ? "Pick 2 to merge" : `Merge ${count}`}
               onClick={onMerge}

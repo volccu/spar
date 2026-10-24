@@ -33,7 +33,10 @@
      covers the header, and the wordmark and the creature must not move when
      it opens (review UI-B-11). Only the right edge differs, for Close. */
   gap: var(--head-gap);
-  padding: calc(var(--head-top) + env(safe-area-inset-top)) 6px var(--head-bottom) var(--head-x);
+  padding: calc(var(--head-top) + env(safe-area-inset-top)) var(--exit-clear) var(--head-bottom) var(--head-x);
+  /* The header's own band, whether or not a creature stands in it, so the exit
+     mark's place is inside it on every page that uses this head. */
+  min-height: calc(var(--head-top) + var(--mascot-box) + var(--head-bottom) + env(safe-area-inset-top));
   border-bottom: 1px solid var(--rule);
 }
 
@@ -61,12 +64,24 @@
   margin-right: calc(var(--mascot-trim) * -1);
 }
 
+/* Every full-screen exit mark, in one place: the header cog's spot. The Tidy up
+   and Tick off crosses join About and Settings here, and the picture viewer's
+   takes the same two tokens (`--exit-top`, `--exit-right`); each band keeps
+   `--exit-clear` free beside it. */
+.about-close,
+.sorter-exit,
+.ticker-done {
+  position: absolute;
+  top: calc(var(--exit-top) + env(safe-area-inset-top));
+  right: var(--exit-right);
+  z-index: 1;
+}
+
 .about-close {
-  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
+  width: var(--hit);
   height: var(--hit);
   padding: 0;
   background: transparent;
@@ -127,6 +142,9 @@
 }
 
 .about-h {
+  /* `?` scrolls the page to its list of keys: the heading lands one section
+     gap below the header's edge, never on it (review UX-20). */
+  scroll-margin-top: 2.2em;
   margin-top: 2.2em;
   margin-bottom: 0.9em;
   color: var(--muted);
@@ -138,10 +156,14 @@
   text-transform: uppercase;
 }
 
+/* Buttons that do the same kind of job share a floor of width, and a mark
+   on every one of them or on none (review UI-08). */
 .about-export {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  min-width: 9em;
   min-height: var(--hit);
   margin-top: 1.2em;
   color: var(--ink);
@@ -235,6 +257,17 @@
   gap: 4px;
 }
 
+/* The touches (`About.tsx`): the gesture in the sentences' size, what it does
+   quieter beside it and never broken across lines, so it is the gesture that
+   gives way on a narrow phone (review PL-03). */
+.about-touches dd {
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: var(--t-text);
+  line-height: var(--lh-read);
+  white-space: nowrap;
+}
+
 /* --- Settings ----------------------------------------------------------------
    Settings.tsx (2026-10-11, owner approved). About's layer (`.about`: fixed,
    full size, the paper ground), laid out the way a settings screen is: the
@@ -253,8 +286,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--s-5);
-  min-height: calc(var(--hit) + var(--s-6));
-  padding: calc(var(--s-4) + env(safe-area-inset-top)) var(--s-2) var(--s-4) var(--s-6);
+  min-height: calc(var(--head-top) + var(--mascot-box) + var(--head-bottom) + env(safe-area-inset-top));
+  padding: calc(var(--head-top) + env(safe-area-inset-top)) var(--exit-clear) var(--head-bottom) var(--head-x);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -331,6 +364,21 @@
   color: var(--ink);
   font-family: var(--body);
   font-size: var(--t-read);
+}
+
+/* The clear button of a search field, in the same terms as the date field's
+   calendar (`.selpanel-row input`, review UI-05): the browser's button and
+   its tap, the set's cross in `--muted` in place of its bold white one. */
+.settings-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  background: var(--muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+  cursor: var(--cursor-pointer);
 }
 
 .settings-search input::placeholder {
@@ -485,7 +533,9 @@
 .settings-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s-3);
+  min-width: 9em;
   min-height: var(--hit);
   color: var(--ink);
   text-decoration: none;

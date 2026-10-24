@@ -1,5 +1,6 @@
 import { useIsShort } from "../lib/breakpoint";
 import { Count } from "./Count";
+import { IconClear } from "./Icons";
 import { Speech, type Said } from "./Speech";
 
 /**
@@ -25,9 +26,11 @@ interface Props {
   quiet: { words: string; run: () => void } | null;
   /** What the board row cannot count: "3 selected", "5 found", "2 reminders". */
   headerCount: string | null;
+  /** While notes are picked: the count is a button that ends the selection (review 2026-10-24, UX-15). */
+  onEndSelection?: () => void;
 }
 
-export function HeaderWords({ said, announcement, offerMessage, updateReady, quiet, headerCount }: Props) {
+export function HeaderWords({ said, announcement, offerMessage, updateReady, quiet, headerCount, onEndSelection }: Props) {
   // What the bubble says that no other region already does: a capture's
   // receipt, a link already saved, the answer to a poke or a double tap, a
   // reminder about to ring, the connection coming back, and a moment
@@ -63,7 +66,20 @@ export function HeaderWords({ said, announcement, offerMessage, updateReady, qui
           {quiet.words}
         </button>
       )}
-      {headerCount && <Count className="count mono" text={headerCount} />}
+      {headerCount && onEndSelection ? (
+        <button
+          type="button"
+          className="count count-end mono"
+          aria-label={`Cancel, ${headerCount}`}
+          title="Cancel"
+          onClick={onEndSelection}
+        >
+          <Count className="" text={headerCount} />
+          <IconClear />
+        </button>
+      ) : (
+        headerCount && <Count className="count mono" text={headerCount} />
+      )}
       <span className="sr-only" role="status" aria-live="polite">
         {updateReady ? "A new version is ready. Reload to use it." : ""}
       </span>

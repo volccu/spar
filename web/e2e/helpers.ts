@@ -11,7 +11,7 @@ export async function openDemoWithSamples(page: Page) {
   await page.clock.setFixedTime(new Date("2026-10-08T10:00:00"));
   await page.goto("/");
   await page.getByRole("button", { name: /sample notes/i }).first().click();
-  await expect(page.getByRole("button", { name: /^Start here/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^call dentist/ })).toBeVisible();
   // The load is done once its undo offer stands; a reload before that is aborted in Firefox.
   await expect(page.getByRole("button", { name: /^Undo/ })).toBeVisible();
 }

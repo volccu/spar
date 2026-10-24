@@ -26,6 +26,8 @@ import {
   trashImport,
   undoImport,
   untrashImport,
+  whereToShow,
+  whereTheyWent,
   type ImportChunk,
   type ImportStore,
   type KeepFound,
@@ -558,6 +560,17 @@ describe("runImport", () => {
     expect(all.beforeInboxLine).toBe(0);
   });
 
+  it("counts the to-dos and bare links it left on Todos and Links, so every active unfiled note is somewhere (review 2026-10-24 critic)", async () => {
+    const { scan } = await planned();
+    const list = { ...byStem(scan, "Pantry list"), stem: "Shopping", body: "# Shopping\n\n[ ] flour\n[ ] eggs", labels: [] };
+    const plan = planImport({ ...scan, notes: [...scan.notes, list] }, []);
+    const { chunks, write } = recorder();
+    const result = await runImport(plan, new Map(), write, { inboxSince: "1970-01-01T00:00:00.000Z" });
+    const unfiled = chunks.flat().filter(({ note }) => note.status === "active" && !note.board_id).length;
+    expect(result.onTodos + result.onLinks).toBeGreaterThan(0);
+    expect(result.inInbox + result.beforeInboxLine + result.onTodos + result.onLinks).toBe(unfiled);
+  });
+
   it("stops at a chunk the device will not take, with what landed still counted", async () => {
     const { scan } = await planned();
     const many = { ...scan, notes: Array.from({ length: 80 }, (_, i) => ({ ...scan.notes[0], stem: `n${i}`, files: [] })) };
@@ -602,6 +615,47 @@ describe("runImport", () => {
     });
     // Filed under Kitchen, the list carries no line and is not counted.
     expect(filed.beforeInboxLine).toBe(4);
+  });
+});
+
+describe("where the notes went (review UX-19)", () => {
+  const none = { inInbox: 0, filed: 0, archived: 0, archivedFiled: 0, beforeInboxLine: 0, onTodos: 0, onLinks: 0 };
+
+  it("says it in one line, in the order of the shelf", () => {
+    expect(whereTheyWent({ ...none, inInbox: 4, archived: 1 })).toBe("4 in the Inbox, 1 in the Archive");
+    expect(whereTheyWent({ ...none, inInbox: 2, filed: 3, archived: 1, beforeInboxLine: 5 })).toBe(
+      "2 in the Inbox, 3 in boards, 1 in the Archive, 5 on All",
+    );
+    // An archived note that was also filed is counted once, as archived.
+    expect(whereTheyWent({ ...none, filed: 3, archived: 2, archivedFiled: 1 })).toBe("2 in boards, 2 in the Archive");
+    expect(whereTheyWent(none)).toBe("");
+    // To-dos and bare links wait on their own boards, and are named too.
+    expect(whereTheyWent({ ...none, inInbox: 2, onTodos: 3, onLinks: 1 })).toBe(
+      "2 in the Inbox, 3 on Todos, 1 on Links",
+    );
+    expect(whereTheyWent({ ...none, onTodos: 3 })).toBe("3 on Todos");
+  });
+
+  it("opens the Inbox when it got any, else the first board the import made", () => {
+    const made: UserBoard[] = [
+      { id: "a", name: "Recipes", position: 0 },
+      { id: "b", name: "Home", position: 1 },
+    ];
+    const empty = { inInbox: 0, onTodos: 0, onLinks: 0 };
+    expect(whereToShow({ ...empty, inInbox: 3 }, made)).toBeNull();
+    expect(whereToShow(empty, made)).toBe("a");
+    expect(whereToShow(empty, [])).toBeNull();
+  });
+
+  it("falls back to Todos, then Links, when the import left nothing in the Inbox or a new board", () => {
+    expect(whereToShow({ inInbox: 0, onTodos: 2, onLinks: 1 }, [])).toBe("todos");
+    expect(whereToShow({ inInbox: 0, onTodos: 0, onLinks: 1 }, [])).toBe("links");
+    expect(whereToShow({ inInbox: 1, onTodos: 2, onLinks: 1 }, [])).toBeNull();
+  });
+
+  it("opens All when the only notes it left loose are older than the Inbox's line", () => {
+    expect(whereToShow({ inInbox: 0, beforeInboxLine: 4, onTodos: 0, onLinks: 0 }, [])).toBe("recent");
+    expect(whereToShow({ inInbox: 0, beforeInboxLine: 4, onTodos: 2, onLinks: 0 }, [])).toBe("recent");
   });
 });
 

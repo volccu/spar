@@ -157,7 +157,7 @@ describe("the Sorter", () => {
 
     // Filed, and on to the next one — the pile does not wait to be dismissed.
     await waitFor(() => expect(showing()).not.toBe(first));
-    expect(screen.getByText(/moved 1/i)).toBeTruthy();
+    expect(within(sorter()!).getByText(/moved 1/i)).toBeTruthy();
 
     // Stop sorting: the note is in the folder and gone from the Inbox.
     fireEvent.click(within(sorter()!).getByRole("button", { name: "Stop tidying up" }));
@@ -259,7 +259,7 @@ describe("the Sorter", () => {
     // Left: the trash, by the ordinary path, with the ordinary offer back.
     swipe(300, 100);
     await waitFor(() => expect(showing()).not.toBe(second));
-    expect(screen.getByText(/deleted 1/i)).toBeTruthy();
+    expect(within(sorter()!).getByText(/^Poof\. Deleted 1 note$/)).toBeTruthy();
     expect(screen.queryByText(/moved 1/i)).toBeNull();
   });
 
@@ -317,7 +317,7 @@ describe("the Sorter", () => {
     await waitFor(() => expect(sorter()).toBeTruthy());
     openBoards();
     fireEvent.click(within(sorter()!).getByRole("button", { name: /zzzsorterhalf/i }));
-    await waitFor(() => expect(screen.getByText(/moved 1/i)).toBeTruthy());
+    await waitFor(() => expect(within(sorter()!).getByText(/moved 1/i)).toBeTruthy());
 
     // Walking out mid-pile is normal and costs nothing — there is no session to
     // abandon, so Back is all it takes. With an answer given it shows the run
@@ -552,7 +552,7 @@ describe("the Sorter", () => {
     fireEvent.click(within(sorter()!).getByRole("button", { name: "Leave" }));
 
     // The summary tells the truth, and has nothing to put back.
-    await waitFor(() => expect(screen.getByText(/ done$/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Went through 3. None filed.")).toBeTruthy());
     const line = (word: string) =>
       [...document.querySelectorAll(".sorter-end-line")].find(
         (li) => li.firstElementChild?.textContent === word,
@@ -714,14 +714,19 @@ describe("the Sorter", () => {
 
     fireEvent.click(within(sorter()!).getByRole("button", { name: /^archive/i }));
     await waitFor(() => expect(showing()).not.toBe(first));
-    expect(screen.getByText(/archived 1/i)).toBeTruthy();
+    expect(within(sorter()!).getByText(/archived 1/i)).toBeTruthy();
 
-    // The undo mark stands in the note's face, never in the head band: it
-    // used to float over the band's right end, exactly on the ✕, so leaving
-    // the mode quietly undid the last answer (review 2026-10-01, UX-01).
-    const undo = screen.getByRole("button", { name: "Undo: Archived 1" });
-    expect(undo.closest(".sorter-note")).not.toBeNull();
-    expect(undo.closest(".sorter-head")).toBeNull();
+    // The offer is said by the creature in the head band, in its speech bubble
+    // as on the board — a bubble beside it, never a mark floated over the ✕,
+    // which once made leaving the mode quietly undo the last answer (review
+    // 2026-10-01, UX-01; review 2026-10-24, UX-02). Only one creature is on
+    // screen: the header's is away while this one visits.
+    const undo = within(sorter()!).getByRole("button", { name: "Undo: Archived 1 note" });
+    expect(undo.closest(".speech")).not.toBeNull();
+    expect(undo.closest(".sorter-head-row")).not.toBeNull();
+    expect(undo.closest(".sorter-exit")).toBeNull();
+    expect(document.querySelectorAll("spar-mascot:not([away])")).toHaveLength(1);
+    expect(sorter()!.querySelector("spar-mascot")).not.toBeNull();
   });
 
   /**
@@ -961,7 +966,7 @@ describe("the Sorter", () => {
     await boardIsUp();
     fireEvent.click(entry()!);
     const layer = sorter()!;
-    const focusable = [...layer.querySelectorAll<HTMLElement>("button:not(:disabled)")];
+    const focusable = [...layer.querySelectorAll<HTMLElement>("button:not(:disabled), spar-mascot[tabindex='0']")];
     expect(focusable.length).toBeGreaterThan(1);
 
     focusable[focusable.length - 1].focus();
@@ -1370,7 +1375,7 @@ describe("a swipe in the Sorter", () => {
     const { onDelete } = renderSorter({ pile: [fixtureNote({ id: "only", body: "alone" })] });
     const layer = sorter()!;
     fireEvent.click(within(layer).getByRole("button", { name: "Leave" }));
-    expect(screen.getByText(/ done$/)).toBeTruthy();
+    expect(screen.getByText("Went through 1. None filed.")).toBeTruthy();
 
     // A left swipe on the summary used to bin the last card a second time.
     fireEvent.touchStart(layer, { touches: [{ clientX: 300, clientY: 300 }] });
@@ -1378,7 +1383,7 @@ describe("a swipe in the Sorter", () => {
     fireEvent.keyDown(layer, { key: "ArrowRight" });
     fireEvent.keyDown(layer, { key: "ArrowLeft" });
     expect(onDelete).not.toHaveBeenCalled();
-    expect(screen.getByText(/ done$/)).toBeTruthy();
+    expect(screen.getByText("Went through 1. None filed.")).toBeTruthy();
   });
 });
 
@@ -1400,7 +1405,7 @@ describe("an offer made before Tidy up", () => {
 
     fireEvent.click(within(sorter()!).getByRole("button", { name: /^archive/i }));
     await waitFor(() =>
-      expect(within(sorter()!).getByRole("button", { name: "Undo: Archived 1" })).toBeTruthy(),
+      expect(within(sorter()!).getByRole("button", { name: "Undo: Archived 1 note" })).toBeTruthy(),
     );
   });
 });
@@ -1415,6 +1420,14 @@ describe("the Sorter's run", () => {
     expect(onLeft.mock.calls[0][0]).toEqual(["p1"]);
   });
 
+  it("says what happened when every note was left (review 2026-10-24, UX-12)", () => {
+    renderSorter();
+    fireEvent.click(within(sorter()!).getByRole("button", { name: "Leave" }));
+    fireEvent.click(within(sorter()!).getByRole("button", { name: "Leave" }));
+    expect(within(sorter()!).getByText("Went through 2. None filed.")).toBeTruthy();
+    expect(screen.queryByText(/ done$/)).toBeNull();
+  });
+
   it("does not show a note trashed out from under the pile, but keeps its own deletes", () => {
     renderSorter({
       pile: [
@@ -1426,39 +1439,16 @@ describe("the Sorter's run", () => {
   });
 });
 
-describe("the undo corner of the Sorter's note", () => {
-  it("keeps its box when the mark goes, until the note changes", () => {
-    const props = {
-      pile: [fixtureNote({ id: "p1", body: "first" }), fixtureNote({ id: "p2", body: "second" })],
-      where: "Inbox",
-      boards: [],
-      countFor: () => 0,
-      onFile: vi.fn(),
-      onLinks: vi.fn(),
-      onArchive: vi.fn(),
-      onDelete: vi.fn(),
-      onUnsort: vi.fn(),
-      onPriority: vi.fn(),
-      onTodo: vi.fn(),
-      onRestore: vi.fn(),
-      onClose: vi.fn(),
-      onCreateBoard: () => fixtureBoard(),
-      nameMax: 40,
-      origin: null,
-      restoreTo: { current: null },
-    };
-    const mark = <span className="undo-slot undo-slot-face">mark</span>;
-    const { rerender } = render(<Sorter {...props} />);
-    // No mark has stood here: nothing is held, and the text has its full line.
-    expect(document.querySelector(".sorter-read .undo-slot-face")).toBeNull();
-    rerender(<Sorter {...props} undo={mark} />);
-    expect(document.querySelector(".sorter-read .undo-slot-face")).toBeTruthy();
-    // The offer expires: the corner stays the same size.
-    rerender(<Sorter {...props} />);
-    expect(document.querySelector(".sorter-read .undo-slot-face")).toBeTruthy();
-    // The note changes: the box is released.
-    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
-    expect(document.querySelector(".sorter-read .undo-slot-face")).toBeNull();
+describe("the creature in the Sorter's head band", () => {
+  it("stands at the left end, before the count, and the way out stands apart from the controls", () => {
+    renderSorter({ creature: <span data-testid="creature">c</span> });
+    const row = document.querySelector(".sorter-head-row")!;
+    expect(row.firstElementChild).toBe(screen.getByTestId("creature"));
+    expect(row.querySelector(".sorter-at")).not.toBeNull();
+    // The ✕ is neither in the row nor among the controls (review 2026-10-24, UI-02 and UX-02).
+    const exit = screen.getByRole("button", { name: "Stop tidying up" });
+    expect(exit.closest(".sorter-head-row")).toBeNull();
+    expect(exit.closest(".sorter-tools")).toBeNull();
   });
 });
 
@@ -1871,7 +1861,7 @@ describe("the ways out of the Sorter", () => {
       renderSorter();
       leave();
       leave();
-      expect(within(sorter()!).getByText("All 2 done")).toBeTruthy();
+      expect(within(sorter()!).getByText("Went through 2. None filed.")).toBeTruthy();
       cleanup();
       expect(hop).toHaveBeenCalledTimes(1);
       expect(hop).toHaveBeenCalledWith(expect.objectContaining({ left: 2 }));

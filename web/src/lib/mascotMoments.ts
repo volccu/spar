@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { Said } from "../components/Speech";
-import { mascotPlay, mascotSign } from "../components/mascot-element";
+import { mascotPlay, mascotSign, whenSeen } from "../components/mascot-element";
 import { hasOpenBox } from "./blocks";
 
 /**
@@ -44,6 +44,11 @@ export function robotSays(words: string, act?: Said["act"], ms = MOMENT_MS): str
   timer = window.setTimeout(() => hush(key), ms);
   emit();
   return key;
+}
+
+/** A sentence kept for `keepMs` until a creature can be seen to say it (nowhere to say it inside Tidy up, say). */
+export function robotSaysWhenSeen(words: string, keepMs = KEEP_MS) {
+  whenSeen(() => robotSays(words), keepMs);
 }
 
 /** Stops saying a moment early — its search closed, say — if it is still the one being said. */

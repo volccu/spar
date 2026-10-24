@@ -29,6 +29,8 @@ function renderBar(
     inTrash: boolean;
     moving: boolean;
     anyFiled: boolean;
+    anyReminder: boolean;
+    onClearReminder: () => void;
     boards: UserBoard[];
     onSelectAll: () => void;
     onMoveUnfile: () => void;
@@ -46,6 +48,7 @@ function renderBar(
       anyArchived={props.anyArchived ?? false}
       allTodo={props.allTodo ?? false}
       allPriority={props.allPriority ?? false}
+      anyReminder={props.anyReminder ?? false}
       inTrash={props.inTrash ?? false}
       moving={props.moving ?? false}
       anyFiled={props.anyFiled ?? false}
@@ -62,6 +65,7 @@ function renderBar(
       onMerge={noop}
       onPriority={props.onPriority ?? noop}
       onTodo={noop}
+      onClearReminder={props.onClearReminder ?? noop}
       onArchive={props.onArchive ?? noop}
       onDelete={props.onDelete ?? noop}
       onRestore={noop}
@@ -105,6 +109,19 @@ describe("the selection panel's rows", () => {
     ]) {
       expect(within(panel).getByRole("button", { name })).toBeTruthy();
     }
+  });
+
+  /** Review 2026-10-24, UX-14: Clear reminder stands beside To-do, and only while a picked note has one. */
+  it("offers Clear reminder after To-do only when a picked note has a reminder", () => {
+    renderBar({ count: 3 });
+    expect(rows()).not.toContain("Clear reminder");
+    cleanup();
+    const onClearReminder = vi.fn();
+    renderBar({ count: 3, anyReminder: true, onClearReminder });
+    const all = rows();
+    expect(all.indexOf("Clear reminder")).toBe(all.indexOf("To-do") + 1);
+    fireEvent.click(screen.getByRole("button", { name: "Clear reminder" }));
+    expect(onClearReminder).toHaveBeenCalledOnce();
   });
 
   it("keeps one name for the flag and says it is on once every picked note carries it", () => {

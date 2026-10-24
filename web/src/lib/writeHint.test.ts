@@ -9,9 +9,9 @@ describe("writeHint", () => {
     expect(writeHint({ name: "Recipes" }, false)).toBe("Write into Recipes…");
     expect(writeHint({ name: "Åland trip" }, false)).toBe("Write into Åland trip…");
   });
-  it("takes pasting on Inspiration, and says list on Todos", () => {
+  it("takes pasting on Inspiration, and says to-do on Todos", () => {
     expect(writeHint({ name: "Inspiration", kind: "inspiration" }, false)).toBe("Paste or write…");
-    expect(writeHint(null, true)).toBe("Add to the list…");
+    expect(writeHint(null, true)).toBe("Write a to-do…");
   });
   it("cuts a long name to one ellipsis, on a word when it can", () => {
     const hint = writeHint({ name: "Recipes for the whole family" }, false);

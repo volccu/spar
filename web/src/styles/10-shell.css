@@ -67,6 +67,28 @@
   white-space: nowrap;
 }
 
+/* "3 selected" while notes are picked is the way out of picking: the count
+   with a cross after it, a 44px target centred in the row rather than hung
+   from its baseline, which would put its top above the screen. Chrome: muted
+   at rest, raised under the finger (review 2026-10-24, UX-15). */
+.count-end {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-height: var(--hit);
+  padding: 0 var(--s-4);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  cursor: var(--cursor-pointer);
+}
+
+.count-end:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
 /* Settings, in the corner opposite the creature (2026-10-12, owner). The
    board row's own icon controls (.board-burger, .board-search) say how: a
    muted mark with no box of its own at rest, the one raised step under the
@@ -144,14 +166,12 @@
    *raises* rather than inverting (DESIGN.md §5) — the state is "this is where
    the search is standing", which is the same fact the raised tab states.
 
-   Capped at two fifths of the row and cut with an ellipsis, so a long folder
-   name on a 360px phone still leaves the field most of the width. Present from
-   the frame the row opens and unchanged by typing, so it never moves the
-   field under the caret. */
+   It says "Only here" outright (review 2026-10-24, UX-06): the words are short
+   and fixed, so the chip is never capped, and the board's name stays in its
+   accessible name and title. Present from the frame the row opens and
+   unchanged by typing, so it never moves the field under the caret. */
 .search-scope {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 40%;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -184,6 +204,7 @@
 .search-scope:active,
 .search-scope[aria-pressed="true"] {
   background: var(--raised);
+  border-right-color: var(--rule);
   color: var(--ink);
 }
 

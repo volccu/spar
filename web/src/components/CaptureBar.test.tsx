@@ -81,6 +81,75 @@ describe("capture asks for one thing", () => {
     expect(onCapture).toHaveBeenCalledWith("kahvia", NO_CHOICE);
   });
 
+  it("names where the words go on the field's edge only while the board row stands down", () => {
+    const boards = [{ id: "b1", name: "Recipes", position: 0 }];
+    const { rerender, container } = bar({ boards, here: "b1" });
+    const typed = () => fireEvent.change(screen.getByLabelText("Write a note"), { target: { value: "kahvia" } });
+    typed();
+    expect(container.querySelector(".capture-dest")).toBeNull();
+    rerender(
+      <CaptureBar
+        onCapture={vi.fn()}
+        onCaptureFiles={vi.fn().mockResolvedValue(true)}
+        onDraw={vi.fn()}
+        menuOpen={false}
+        onMenu={vi.fn()}
+        boards={boards}
+        here="b1"
+        nameBoard
+        onCreateBoard={vi.fn()}
+      />,
+    );
+    expect(container.querySelector(".capture-dest")?.textContent).toBe("In Recipes");
+    // Nothing chosen and no folder: where a capture falls through to.
+    rerender(
+      <CaptureBar
+        onCapture={vi.fn()}
+        onCaptureFiles={vi.fn().mockResolvedValue(true)}
+        onDraw={vi.fn()}
+        menuOpen={false}
+        onMenu={vi.fn()}
+        boards={boards}
+        nameBoard
+        onCreateBoard={vi.fn()}
+      />,
+    );
+    expect(container.querySelector(".capture-dest")?.textContent).toBe("In Inbox");
+  });
+
+  it("starts a one-line capture on Todos as a tick box, and leaves one anywhere else alone", () => {
+    const todos = vi.fn();
+    bar({ onCapture: todos, onTodos: true });
+    fireEvent.change(screen.getByLabelText("Write a note"), { target: { value: "bread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(todos).toHaveBeenCalledWith("[ ] bread", NO_CHOICE);
+    cleanup();
+
+    const elsewhere = vi.fn();
+    bar({ onCapture: elsewhere });
+    fireEvent.change(screen.getByLabelText("Write a note"), { target: { value: "bread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(elsewhere).toHaveBeenCalledWith("bread", NO_CHOICE);
+  });
+
+  it("leaves a several-line capture on Todos as it was written", () => {
+    const onCapture = vi.fn();
+    bar({ onCapture, onTodos: true });
+    fireEvent.change(screen.getByLabelText("Write a note"), { target: { value: "bread\nmilk" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(onCapture).toHaveBeenCalledWith("bread\nmilk", NO_CHOICE);
+  });
+
+  it("leaves a capture on Todos alone when a board was chosen for it", () => {
+    const onCapture = vi.fn();
+    bar({ onCapture, onTodos: true, boards: [{ id: "b1", name: "Recipes", position: 0 }] });
+    fireEvent.change(screen.getByLabelText("Write a note"), { target: { value: "bread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Board" }));
+    fireEvent.click(screen.getByRole("button", { name: /Recipes/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(onCapture).toHaveBeenCalledWith("bread", { ...NO_CHOICE, board: "b1" });
+  });
+
   it("asks for no choices — no title, no tag, nothing to fill in", () => {
     const { container } = bar();
     // A picker of any kind is the shape this invariant is guarding against.
@@ -241,6 +310,19 @@ describe("capture asks for one thing", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Save note" }));
       expect(onCapture).toHaveBeenCalledWith("soita äidille", { ...NO_CHOICE, reminder: "next-week" });
+    });
+
+    it("says when it will ring beside the clock, and nothing before one is picked", () => {
+      bar();
+      fireEvent.change(screen.getByLabelText("Write a note"), { target: { value: "soita äidille" } });
+      expect(document.querySelector(".capture-when")).toBeNull();
+      fireEvent.click(clock());
+      fireEvent.click(screen.getByRole("menuitemradio", { name: /^In 1 hour/ }));
+      // The same time the mark's name and the panel's row carry: HH:MM, or a weekday and the time.
+      expect(document.querySelector(".capture-when")?.textContent).toMatch(/^(\w{3} )?\d{2}:\d{2}$/);
+      fireEvent.click(clock());
+      fireEvent.click(screen.getByRole("menuitem", { name: "No reminder" }));
+      expect(document.querySelector(".capture-when")).toBeNull();
     });
 
     it("takes the reminder off again from the same panel", () => {
@@ -524,7 +606,7 @@ describe("on a phone, the words take the whole width", () => {
     expect(form.hasAttribute("data-ready")).toBe(false);
   });
 
-  it("reads the words, then the four marks, then Save at the row's end", () => {
+  it("reads the words, then Add and the four marks, then Save at the row's end", () => {
     onAPhone();
     const { form } = bar();
     fireEvent.change(field(), { target: { value: "kahvia" } });
@@ -539,6 +621,7 @@ describe("on a phone, the words take the whole width", () => {
     expect(form.lastElementChild).toBe(screen.getByRole("button", { name: "Save note" }));
     const group = screen.getByRole("group", { name: "Save as" });
     expect([...group.querySelectorAll("button")].map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Add",
       "Important",
       "To-do",
       "Board",
@@ -639,6 +722,16 @@ describe("the Draw row", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Draw" }));
     expect(onDraw).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("menu", { name: "Add" })).toBeNull();
+  });
+
+  it("keeps Add once there are words, with a picture able to join them, and no Draw", () => {
+    const onDraw = bar();
+    const field = screen.getByLabelText("Write a note");
+    fireEvent.change(field, { target: { value: "fridge receipt" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.getAllByRole("menuitem").map((row) => row.textContent)).toEqual(["Attachment"]);
+    expect(onDraw).not.toHaveBeenCalled();
+    expect((field as HTMLTextAreaElement).value).toBe("fridge receipt");
   });
 
   /**
@@ -1475,7 +1568,7 @@ describe("the empty field knows where it is", () => {
   it("says Write… on the Inbox", () => expect(bar()).toBe("Write…"));
   it("names the folder it is standing in", () => expect(bar({ here: "f1" })).toBe("Write into Recipes…"));
   it("takes pasting on Inspiration", () => expect(bar({ here: "i1" })).toBe("Paste or write…"));
-  it("speaks of the list on Todos", () => expect(bar({ onTodos: true })).toBe("Add to the list…"));
+  it("speaks of a to-do on Todos", () => expect(bar({ onTodos: true })).toBe("Write a to-do…"));
 });
 
 /** A board chosen and then taken away (the undo of making it) is no choice at all. */

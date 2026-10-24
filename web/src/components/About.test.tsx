@@ -100,6 +100,25 @@ describe("the keys, on the About page", () => {
     expect(screen.queryByRole("heading", { name: "The keys" })).toBeNull();
   });
 
+  it("draws the touches instead on a device with no keyboard (review PL-03)", () => {
+    page();
+    const heading = screen.getByRole("heading", { name: "The touches" });
+    const rows = heading.parentElement?.querySelectorAll(".about-touches dt") ?? [];
+    expect([...rows].map((row) => row.textContent)).toEqual([
+      "Hold a note",
+      "Hold a note and carry it onto another",
+      "Hold a note and carry it to a board name",
+      "Swipe sideways",
+      "Swipe right on the Inbox",
+    ]);
+  });
+
+  it("leaves the touches out where there is a keyboard", () => {
+    withKeyboard();
+    page();
+    expect(screen.queryByRole("heading", { name: "The touches" })).toBeNull();
+  });
+
   it("opens at the list when asked, and `?` on the page goes back to it", () => {
     const scrolled = vi.fn();
     Element.prototype.scrollIntoView = scrolled;

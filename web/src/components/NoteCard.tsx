@@ -27,7 +27,7 @@ import {
   type CardMetrics,
   type ChecklistItem,
 } from "../lib/face";
-import { goneCount, overlaySaved, previewsFor, visiblePreviews } from "../lib/links";
+import { goneCount, overlaySaved, previewsFor, titleAddsNothing, visiblePreviews } from "../lib/links";
 import { linkRow, rowWords } from "../lib/linkRow";
 import { peekLinesFor, usePeek } from "../lib/usePeek";
 import { useReminderPassed, useRingMark, useTimeMark } from "../lib/clock";
@@ -745,7 +745,9 @@ function NoteCardBase({
       fired.current = false;
       return;
     }
-    if (e.shiftKey) {
+    // Shift, Ctrl or Cmd with the click picks the card, as in mail and files
+    // (review 2026-10-24, UX-07); the plain click opens it.
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
       dropPeek(false);
       onLongPress(note);
       return;
@@ -772,6 +774,19 @@ function NoteCardBase({
     // never raises a phone's keyboard (lib/keyOpen.ts).
     markKeyOpen(e.detail === 0 && hasKeyboard(false) ? note.id : null);
     onOpen(note, from);
+  }
+
+  /**
+   * Space on a focused card picks it, like Ctrl+click (review 2026-10-24,
+   * UX-07); Enter still opens. The button's own click for Space is refused on
+   * both halves of the press, as browsers differ on which one fires it.
+   */
+  function onSpace(e: React.KeyboardEvent<HTMLButtonElement>, press: boolean) {
+    if (e.key !== " " || e.target !== e.currentTarget || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    e.preventDefault();
+    if (!press || e.repeat) return;
+    dropPeek(false);
+    onLongPress(note);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLButtonElement>) {
@@ -1146,7 +1161,7 @@ function NoteCardBase({
     kind: face.kind,
     idea,
     todo: note.note_type === "todo",
-    name,
+    name: name ?? face.title,
     body: face.body,
     items: face.kind === "checklist" ? face.items : [],
     fileName: face.file?.name ?? null,
@@ -1213,6 +1228,8 @@ function NoteCardBase({
       }
       tabIndex={tabIndex}
       onClick={onClick}
+      onKeyDown={(e) => onSpace(e, true)}
+      onKeyUp={(e) => onSpace(e, false)}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -1356,9 +1373,10 @@ function NoteCardBase({
         </>
       ) : face.kind === "checklist" ? (
         // A named list keeps its boxes, with the name over them in the same
-        // voice; the face spent one line fewer on items to leave it room.
+        // voice; the face spent one line fewer on items to leave it room. A
+        // title line the user wrote above the boxes stands in the same place.
         <>
-          {name && <span className="card-idea-name">{name}</span>}
+          {(name ?? face.title) && <span className="card-idea-name">{name ?? face.title}</span>}
           <CheckList items={face.items} />
         </>
       ) : idea && snapshot ? (
@@ -1387,7 +1405,11 @@ function NoteCardBase({
                  og:image is worth 58px of a card: there is a single page
                  behind this note and this is what it looks like. */
               <div className="card-link-previews">
-                <LinkPreview preview={linkPreviews[0]} compact />
+                <LinkPreview
+                  preview={linkPreviews[0]}
+                  compact
+                  untitled={titleAddsNothing(linkPreviews[0], localLinkPreviews[0], face.body)}
+                />
               </div>
             ) : (
               /* Several addresses get a ledger, one line each, no pictures

@@ -15,14 +15,6 @@
   margin-top: 1.2em;
 }
 
-/* The labels line as it will be written — the note's own words, so the
-   reading face, a step down, as a quotation from the note rather than a
-   sentence of the page. */
-.keep-example {
-  color: var(--muted);
-  font-style: italic;
-}
-
 .keep-labels {
   margin-bottom: 0.4em;
 }
@@ -190,14 +182,12 @@
   cursor: var(--cursor-default);
 }
 
-/* Where the demo's notes live, said once under the offers in the machine's
-   voice — the same words the desktop header's quiet button says (review
-   GD-10). Not a button: a stamp. */
+/* Where the demo's notes live, said once under the offers — the same words
+   the desktop header's quiet button says (review GD-10). Not a button. Its
+   face is `.advice` (review UI-18). */
 .empty-stamp {
   display: block;
   margin-top: 18px;
-  color: var(--muted);
-  font-style: normal;
 }
 
 /* **The way into a mode has no style of its own any more.** `.sort-entry`
@@ -239,14 +229,15 @@
 .ticker-head {
   flex: 0 0 auto;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: calc(10px + env(safe-area-inset-top)) 6px 10px 16px;
+  flex-direction: column;
+  padding: calc(var(--head-top) + env(safe-area-inset-top)) var(--exit-clear) var(--s-4) var(--head-x);
+  min-height: calc(var(--head-top) + var(--mascot-box) + var(--head-bottom) + env(safe-area-inset-top));
   border-bottom: 1px solid var(--rule);
 }
 
 .ticker-at {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  margin-left: auto;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--track-data);
@@ -257,6 +248,8 @@
    reports rather than the band that acts. */
 .ticker-skip {
   flex: 0 0 auto;
+  align-self: flex-end;
+  margin-right: calc(var(--hit) * -1);
   display: inline-flex;
   align-items: center;
   min-height: var(--hit);
@@ -273,11 +266,10 @@
 }
 
 .ticker-done {
-  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
+  width: var(--hit);
   height: var(--hit);
   padding: 0;
   background: transparent;
@@ -393,6 +385,32 @@
   .ticker-foot {
     padding-left: max(var(--s-6), calc((100% - 33 * var(--t-read)) / 2));
     padding-right: max(var(--s-3), calc((100% - 33 * var(--t-read)) / 2));
+  }
+
+  .ticker-skip {
+    margin-right: 0;
+  }
+}
+
+/* A short window has no height for a second row: Next joins the creature's row
+   and the head is not gathered to the column (as `.sorter-head`, `88-sorter.css`).
+   After the wide rule above, never before it. */
+@media (max-height: 500px) {
+  .ticker-head {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--s-4);
+    padding-left: var(--head-x);
+    padding-right: var(--exit-clear);
+  }
+
+  .ticker-head-row {
+    flex: 1 1 auto;
+  }
+
+  .ticker-skip {
+    align-self: auto;
+    margin-right: 0;
   }
 }
 

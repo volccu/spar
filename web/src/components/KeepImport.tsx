@@ -14,6 +14,8 @@ import {
   runImport,
   scanKeep,
   undoImport,
+  whereTheyWent,
+  whereToShow,
   type FileLeftBehind,
   type ImportBatch,
   type ImportChunk,
@@ -60,6 +62,8 @@ interface Props {
   onTidyNow: () => void;
   /** Its "start the Inbox today": the first-open question's other answer. */
   onLeaveThem: () => void;
+  /** The summary's "Show my notes": the board to open, null for the Inbox. */
+  onShowNotes: (boardId: string | null) => void;
   /**
    * This device has not yet heard from the server what it already holds. An
    * import now could make, a second time, notes a first import on the other
@@ -124,6 +128,7 @@ export function KeepImport({
   inboxSince,
   onTidyNow,
   onLeaveThem,
+  onShowNotes,
   waiting,
   stalled = false,
   onImport,
@@ -264,14 +269,14 @@ export function KeepImport({
       className="about keep-import"
       role="dialog"
       aria-modal="true"
-      aria-label="Import from Google Keep"
+      aria-label="Import from Keep"
       tabIndex={-1}
       onKeyDown={onKeyDown}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
       <div className="about-head">
-        <h2 className="about-mark">Import from Google Keep</h2>
+        <h2 className="about-mark">Import from Keep</h2>
         <button type="button" className="about-close" aria-label="Close" title="Close" onClick={close}>
           <IconClear />
         </button>
@@ -306,6 +311,7 @@ export function KeepImport({
                 disabled={waiting || stage.at === "reading"}
                 onClick={() => folderInput.current?.click()}
               >
+                <IconImport />
                 <span>Choose the Keep folder</span>
               </button>
             </div>
@@ -401,6 +407,10 @@ export function KeepImport({
               onTidyNow();
             }}
             onLeaveThem={onLeaveThem}
+            onShow={() => {
+              close();
+              onShowNotes(whereToShow(stage.result, stage.batch.boards));
+            }}
             onClose={close}
           />
         )}
@@ -503,10 +513,8 @@ function Labels({
             <>
               <h3 className="about-h">Labels</h3>
               <p>
-                Each label can become a board, go into a board you have, or stay in the Inbox. A
-                label on one or two notes starts in the Inbox. A note goes into one board only, the
-                first of its labels that became one. Its other labels are kept on its last line, as{" "}
-                <span className="keep-example">Keep labels: work, ideas</span>.
+                Choose where each label goes; a label on one or two notes starts in the Inbox. A note
+                goes into one board only, and its other labels are kept on its last line.
               </p>
               {/* One switch for all of them, and what the choices below add
                   up to (review UX-21): a Keep account with thirty labels made
@@ -583,6 +591,17 @@ function LabelRow({
   // says so in a line, before the import rather than after.
   const into = choice.to === "new" ? folders.find((b) => sameBoardName(b.name, typed)) : undefined;
   const lookalike = choice.to === "new" && !into ? automaticBoardName(typed) : null;
+  // What this label will do, said under it before the import (review UX-18).
+  const goes =
+    choice.to === "inbox"
+      ? `${count === 1 ? "stays" : "stay"} in the Inbox`
+      : `${count === 1 ? "goes" : "go"} to ${
+          choice.to === "board"
+            ? (folders.find((b) => b.id === choice.id)?.name ?? "a board")
+            : into
+              ? into.name
+              : `a new board ${typed}`
+        }`;
   return (
     <div className="keep-label">
       <div className="keep-label-head">
@@ -617,6 +636,7 @@ function LabelRow({
           onChange={(e) => onChoose({ to: "new", name: e.currentTarget.value })}
         />
       )}
+      <p className="keep-label-note">{`${notes(count)} ${goes}`}</p>
       {into && (
         <p className="keep-label-note" role="status">
           {`You already have a board called ${into.name}, so these notes go into it.`}
@@ -652,6 +672,7 @@ function Summary({
   onTidyNow,
   onLeaveThem,
   onUndo,
+  onShow,
   onClose,
 }: {
   stage: Extract<Stage, { at: "done" }>;
@@ -659,6 +680,7 @@ function Summary({
   onTidyNow: () => void;
   onLeaveThem: () => void;
   onUndo: () => void;
+  onShow: () => void;
   onClose: () => void;
 }) {
   const { result, plan, scan, undone } = stage;
@@ -685,6 +707,8 @@ function Summary({
   return (
     <>
       <h3 className="about-h">Imported</h3>
+      {/* Where they went, in one line (review UX-19). */}
+      {whereTheyWent(result) !== "" && <p className="keep-lead">{whereTheyWent(result)}</p>}
       <dl className="about-data mono">
         {rows
           .filter(([, n], i) => i === 0 || n > 0)
@@ -753,8 +777,8 @@ function Summary({
 
       {undone === null ? (
         <div className="keep-actions">
-          <button type="button" className="btn mono about-export" onClick={onClose}>
-            <span>Done</span>
+          <button type="button" className="btn mono about-export" onClick={onShow}>
+            <span>Show my notes</span>
           </button>
           {result.imported > 0 && (
             <button type="button" className="btn mono about-export" onClick={onUndo}>

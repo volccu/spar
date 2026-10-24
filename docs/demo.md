@@ -21,7 +21,7 @@ is read at run time.
 - **Sample notes.** On the Inbox of a browser with no note in use (a deleted "test" note does not
   count), and as a menu row beside the Keep import until they are loaded, *Try it with sample notes*
   loads one invented person's notes (rewritten 2026-10-23 to read like real ones, with no tutorial
-  notes): a pile of about twenty loose notes for Tidy up, four dressed boards (four, so a phone's
+  notes; the robot says one line, "Hold a note to pick it", once the undo offer has gone): a pile of about twenty loose notes for Tidy up, four dressed boards (four, so a phone's
   Tidy up draws each as a one-tap button), to-do lists with some boxes ticked, saved links with
   their previews, two merged notes (one an idea with a canvas), an important note, a reminder for
   tomorrow and one that repeats every week, four photographs on Inspiration and one on Home, a
@@ -30,9 +30,11 @@ is read at run time.
   precached) and credited in `sampleNotes.ts`. None of it is anyone's real writing. It goes in
   through the same path as the Google Keep import, so it behaves exactly like notes typed in, and
   one undo takes it all back to the trash. The notes and the loader are a chunk of their own
-  (`web/src/demo/sampleNotes.ts`), fetched only on the click.
-- **It says where the notes are.** The empty Inbox says *Your notes stay in this browser* once, in the machine's
-  voice under its offers, the
+  (`web/src/demo/sampleNotes.ts`), fetched only on the click. Settings, under Import and export, has
+  *Remove the sample notes* while any is in use: only notes with `source: "sample"` (and an idea made
+  of nothing else) go to the trash, with an undo.
+- **It says where the notes are.** The empty Inbox says *Your notes stay in this browser* once, as a plain sentence of
+  advice under its offers, the
   header says the same on a wide screen and opens the About page, and the About page says
   what the demo does without a server — a saved link shows its address and your words rather than a
   fetched title and picture, and a reminder waits in the Reminders list without ringing — and holds

@@ -515,7 +515,7 @@ export function useIdeaVerbs({
       const woken = unmergeSources(idea, notesRef.current);
       const back = woken.map((n) => n.id);
       // Nothing left to hand back: archiving the idea would only make it
-      // vanish into the Archive under "Un-merged into 0".
+      // vanish into the Archive under "Separated into 0".
       if (back.length === 0) return;
       // A reminder a source handed the idea goes back with it, so the idea
       // taken out of the archive does not ring it too (review 2026-10-13, EH-03).
@@ -532,7 +532,7 @@ export function useIdeaVerbs({
       leaveMark.current = "archive";
 
       pushUndo({
-        message: `Un-merged into ${back.length}`,
+        message: `Separated into ${back.length}`,
         steps: [],
         run: () => {
           // The idea itself is held to the same rule as its sources: put back

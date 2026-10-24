@@ -20,6 +20,7 @@ import {
   countForBoard,
   filePatch,
   folderIds,
+  homeBoard,
   INBOX_ALL,
   INBOX_ASK_MIN,
   INSPIRATION_MARK,
@@ -43,8 +44,8 @@ import {
 } from "./lib/boards";
 import { useWakeLock } from "./lib/useWakeLock";
 import { boardTint, tintOf } from "./lib/boardLook";
-import { closeToSweep, sortTrash, TRASH_WARN_DAYS } from "./lib/trash";
-import { hasPhrase, searchNotes, searchTerms, trashMatches } from "./lib/search";
+import { closeToSweep, sortTrash, TRASH_DAYS, TRASH_WARN_DAYS } from "./lib/trash";
+import { didYouMean, hasPhrase, searchNotes, searchTerms, trashMatches } from "./lib/search";
 import { useReturnSpot } from "./lib/useReturnSpot";
 import { useNotes } from "./store/useNotes";
 import { useCanvases } from "./store/useCanvases";
@@ -81,6 +82,7 @@ import {
   stopAnimations,
   TRACE_MS,
 } from "./lib/motion";
+import { CarryTag } from "./components/CarryTag";
 import { markFor, Vanish, type Ghost, type Mark } from "./components/Vanish";
 import {
   IconBoards,
@@ -211,6 +213,7 @@ import { Spinner } from "./components/Spinner";
 import { StorageBanners } from "./components/StorageBanners";
 import { SearchSuggest } from "./components/SearchSuggest";
 import { Mascot } from "./components/Mascot";
+import { ModeCreature } from "./components/ModeCreature";
 import { UndoOffer } from "./components/UndoOffer";
 import { EmptyBoard } from "./components/EmptyBoard";
 import { timeToFrame } from "./lib/speed";
@@ -1201,8 +1204,9 @@ export default function App() {
       inTrash: trashMatches(gridNotes, gridQuery, pdfTexts).length,
       outside: scopeBoard ? searchNotes(gridNotes, gridQuery, undefined, pdfTexts).length : 0,
       scope: scopeBoard?.name ?? null,
+      didYouMean: didYouMean(searchPool, gridQuery, pdfTexts),
     };
-  }, [gridSearching, remindersOpen, visible.length, gridNotes, gridQuery, pdfTexts, scopeBoard]);
+  }, [gridSearching, remindersOpen, visible.length, gridNotes, gridQuery, pdfTexts, scopeBoard, searchPool]);
   /**
    * Everything on screen, picked out at once — the selection panel's Select all
    * row and Ctrl/Cmd+A, which are one verb said twice.
@@ -2899,6 +2903,7 @@ export default function App() {
     doCopy,
     doPriority,
     doTodo,
+    doClearReminder,
     doMove,
     doMoveLinks,
     doMoveCreate,
@@ -3034,11 +3039,14 @@ export default function App() {
   // sync, never paint.
   // On the board the creature says it, in the bubble where the wordmark stood
   // (lib/useSpeech.ts): the offer, a capture's receipt, sync and the update.
-  const { said, onPoke } = useSpeech({
+  const { said: allSaid, onPoke } = useSpeech({
     // Not over the Keep import, which carries its own Undo; not an offer made
-    // inside the open note, which stands over the note; not in a mode, whose
-    // own screen holds its offers (`undoIn` below).
-    offer: offer && !keepOpen && !(openId && offer.inPlace) && !sorting && !ticker && !isShort ? offer : null,
+    // inside the open note, which stands over the note. In Tidy up and Tick off
+    // the run's own offers are said by the creature visiting there (`modeSaid`).
+    offer:
+      offer && !keepOpen && !(openId && offer.inPlace) && (sorting || ticker ? offer.key > (modeFloor.current ?? 0) : !isShort)
+        ? offer
+        : null,
     onUndo: undoLast,
     landed: barLine && !barLine.also && !isShort ? barLine : null,
     failed:
@@ -3060,6 +3068,10 @@ export default function App() {
     openNote: openSaved,
     quiet: writing || openId !== null || sorting || ticker,
   });
+  // In Tidy up and Tick off the offer is said by the creature visiting the head
+  // band, and the header's own (under the layer, and away) says nothing.
+  const said = sorting || ticker ? null : allSaid;
+  const modeSaid = (sorting || ticker) && allSaid?.key.startsWith("undo:") ? allSaid : null;
   // The creature's other moments (lib/useMascotMoments.ts).
   const { waiting: unsentWaiting } = useMascotMoments({
     online,
@@ -3161,10 +3173,9 @@ export default function App() {
   const undoOver = undoShown && openId && undoShown.inPlace === true ? undoShown : null;
   // On the board the creature says it (`useSpeech` above), except on a short
   // screen, which has no header band to speak in: there it is the bar's cell.
-  const undoIn = (place: "bar" | "face" | "head") => {
+  const undoIn = (place: "bar") => {
     if (!undoShown || undoOver) return undefined;
-    if ((sorting || ticker) && undoShown.key <= (modeFloor.current ?? 0)) return undefined;
-    if (place !== (sorting ? "face" : ticker ? "head" : isShort ? "bar" : null)) return undefined;
+    if (place !== (sorting || ticker ? null : isShort ? "bar" : null)) return undefined;
     return <UndoOffer offer={undoShown} place={place} onUndo={undoLast} />;
   };
 
@@ -3264,8 +3275,9 @@ export default function App() {
               query: it is drawn from the first frame the row is open, so
               typing moves nothing, and it takes width from the field rather
               than height from the grid. Chrome, so on is raised, not
-              inverted (DESIGN.md §5), and it names the board the way every
-              board is named — its mark, in its tint, and its name. A tap
+              inverted (DESIGN.md §5), and it says what it does
+              in words — the board's mark, in its tint, and "Only here"; the
+              name stays in its accessible name and its title (review UX-06). A tap
               must not take the caret out of the field (and put the phone's
               keyboard away), so the press is refused focus; Tab still
               reaches it, and Space or Enter toggles it like any button. */}
@@ -3275,13 +3287,13 @@ export default function App() {
               className="search-scope"
               style={tintOf(board)}
               aria-pressed={searchScoped}
-              aria-label={`Only in ${board.name}`}
+              aria-label={`Only here, in ${board.name}`}
               title={searchScoped ? `Searching only ${board.name}` : `Search only ${board.name}`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setSearchScoped((on) => !on)}
             >
               <BoardIcon kind={board.kind} icon={board.icon} />
-              <span className="search-scope-name">{board.name}</span>
+              <span className="search-scope-name">Only here</span>
             </button>
           )}
           <input
@@ -3730,6 +3742,7 @@ export default function App() {
           offerMessage={offer?.message ?? ""}
           updateReady={updateReady}
           headerCount={headerCount}
+          onEndSelection={selecting ? () => setSelected([]) : undefined}
           // The public demo has no server, so the quiet word says where the
           // notes are and opens the page that says the rest; a device that
           // could sync and does not is offered the sign-in.
@@ -3849,6 +3862,11 @@ export default function App() {
             remindersOpen ? "Reminders" : gridSearching || !isPhone ? undefined : board.name
           }
         >
+        {/* The stamp on a trashed card counts the days left, where every other
+            board's counts an age; one quiet line says so (review 2026-10-24, UX-01). */}
+        {inTrash && !gridSearching && !remindersOpen && visible.length > 0 && (
+          <p className="trash-warn advice">{`Notes stay here ${TRASH_DAYS} days. The number on each is the days left.`}</p>
+        )}
         {inTrash && trashWarnCount > 0 && (
           <p className="trash-warn advice" role="status">
             {`${trashWarnCount} note${trashWarnCount === 1 ? "" : "s"} leave${
@@ -3911,6 +3929,7 @@ export default function App() {
                 goToBoard(trashIndex);
               }}
               onSearchEverywhere={() => setSearchScoped(false)}
+              onSearchWord={setQuery}
             />
           ) : (
             (() => {
@@ -4005,6 +4024,7 @@ export default function App() {
       {rowAtFoot && boardRow}
 
       <Vanish ghosts={ghosts} onDone={clearGhosts} />
+      <CarryTag drag={mergeDrag} notes={notes} boards={boards} />
 
       {wallView && (
         <Suspense fallback={null}>
@@ -4043,6 +4063,7 @@ export default function App() {
           // The same test `doPriority` makes, turned round: it raises unless
           // no picked note is still without the mark.
           allPriority={selectedNotes.length > 0 && !selectedNotes.some((n) => n.priority === 0)}
+          anyReminder={selectedNotes.some((n) => Boolean(n.reminder_at))}
           inTrash={inTrash}
           moving={moving}
           // A note put on Links by hand is out of the Inbox too, so the row
@@ -4070,6 +4091,7 @@ export default function App() {
           onMerge={() => then(doMerge)}
           onPriority={() => then(doPriority)}
           onTodo={() => then(doTodo)}
+          onClearReminder={() => then(doClearReminder)}
           onArchive={() => then(doArchive)}
           onDelete={() =>
             then(
@@ -4171,7 +4193,7 @@ export default function App() {
           nameMax={BOARD_NAME_MAX}
           origin={sorterOrigin}
           restoreTo={menuBtn}
-          undo={undoIn("face")}
+          creature={<ModeCreature said={modeSaid} mood={headerMood} local={!sendsFiles} />}
         />
         </Suspense>
       )}
@@ -4193,7 +4215,7 @@ export default function App() {
           onClose={() => setTickingIds(null)}
           origin={tickerOrigin}
           restoreTo={menuBtn}
-          undo={undoIn("head")}
+          creature={<ModeCreature said={modeSaid} mood={headerMood} local={!sendsFiles} />}
         />
         </Suspense>
       )}
@@ -4358,6 +4380,7 @@ export default function App() {
               setSortingIds(notesForBoard(notes, boards[0]).map((n) => n.id));
             }}
             onLeaveThem={() => setInboxSince(nowIso())}
+            onShowNotes={(id) => goToBoard(Math.max(0, boards.findIndex((b) => b.id === id)))}
             waiting={!serverAnswered}
             stalled={syncState === "error" || syncState === "offline"}
             onImport={importNotes}
@@ -4395,12 +4418,10 @@ export default function App() {
             DEMO
               ? notes.some((n) => n.source === "sample" && n.status !== "trashed")
                 ? undefined
-                : () => {
-                    setMenuOpen(false);
+                : () =>
                     loadSamples().catch((error: unknown) => {
                       console.error("the sample notes could not be written", error);
-                    });
-                  }
+                    })
               : undefined
           }
           onSearch={() => {
@@ -4486,6 +4507,8 @@ export default function App() {
         // The same condition names the folder a note with nothing chosen will
         // be filed into (`captureFields`), so the mark can say so before Save.
         here={here} onTodos={filing && board.kind === "todos"}
+        // The row at the foot stands down while the field has the caret; the bar names the board then.
+        nameBoard={rowAtFoot && writing}
         // A board made from the bar's mark is offered back like any other (`lib/madeBoardUndo.ts`).
         onCreateBoard={(name) =>
           createWithUndo(name, { createBoard, known: folderOrder, pushUndo, notesRef, removeBoard, leaveBoard })
@@ -4511,6 +4534,7 @@ export default function App() {
           notes={notes}
           initialTool={openCanvasIdea?.source === "draw" ? "draw" : "move"}
           justMerged={freshMerge === openCanvas.id}
+          where={openCanvasIdea ? homeBoard(openCanvasIdea, boards)?.name : undefined}
           onClose={closeCanvas}
           onRename={renameIdea}
           onRelease={releaseNote}

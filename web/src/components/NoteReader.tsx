@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Block, CodeBlock, ItemBlock } from "../lib/blocks";
 import { bestLine, markHits, singlesOut } from "../lib/face";
 import { parseInline } from "../lib/inline";
@@ -25,13 +25,36 @@ import { LIT_MS } from "../lib/motion";
  */
 function CodeView({ block }: { block: CodeBlock }) {
   const [copied, copy] = useCopied();
+  // A line wider than the box scrolls it sideways, and a keyboard can only
+  // scroll what it can focus (review UI-13): the box becomes a tab stop, with
+  // a name, only while it overflows.
+  const pre = useRef<HTMLPreElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const el = pre.current;
+    if (!el) return;
+    const measure = () => setScrolls(el.scrollWidth > el.clientWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [block.code]);
 
   return (
     <>
       {block.lead}
     <div className="codeblock" data-fenced={block.open !== ""}>
       <span className="note-mark">{block.open}</span>
-      <pre className="code">{block.code}</pre>
+      <pre
+        ref={pre}
+        className="code"
+        tabIndex={scrolls ? 0 : undefined}
+        role={scrolls ? "region" : undefined}
+        aria-label={scrolls ? "Code, scrolls sideways" : undefined}
+      >
+        {block.code}
+      </pre>
       <span className="note-mark">{block.close}</span>
       <span className="code-tail">{block.tail}</span>
       <button

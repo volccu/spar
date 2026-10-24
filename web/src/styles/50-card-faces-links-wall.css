@@ -149,17 +149,15 @@
   display: none;
 }
 
-/* An item is pulled in tight and given air above instead — the same trade the
-   open note makes, sized so the pair still measures one --card-lh. The gap goes
-   above every item that isn't the first, including one that follows a plain
-   line, which is where a list starts. */
+/* An item in the text face keeps the card's own leading, line for line. The
+   tight pair (--card-item-lh + --card-item-gap) costs a wrapped item 3px less
+   than the two line boxes the cut charged it, so every line after one sat off
+   the baseline grid and the card's clip fell through the middle of a line, its
+   tops showing as a speck above the footer (review 2026-10-24, UI-14). Whole
+   line boxes make the clip land between lines, as it does for plain text. The
+   checklist face keeps the pair: it is cut by whole items. */
 .card-item {
   display: block;
-  line-height: var(--card-item-lh);
-}
-
-.card-item:not(:first-child) {
-  margin-top: var(--card-item-gap);
 }
 
 /* "1." and "10." are not the same width, so their words land on different left
@@ -1333,6 +1331,12 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   text-transform: none;
+  /* The ellipsis clips at the box's own height, which is the line's, and sliced
+     the tails off p, g and y. The padding gives them room inside the clip and
+     the margin takes it back, so the row does not move (review 2026-10-24,
+     UI-03). */
+  padding-bottom: var(--s-2);
+  margin-bottom: calc(var(--s-2) * -1);
 }
 
 /* The note's own words, clamped to the count the row's height was built from. */

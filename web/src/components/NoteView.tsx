@@ -2125,7 +2125,7 @@ export function NoteView({
                 <>
                   <span className={overdue ? "meta-overdue" : "meta-when"}>{reminderMain}</span>
                   {/* Advice, not a machine fact: the reading face (CD-05). */}
-                  {reminderCaveat && <span className="advice"> · {reminderCaveat}</span>}
+                  {reminderCaveat && <>{" "}<span className="advice">{reminderCaveat}</span></>}
                 </>
               ) : (
                 <>

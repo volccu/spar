@@ -634,6 +634,15 @@
   --head-x: var(--s-6);
   --head-gap: var(--s-6);
 
+  /* The exit mark of every full-screen page and mode stands where the header's
+     cog stands: 14 from the top, 6 from the right, a thumb's square, so
+     closing one page and opening the next never sends the eye looking for it
+     (review 2026-10-24, UI-02). `--exit-clear` is what a band beside it keeps
+     free. */
+  --exit-top: calc(var(--s-4) + var(--s-3));
+  --exit-right: var(--s-3);
+  --exit-clear: calc(var(--hit) + var(--exit-right));
+
   /* A card shows a whole number of lines and never a sliced one, so the line
      box is a fixed pixel value that the card height is then built around. */
   --card-lh: 19.5px;
@@ -977,6 +986,17 @@
    pressed state, which inverts the way the rest of the app marks "on". */
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* A scrollbar is the browser's own unless told otherwise: on Windows a cool
+   grey thumb with rounded ends, the brightest and only non-warm thing on a
+   board. Thin, the thumb in the rule tone and the track nothing, on every
+   scroller as the code block already does (review 2026-10-24, UI-16).
+   `scrollbar-width` is not inherited, so `*`; a class that says `none` for
+   itself still wins. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
 }
 
 /* Selection inverts as well, for the same reason — the UA default is the same

@@ -5,7 +5,7 @@
  *
  * Inbox (and every board a capture falls through to the Inbox from: All,
  * Archive, Links, Files) keeps the plain "Write…". A folder names itself, as
- * the user wrote it. Inspiration takes pasting as well; Todos says it is a list.
+ * the user wrote it. Inspiration takes pasting as well; Todos says to-do, never "the list".
  *
  * A placeholder cannot ellipsise itself in a textarea and must never wrap on a
  * phone, so a long folder name is cut here, on a word if there is one, and the
@@ -22,7 +22,7 @@ export interface HintBoard {
 }
 
 export function writeHint(here: HintBoard | null, todos: boolean): string {
-  if (todos) return "Add to the list…";
+  if (todos) return "Write a to-do…";
   if (!here) return WRITE_HINT;
   if (here.kind === "inspiration") return "Paste or write…";
   const name = here.name.trim();

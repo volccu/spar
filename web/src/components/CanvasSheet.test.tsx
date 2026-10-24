@@ -190,10 +190,12 @@ describe("CanvasSheet", () => {
 
   /* --- naming the place ---------------------------------------------------- */
 
-  it("says Idea until somebody names it, and says so quietly", () => {
+  it("says what it holds until somebody names it, and says so quietly", () => {
+    // Beside its count, an unnamed idea of two notes reads "2 notes", not "2 Idea"
+    // (review 2026-10-24 UX-05); a sketch with nothing in it still says Idea.
     renderFolder();
     const title = screen.getByRole("button", { name: /name this idea/i });
-    expect(title.textContent).toBe("Idea");
+    expect(title.textContent).toBe("notes");
     expect(title.dataset.unnamed).toBe("true");
   });
 

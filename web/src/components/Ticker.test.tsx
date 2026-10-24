@@ -162,7 +162,13 @@ describe("the Ticker", () => {
     await waitFor(() => expect(panel().getByText("3 left")).toBeTruthy());
     expect(ticker()).toBeTruthy();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Undo: Unticked 2" }));
+    // Said by the creature in the head band, in its speech bubble, as on the
+    // board; the header's own is away, so there is one (review 2026-10-24, UX-02).
+    const undo = await panel().findByRole("button", { name: "Undo: Unticked 2" });
+    expect(undo.closest(".speech")).not.toBeNull();
+    expect(undo.closest(".ticker-head-row")).not.toBeNull();
+    expect(document.querySelectorAll("spar-mascot:not([away])")).toHaveLength(1);
+    fireEvent.click(undo);
     await waitFor(() => expect(panel().getByText("1 left")).toBeTruthy());
     // Reversed in place: the mode is still up.
     expect(ticker()).toBeTruthy();

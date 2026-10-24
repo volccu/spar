@@ -828,10 +828,14 @@ button.sync-state {
    you type into rather than one you press, so it says so. */
 .shelf-row-new {
   cursor: var(--cursor-text);
+  /* The field fills the row's height, so the whole row is the place to tap
+     (review 2026-10-24, UX-09). */
+  padding-block: 0;
 }
 
 .shelf-row-new input {
   flex: 1 1 auto;
+  align-self: stretch;
 }
 
 /* The three new-board fields — the strip's +, the drawer's, Tidy up's "New

@@ -2,7 +2,7 @@
 # one volume. docs/self-hosting.md walks through it; docs/server-api.md lists
 # every setting.
 #
-#   docker compose up -d
+#   docker compose up -d --build
 #   docker compose logs -f spar
 #
 # The port is published on this machine's loopback only. Browsers allow the
@@ -15,9 +15,9 @@
 
 services:
   spar:
-    image: ghcr.io/volccu/spar:latest
-    # Or build it from this checkout:
-    # build: .
+    # Built from this checkout; there is no ready-made image to download.
+    build: .
+    image: spar
     container_name: spar
     restart: unless-stopped
     ports:

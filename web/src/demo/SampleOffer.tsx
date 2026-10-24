@@ -9,8 +9,8 @@ import { IconSamples } from "../components/Icons";
  * The board's own words come first and are unchanged: one sentence (review
  * GD-10). On the Inbox of an archive with nothing active in it — the screen a
  * stranger lands on — they gain a way to see the app full without writing
- * forty notes first. Where the notes live is said once, under the offers, in
- * the machine's voice (`EmptyBoard`'s stamp). It is drawn as the Keep import's
+ * forty notes first. Where the notes live is said once, under the offers, as
+ * a sentence of advice (`EmptyBoard`'s stamp). It is drawn as the Keep import's
  * offer is drawn beneath it — the words' own face, a mark from the icon set,
  * a thumb tall, under the words rather than instead of them — and is the
  * first of the two (`.empty-offer-first`): its edge and its words one step up
@@ -32,6 +32,7 @@ export function DemoEmptyWords({ hint, fresh }: { hint: string; fresh: boolean }
         type="button"
         className="empty-offer empty-offer-first"
         disabled={adding}
+        aria-busy={adding}
         onClick={() => {
           setAdding(true);
           // On success the archive is no longer empty and this unmounts; on a
@@ -48,7 +49,7 @@ export function DemoEmptyWords({ hint, fresh }: { hint: string; fresh: boolean }
         }}
       >
         <IconSamples />
-        Try it with sample notes
+        {adding ? "Adding the sample notes…" : "Try it with sample notes"}
       </button>
     </>
   );

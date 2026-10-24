@@ -1890,7 +1890,7 @@ describe("a reminder", () => {
     const soon = new Date(Date.now() + 2 * 60 * 60 * 1000 + 60_000).toISOString();
     const { container } = view({ ...reminderNote("r7", soon), status: "archived" });
     const foot = container.querySelector(".sheet-verbs")?.textContent ?? "";
-    expect(foot).toContain("reminds in 2 hours · not while archived");
+    expect(foot).toContain("reminds in 2 hours not while archived");
     expect(foot).not.toContain("not on this device");
   });
 

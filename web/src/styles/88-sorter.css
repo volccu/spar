@@ -39,44 +39,63 @@
 .sorter-head {
   flex: 0 0 auto;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  /* 10, not 12: the ✕ grew to a thumb's worth and the band keeps its height.
-     The top inset is `.sorter-to`'s bottom one said at the other end — this
+  flex-direction: column;
+  /* The top inset is `.sorter-to`'s bottom one said at the other end — this
      layer is `inset: 0`, so both bands land in the system's own strips and
      only one of them was paying for it. */
-  padding: calc(10px + env(safe-area-inset-top)) 6px 10px 16px;
+  padding: calc(var(--head-top) + env(safe-area-inset-top)) var(--exit-clear) var(--s-4) var(--head-x);
+  min-height: calc(var(--head-top) + var(--mascot-box) + var(--head-bottom) + env(safe-area-inset-top));
   border-bottom: 1px solid var(--rule);
 }
 
-/* A phone's head holds the count, Back, Open note, Important, To-do, Remind,
-   Leave and the cross: six cells and Leave take nearly all a 390px screen has,
-   so the cells touch (review 2026-10-04, FX-B-01). */
-@media (max-width: 699px) {
-  .sorter-head {
-    gap: 0;
-  }
+/* Two rows, on every width: the creature's, as the header's own band stands —
+   the creature, what it says, and the count at the far end — and under it the
+   controls as one group (`.sorter-tools`: Back, Open note, Important, To-do,
+   Remind, Leave), which never wraps and never squeezes the count (audit
+   2026-10-24, UX-002; review 2026-10-24, UX-02). The cross is in neither: it
+   stands where every exit stands (`.sorter-exit`). A phone's cells touch, six
+   of them and Leave take nearly all a 390px screen has (review 2026-10-04,
+   FX-B-01); the group's right edge is the screen's, reaching back over the
+   room the cross keeps beside the row above. */
+.sorter-head-row,
+.ticker-head-row {
+  display: flex;
+  align-items: center;
+  gap: var(--head-gap);
+  min-width: 0;
 }
 
-/* The controls are one group (`.sorter-tools`). Where the count and all of
-   them do not fit one row — a phone under ~430px — the group wraps under the
-   count as a whole and keeps the right edge, the cross last; the count never
-   gives way (audit 2026-10-24, UX-002). Wrapping rather than a second width
-   breakpoint, because the app has one (`breakpoint.test.ts`). */
-.sorter-head {
-  flex-wrap: wrap;
-  justify-content: flex-end;
+/* The creature is drawn in a box it does not fill; the header trims it so the
+   shell stands on the margin (`--mascot-trim`), and so does this. */
+.sorter-head spar-mascot,
+.ticker-head spar-mascot {
+  flex: 0 0 auto;
+  margin-left: calc(var(--mascot-trim) * -1);
+  margin-right: calc(var(--mascot-trim) * -1);
+}
+
+/* Where the bubble stands, which is all the room the row has left. */
+.mode-says {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
 }
 
 .sorter-tools {
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: inherit;
+  justify-content: flex-end;
+  margin-right: calc(var(--hit) * -1);
+}
+
+/* Nothing to do once the pile has ended: only the cross is left. */
+.sorter-tools:empty {
+  display: none;
 }
 
 .sorter-at {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
+  margin-left: auto;
   white-space: nowrap;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -230,11 +249,8 @@
 
 /* The answer this note already has, reached by Back — "Archived · Leave puts it
    back". The machine reporting, so mono caps in --muted, one line above the
-   note at the size the head band's count is set in. Its own block formatting
-   context, so its box stops at the undo mark floated beside it rather than
-   running under it (review 2026-10-04, CD-07). */
+   note at the size the head band's count is set in (review 2026-10-04, CD-07). */
 .sorter-was {
-  display: flow-root;
   margin: 0 0 12px;
   color: var(--muted);
   font-size: var(--t-data);
@@ -500,6 +516,11 @@
     padding-right: max(6px, calc((100% - 33 * var(--t-read)) / 2));
   }
 
+  .sorter-tools {
+    gap: 8px;
+    margin-right: 0;
+  }
+
   .sorter-to {
     width: 100%;
     max-width: calc(33 * var(--t-read));
@@ -511,6 +532,47 @@
   .ticker-list > * {
     max-width: calc(33 * var(--t-read));
     margin-inline: auto;
+  }
+}
+
+/* A wide window worked with a mouse stands the destinations right under the
+   note, the pile in the middle of the screen, instead of a screen's height
+   away on the floor: every note was a read at the top and a mouse trip to the
+   bottom and back (review 2026-10-24, PL-06). The card keeps one height, ten
+   lines, whatever the note, so the destinations never move between notes; a
+   long note scrolls inside it, and a short window lets it give. A touch
+   screen keeps them under the thumb at the floor. The width is the app's own
+   one breakpoint, so this is no second one (`breakpoint.test.ts`). */
+@media (min-width: 700px) and (hover: hover) and (pointer: fine) {
+  .sorter-card {
+    flex: 0 1 calc(10 * var(--lh-read) * var(--t-read));
+    margin-top: auto;
+  }
+
+  .sorter-to {
+    margin-bottom: auto;
+  }
+}
+
+/* A short window — a phone on its side — has no height to spare for a second
+   row: the controls join the creature's row, and the head is not gathered to
+   the note's column, so the bubble keeps its room. After the rule above, never
+   before it (`SHORT_MAX`, the app's one height query). */
+@media (max-height: 500px) {
+  .sorter-head {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--s-4);
+    padding-left: var(--head-x);
+    padding-right: var(--exit-clear);
+  }
+
+  .sorter-head-row {
+    flex: 1 1 auto;
+  }
+
+  .sorter-tools {
+    margin-right: 0;
   }
 }
 

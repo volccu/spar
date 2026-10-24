@@ -500,3 +500,62 @@ export function trashMatches(notes: Note[], query: string, files: FileTexts = NO
     files,
   ).map((n) => byId.get(n.id)!);
 }
+
+/** Whether two words differ by one letter: swapped, added, dropped or changed. */
+function oneLetterApart(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+  if (i === a.length && i === b.length) return false;
+  const rest = (x: string) => x.slice(i + 1);
+  if (a.length === b.length) {
+    return rest(a) === rest(b) || (a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2));
+  }
+  return a.length > b.length ? rest(a) === b.slice(i) : a.slice(i) === rest(b);
+}
+
+/** The words of the notes that are not trashed, counted. Kept per notes array,
+ *  so a keystroke that finds nothing does not read every note again. */
+const vocabularies = new WeakMap<Note[], Map<string, number>>();
+function vocabularyOf(notes: Note[]): Map<string, number> {
+  const known = vocabularies.get(notes);
+  if (known) return known;
+  const vocabulary = new Map<string, number>();
+  for (const n of notes) {
+    if (n.status === "trashed") continue;
+    for (const w of n.body.toLowerCase().normalize("NFC").split(/[^\p{L}\p{N}]+/u)) {
+      if (w.length >= 3) vocabulary.set(w, (vocabulary.get(w) ?? 0) + 1);
+    }
+  }
+  vocabularies.set(notes, vocabulary);
+  return vocabulary;
+}
+
+/**
+ * What to offer when a search found nothing (review 2026-10-24, PL-07): the
+ * query with each word no note holds swapped for a word the notes really do
+ * hold, one letter away, the commonest if several. Results stay exact — this
+ * is asked only on an empty answer — and the offer is made only if it would
+ * find something itself. Words come from notes that are not trashed; a word
+ * under four letters is too short to guess; a quoted phrase is a quotation.
+ */
+export function didYouMean(notes: Note[], query: string, files: FileTexts = NO_FILE_TEXTS): string | null {
+  if (query.includes('"')) return null;
+  const terms = tokenize(query);
+  if (terms.length === 0) return null;
+  const unfound = terms.filter((t) => t.length >= 4 && searchNotes(notes, t, undefined, files).length === 0);
+  if (unfound.length === 0) return null;
+  const vocabulary = vocabularyOf(notes);
+  const swaps = new Map<string, string>();
+  for (const t of unfound) {
+    let best: string | null = null;
+    for (const [w, count] of vocabulary) {
+      if (!oneLetterApart(t, w)) continue;
+      if (best === null || count > vocabulary.get(best)! || (count === vocabulary.get(best) && w < best)) best = w;
+    }
+    if (best === null) return null;
+    swaps.set(t, best);
+  }
+  const fixed = terms.map((t) => swaps.get(t) ?? t).join(" ");
+  return searchNotes(notes, fixed, undefined, files).length > 0 ? fixed : null;
+}

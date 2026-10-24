@@ -26,7 +26,7 @@ describe("the undo offer", () => {
   // UX-09).
   it("says its verb for the first seconds, then settles to the arrow", () => {
     const { container, rerender } = render(
-      <UndoOffer offer={offer(1, "Archived 3")} place="face" onUndo={() => {}} />,
+      <UndoOffer offer={offer(1, "Archived 3")} place="bar" onUndo={() => {}} />,
     );
     const button = () => container.querySelector<HTMLElement>("button.undo")!;
     expect(button().querySelector(".undo-word")?.textContent).toBe("Archived");
@@ -42,12 +42,12 @@ describe("the undo offer", () => {
     expect(button().textContent).toBe("");
 
     // A fresh offer starts with its word in the very first frame.
-    rerender(<UndoOffer offer={offer(2, "Deleted 1")} place="face" onUndo={() => {}} />);
+    rerender(<UndoOffer offer={offer(2, "Deleted 1")} place="bar" onUndo={() => {}} />);
     expect(button().querySelector(".undo-word")?.textContent).toBe("Deleted");
   });
 
   it("stands where the screen puts it", () => {
-    for (const place of ["face", "head", "over"] as const) {
+    for (const place of ["bar", "over"] as const) {
       const { container, unmount } = render(
         <UndoOffer offer={offer(1, "Moved 1")} place={place} onUndo={() => {}} />,
       );

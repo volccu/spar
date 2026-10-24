@@ -679,6 +679,41 @@ describe("a named checklist", () => {
   });
 });
 
+describe("a checklist with a title line", () => {
+  // The To-do mark writes a first line ended with ':' as the title (`asChecklist`),
+  // and a person types the same thing by hand; the card draws both lists alike.
+  it("keeps the checklist face when the first line ends with a colon", () => {
+    const face = deriveFace(note({ body: "Packing:\n[ ] passport\n[x] sunglasses\n[ ] charger" }));
+    expect(face.kind).toBe("checklist");
+    expect(face.title).toBe("Packing");
+    expect(face.items).toHaveLength(3);
+    expect(face.checkDone).toBe(1);
+  });
+
+  it("keeps it when a blank line sets the first line off", () => {
+    const face = deriveFace(note({ body: "Packing\n\n[ ] passport\n[ ] charger" }));
+    expect(face.kind).toBe("checklist");
+    expect(face.title).toBe("Packing");
+  });
+
+  it("gives the title a line out of the items' budget", () => {
+    const items = Array.from({ length: 20 }, (_, i) => `[ ] item ${i}`).join("\n");
+    const plain = deriveFace(note({ body: items }));
+    const titled = deriveFace(note({ body: `Packing:\n${items}` }));
+    expect(titled.items.length).toBe(plain.items.length - 1);
+  });
+
+  it("is still text when there is more than a title above the boxes", () => {
+    expect(deriveFace(note({ body: "Packing:\nremember\n[ ] milk\n[ ] eggs" })).kind).toBe("text");
+    expect(deriveFace(note({ body: "Packing\n[ ] milk\n[ ] eggs" })).kind).toBe("text");
+  });
+
+  it("does not read a box as a title, nor a sentence set off by a blank line", () => {
+    expect(deriveFace(note({ body: "[ ] pack:\n[ ] milk" })).title).toBeNull();
+    expect(deriveFace(note({ body: "It is all done.\n\n[ ] milk\n[ ] eggs" })).kind).toBe("text");
+  });
+});
+
 describe("code on a card (design review 2026-10-23)", () => {
   const html = [
     "Nav fix",

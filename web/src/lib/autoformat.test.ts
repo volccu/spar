@@ -218,6 +218,15 @@ describe("continueList, numbered", () => {
  * runs on the words of a plain capture.
  */
 describe("asChecklist", () => {
+  it("boxes a single line only when asked to (a capture on Todos), and never names it", () => {
+    expect(asChecklist("bread")).toBe("bread");
+    expect(asChecklist("bread", true)).toBe("[ ] bread");
+    expect(asChecklist("buy stamps.", true)).toBe("[ ] buy stamps.");
+    expect(asChecklist("– bread", true)).toBe("[ ] bread");
+    expect(asChecklist("[ ] bread", true)).toBe("[ ] bread");
+    expect(asChecklist("# Errands", true)).toBe("# Errands");
+  });
+
   it("makes every line a tick box", () => {
     expect(asChecklist("- screws\n- sandpaper\n- glue")).toBe("[ ] screws\n[ ] sandpaper\n[ ] glue");
   });

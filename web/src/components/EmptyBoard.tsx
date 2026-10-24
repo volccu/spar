@@ -3,7 +3,7 @@ import { emptyBoardHint, emptyBoardTitle, type WaitingElsewhere } from "../lib/b
 import type { MascotState } from "./mascot-element";
 import { Mascot } from "./Mascot";
 import { Spinner } from "./Spinner";
-import { IconImport } from "./Icons";
+import { IconImport, IconSearch } from "./Icons";
 import { DEMO } from "../lib/demo";
 import { DemoEmptyWords } from "../demo/SampleOffer";
 import { BoardIcon } from "./BoardLook";
@@ -57,6 +57,8 @@ interface Props {
   missed?: SearchMissed;
   onGoToTrash?: () => void;
   onSearchEverywhere?: () => void;
+  /** Tapping the "Did you mean" offer searches that word. */
+  onSearchWord?: (word: string) => void;
 }
 
 export interface SearchMissed {
@@ -64,6 +66,8 @@ export interface SearchMissed {
   outside: number;
   /** The board the search is narrowed to, or null. */
   scope: string | null;
+  /** A word the notes really hold, one letter from what was typed (`didYouMean`). */
+  didYouMean?: string | null;
 }
 
 const MISSED_NONE: SearchMissed = { inTrash: 0, outside: 0, scope: null };
@@ -111,6 +115,7 @@ export function EmptyBoard({
   missed = MISSED_NONE,
   onGoToTrash,
   onSearchEverywhere,
+  onSearchWord,
 }: Props) {
   const missedSaid = searching && !remindersOpen ? missedLine(missed) : null;
   const onTheBoard = board.kind === "inbox" && !searching && !remindersOpen;
@@ -212,7 +217,11 @@ export function EmptyBoard({
             // Unless the note is somewhere search did not look (UX-1): then
             // that is the answer, and the offers below are the way there.
             missedSaid ??
-            (searchQuoted
+            // A "Did you mean" offer is the advice; the generic hint does not
+            // stand beside it.
+            (missed.didYouMean
+            ? null
+            : searchQuoted
             ? "Words in quotes must stand together in a note, in that order."
             : searchWords === 1
             ? "Try a shorter form of the word."
@@ -227,6 +236,12 @@ export function EmptyBoard({
       {/* The way to the board a list or a bare link went to (review UX-B-02):
           the hint above names it, and this is the same sentence's other half,
           drawn as the empty Inbox's other offers are. */}
+      {searching && !remindersOpen && missed.didYouMean && onSearchWord && (
+        <button type="button" className="empty-offer" onClick={() => onSearchWord(missed.didYouMean!)}>
+          <IconSearch />
+          Did you mean {missed.didYouMean}?
+        </button>
+      )}
       {missedSaid && missed.outside > 0 && missed.scope && onSearchEverywhere && (
         <button type="button" className="empty-offer" onClick={onSearchEverywhere}>
           <BoardIcon kind="recent" />
@@ -273,12 +288,13 @@ export function EmptyBoard({
           Import from Google Keep
         </button>
       )}
-      {/* The demo says where the notes are once, in the machine's voice, under
-          the offers — as the desktop header does — rather than as a second
-          sentence in the italic line (review GD-10). Folded away in every
+      {/* The demo says where the notes are once, under the offers — as the
+          desktop header does — rather than as a second sentence in the first
+          line (review GD-10), and as a sentence of advice, not a machine
+          string (review UI-18). Folded away in every
           other build. */}
       {DEMO ? (
-        freshArchive && onTheBoard ? <span className="empty-stamp mono">Your notes stay in this browser</span> : null
+        freshArchive && onTheBoard ? <span className="empty-stamp advice">Your notes stay in this browser</span> : null
       ) : null}
     </p>
     )

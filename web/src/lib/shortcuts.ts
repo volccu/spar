@@ -92,7 +92,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: [key(ARCHIVE_KEY)], does: "Archive the card, or everything selected" },
       { keys: [key(MOVE_KEY)], does: "Move the card, or everything selected, to a board" },
       { keys: [key(FLAG_KEY)], does: "Mark the card, or everything selected, Important" },
-      { keys: [{ key: "F10", shift: true }, key("ContextMenu")], does: "Pick the card, to act on several" },
+      { keys: [key(" "), { key: "F10", shift: true }, key("ContextMenu")], does: "Pick the card, to act on several (Ctrl-click does it too)" },
       { keys: [key("ArrowDown")], does: "From the board row: into the cards" },
       { keys: [{ key: "Tab", shift: true }], does: "From an empty write box: into the cards" },
     ],
@@ -179,6 +179,7 @@ const NAMES: Record<string, [drawn: string, said: string]> = {
   Home: ["Home", "Home"],
   End: ["End", "End"],
   ContextMenu: ["Menu", "Menu key"],
+  " ": ["Space", "Space"],
   "?": ["?", "Question mark"],
   "1-9": ["1–9", "Number keys 1 to 9"],
 };

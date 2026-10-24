@@ -38,13 +38,13 @@ function UndoClock() {
  * - `bar`  a cell of the capture bar — the board, on a short screen only.
  *          Everywhere else on the board the header's creature says the offer
  *          in its speech bubble (`Speech.tsx`, 2026-10-16).
- * - `face` floated at the top of the Sorter's note, the words running round it.
- * - `head` in the Ticker's head band, which has the room the Sorter's lacks.
+ *   Tidy up and Tick off have no place of their own: their offers are said
+ *          by the creature visiting their head bands (`ModeCreature`, 2026-10-24).
  * - `over` over the open note, above its +, for an offer made from inside the
  *          note (Untick all, Clear done) — the one that still floats, over a
  *          sheet that has nothing in that corner.
  */
-export type UndoPlace = "bar" | "face" | "head" | "over";
+export type UndoPlace = "bar" | "over";
 
 interface Props {
   offer: Undo;

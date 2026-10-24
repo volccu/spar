@@ -140,6 +140,8 @@ interface Props {
    * `initialTool`.
    */
   justMerged?: boolean;
+  /** The board the idea is on, named in the merge's line ("in Inbox"). */
+  where?: string;
 }
 
 /** Air left round a merge's notes when it opens fitted to the screen. */
@@ -690,7 +692,7 @@ function CanvasName({
           onClick={open}
           data-unnamed={name === null}
         >
-          {name ?? "Idea"}
+          {name ?? (count > 0 ? (count === 1 ? "note" : "notes") : "Idea")}
         </button>
       )}
     </div>
@@ -745,6 +747,7 @@ export function CanvasSheet({
   onRemoveText,
   initialTool,
   justMerged = false,
+  where,
 }: Props) {
   const [items, setItems] = useState(folder.items);
   const [tool, setTool] = useState<Tool>(initialTool ?? "move");
@@ -1529,15 +1532,17 @@ export function CanvasSheet({
         {/* Hangs under the bar, over the top of the canvas, so its arriving
             and going moves nothing (`.canvas-merged`). */}
         {mergedLine && (
-          <p className="canvas-merged mono" role="status">
-            Merged into an idea
+          <p className="canvas-merged advice" role="status">
+            {/* What happened and where the notes went, in plain words (review
+                UX-05); the sources are archived, so the board's count drops. */}
+            {`Joined ${children.length} notes. They are now one idea${where ? ` in ${where}` : ""}.`}
             {canUnmerge && (
               <>
                 {/* One line on a desktop; on a phone the way back takes a
                     line of its own rather than breaking mid-word. */}
-                <span className="canvas-merged-sep"> · </span>
+                <span className="canvas-merged-sep"> </span>
                 <span className="canvas-merged-how">
-                  {keyboard ? "Right-click an empty spot to un-merge" : "Hold an empty spot to un-merge"}
+                  {keyboard ? "Right-click an empty spot to separate them." : "Hold an empty spot to separate them."}
                 </span>
               </>
             )}
@@ -1744,7 +1749,7 @@ export function CanvasSheet({
                     }}
                   >
                     <IconUnmerge />
-                    Un-merge
+                    Separate
                   </button>
                 )}
                 <button

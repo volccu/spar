@@ -2,6 +2,7 @@ import type { Attachment, Note } from "../types";
 import { hasCode, headingOf, markerOf, parseBlocks } from "./blocks";
 import { plainInline, type InlineSeg } from "./inline";
 import { countLinks, domainFor, firstLink, linkify, SAVED_LINK_PREFIX } from "./links";
+import { listTitle } from "./autoformat";
 import { noteName } from "./name";
 
 /**
@@ -176,6 +177,8 @@ export interface CardFace {
   files: Attachment[];
   /** Files carried, for the footer mark. Counted even when the face is text. */
   fileCount: number;
+  /** A checklist's title line, drawn over its boxes (`listTitle`); null on every other face. */
+  title: string | null;
 }
 
 /**
@@ -574,6 +577,7 @@ function computeFace(note: Note, metrics: CardMetrics, terms: string[] = []): Ca
     file: null,
     files: atts,
     fileCount: atts.length,
+    title: null,
   };
 
   // --- A file, and nothing else --------------------------------------------
@@ -595,7 +599,12 @@ function computeFace(note: Note, metrics: CardMetrics, terms: string[] = []): Ca
   // afterthought — the card stopped standing for the note. Falling through to
   // the text face loses nothing: that face already draws a tick box as a tick
   // box, in its place, with the words around it kept.
-  const written = underName.split("\n").filter((line) => line.trim() !== "").length;
+  // A title above the boxes ("Packing:", or a line a blank one sets off) gets
+  // the name's row, by the same rule the To-do mark titles a list with
+  // (`listTitle`): one title line, and everything under it a box.
+  const title = named ? null : listTitle(text.split("\n"));
+  const rows = title === null ? underName : text.split("\n").slice(1).join("\n");
+  const written = rows.split("\n").filter((line) => line.trim() !== "").length;
   // The checklist face draws only its items. Use it only when the note is
   // entirely a checklist, otherwise prose before or between boxes disappears
   // from the card even though it is still part of the note.
@@ -622,7 +631,7 @@ function computeFace(note: Note, metrics: CardMetrics, terms: string[] = []): Ca
     // are, and `hiddenItems` counts by number rather than by position, so the
     // cut level stays honest without having to know which end they went off.
     // The name takes its row out of the items' lines, never out of the card.
-    const lines = Math.max(1, metrics.lines - (named ? 1 : 0));
+    const lines = Math.max(1, metrics.lines - (named || title !== null ? 1 : 0));
     // The words of an item start after its box, so they are measured on what
     // is left of the line once the box has taken its share (review UI-07).
     const itemChars = Math.max(8, metrics.charsPerLine - CHECK_BOX_CHARS);
@@ -641,6 +650,7 @@ function computeFace(note: Note, metrics: CardMetrics, terms: string[] = []): Ca
       items: shown,
       boxesShown: true,
       hiddenItems: items.length - shown.length,
+      title,
     };
   }
 

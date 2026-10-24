@@ -20,7 +20,7 @@ import { expectScreen } from "./shots";
  */
 const screens: { name: string; go: (p: Page) => Promise<void> }[] = [
   { name: "inbox", go: async () => {} },
-  { name: "open-note", go: (p) => p.getByRole("button", { name: /^Start here/ }).click() },
+  { name: "open-note", go: (p) => p.getByRole("button", { name: /^call dentist/ }).click() },
   {
     name: "drawer",
     go: async (p) => {
@@ -56,7 +56,7 @@ for (const [size, viewport, isMobile] of [
       for (const screen of screens) {
         await test.step(screen.name, async () => {
           await page.reload();
-          await page.getByRole("button", { name: /^Start here/ }).waitFor();
+          await page.getByRole("button", { name: /^call dentist/ }).waitFor();
           await waitForNoUndo(page);
           await screen.go(page);
           await page.waitForTimeout(500);

@@ -111,6 +111,8 @@ export function useMascotMoments({ online, syncs, unsent, notes, landed, search 
       // The search has closed: what it found nothing for is no longer the question.
       hush(shrugSaid.current);
     }
+    // Results again: the line about nothing is no longer true, whatever its time.
+    if (!nothing) hush(shrugSaid.current);
     if (!nothing || shrugged.current === query) return;
     const timer = window.setTimeout(() => {
       shrugged.current = query;

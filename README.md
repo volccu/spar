@@ -61,15 +61,18 @@ One container holds the app and a small sync server with its SQLite database. Ev
 is in one volume.
 
 ```bash
+git clone https://github.com/volccu/spar.git && cd spar
+docker build -t spar .
 docker run -d --name spar --restart unless-stopped \
   -p 127.0.0.1:8080:8080 \
   -v spar-data:/data \
   -e SPAR_ALLOWED_HOSTS=localhost \
-  ghcr.io/volccu/spar:latest
+  spar
 ```
 
-Open <http://localhost:8080> and make the first account; it becomes the admin. The image is built
-for `linux/amd64` and `linux/arm64`, so a Raspberry Pi 4 or 5 works.
+Open <http://localhost:8080> and make the first account; it becomes the admin. You build the image
+yourself (there is no ready-made one to download); it is built on the machine that runs it, so a
+Raspberry Pi 4 or 5 works.
 
 The port is on loopback on purpose. Browsers allow a service worker (offline, installing, sharing
 into the app) and Web Push (reminders) only over HTTPS or on `localhost`, so to use spår from a

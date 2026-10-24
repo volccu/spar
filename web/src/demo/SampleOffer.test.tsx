@@ -45,11 +45,13 @@ describe("the demo's empty Inbox", () => {
     expect(screen.getByText(/A notes app where you just write/).textContent).toContain(
       "A notes app where you just write. Type in the bar below, and sort it into boards later.",
     );
-    // Where the notes live: once, in the machine's voice, under the offers
+    // Where the notes live: once, under the offers
     // (review GD-10) — not a second sentence in the italic line.
     expect(state.textContent).not.toContain("Your notes live in this browser only.");
-    const stamp = state.querySelector(".empty-stamp.mono");
+    // A sentence of advice, not a machine string: the reading face, italic (review UI-18).
+    const stamp = state.querySelector(".empty-stamp.advice");
     expect(stamp?.textContent).toBe("Your notes stay in this browser");
+    expect(stamp?.classList.contains("mono")).toBe(false);
     const buttons = screen.getAllByRole("button").map((b) => b.textContent);
     expect(buttons.indexOf("Try it with sample notes")).toBeGreaterThanOrEqual(0);
     expect(buttons.indexOf("Try it with sample notes")).toBeLessThan(buttons.indexOf("Import from Google Keep"));
@@ -87,6 +89,9 @@ describe("the demo's empty Inbox", () => {
     fireEvent.click(offer);
     expect(demo.loadSamples).toHaveBeenCalledTimes(1);
     expect((offer as HTMLButtonElement).disabled).toBe(true);
+    // While it loads the button says so, in the same box (review UX-13).
+    expect(offer.textContent).toBe("Adding the sample notes…");
+    expect(offer.getAttribute("aria-busy")).toBe("true");
     await act(async () => finish(42));
   });
 
@@ -109,7 +114,7 @@ describe("the demo's empty Inbox", () => {
  * in (review UX-A-03); App hands `onSampleNotes` only while none is.
  */
 describe("the demo's menu", () => {
-  function menu(onSampleNotes?: () => void) {
+  function menu(onSampleNotes?: () => Promise<unknown>, onClose: () => void = () => {}) {
     const noop = () => {};
     return render(
       <MenuPanel
@@ -130,18 +135,31 @@ describe("the demo's menu", () => {
         onAbout={noop}
         onImportKeep={noop}
         onSampleNotes={onSampleNotes}
-        onClose={noop}
+        onClose={onClose}
       />,
     );
   }
 
   it("offers the sample notes until they are in", () => {
-    const load = vi.fn();
+    const load = vi.fn(async () => 1);
     menu(load);
     fireEvent.click(screen.getByRole("menuitem", { name: "Try it with sample notes" }));
     expect(load).toHaveBeenCalledOnce();
     cleanup();
     menu(undefined);
     expect(screen.queryByRole("menuitem", { name: "Try it with sample notes" })).toBeNull();
+  });
+
+  it("says Adding the sample notes while they load, then closes (review UX-13)", async () => {
+    let finish: () => void = () => {};
+    const load = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    const onClose = vi.fn();
+    menu(load, onClose);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Try it with sample notes" }));
+    const row = screen.getByRole("menuitem", { name: "Adding the sample notes…" }) as HTMLButtonElement;
+    expect(row.disabled).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+    await act(async () => finish());
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

@@ -2,7 +2,9 @@ import type { LinkPreview, Note, NoteStatus, NoteType, ReminderRepeat, UserBoard
 import { CONFLICT_FIELDS } from "../lib/versions";
 import { composeMergedBody } from "../lib/merge";
 import { withNoteName } from "../lib/name";
-import { trashImport, type ImportChunk, type ImportStore } from "../lib/keepImport";
+import { trashImport, untrashImport, type ImportChunk, type ImportStore } from "../lib/keepImport";
+import { robotSaysWhenSeen } from "../lib/mascotMoments";
+import { UNDO_MS } from "../store/useUndo";
 
 /* --- the demo's sample notes ------------------------------------------------------
    One invented person's notes, for the public demo's empty Inbox ("Try it with
@@ -11,7 +13,9 @@ import { trashImport, type ImportChunk, type ImportStore } from "../lib/keepImpo
    never read here). Rewritten 2026-10-23 (owner): it should read like somebody's
    actual notes — mixed lengths, half-finished thoughts, a typo or two, lists that
    look used — and show what the app does without a tutorial, so there is no
-   "Start here" note and no note explaining a gesture.
+   "Start here" note and no note explaining a gesture (the robot says one line
+   about holding a note, after the undo offer has gone: 2026-10-24, owner
+   approved, review PL-03).
 
    What a visitor finds: a pile in the Inbox worth tidying, four dressed boards
    (four, so a phone's Tidy up draws every one as a button — `DIRECT_PHONE` in
@@ -534,10 +538,53 @@ export async function loadSampleNotes(
   const made = await store.importNotes(chunk);
 
   const batch = { made: made.map((n) => ({ id: n.id, status: n.status })), boards: set.boards };
+  let undone = false;
   store.pushUndo({
     message: `Added ${made.length} sample notes`,
     steps: [],
-    run: () => void trashImport(batch, store),
+    run: () => {
+      undone = true;
+      void trashImport(batch, store);
+    },
   });
+  // The one hint about a gesture with no button on the board (review PL-03,
+  // owner approved a bend of "no note explaining a gesture"): said by the
+  // robot, once, after the undo offer above has gone — never over it.
+  setTimeout(() => {
+    if (!undone) robotSaysWhenSeen("Hm. Hold a note to pick it.");
+  }, UNDO_MS + 400);
   return made.length;
+}
+
+/**
+ * Takes the sample notes out again, for a visitor who wants to try their own
+ * (review UX-08): every note the set wrote (`source: "sample"`), and a merged
+ * idea only when every source of it is one, go to the trash, and the set's own
+ * four boards come off the shelf once nothing else is in them. Offered back as
+ * one undo. Answers how many notes it moved.
+ */
+export function removeSampleNotes(store: ImportStore): number {
+  const all = store.notes();
+  const samples = new Set(all.filter((n) => n.source === "sample").map((n) => n.id));
+  const going = all.filter(
+    (n) =>
+      n.status !== "trashed" &&
+      (samples.has(n.id) || (n.merged_from !== null && n.merged_from.length > 0 && n.merged_from.every((id) => samples.has(id)))),
+  );
+  if (going.length === 0) return 0;
+  // The set's own boards, as the shelf holds them now (an edit that hands the
+  // list back writes nothing); a board of the visitor's is never a candidate.
+  let shelf: UserBoard[] = [];
+  store.editBoards((list) => {
+    shelf = list;
+    return list;
+  });
+  const boards = shelf.filter((b) => BOARDS.some((own) => own.name === b.name && own.icon === b.icon));
+  const { moved, boards: taken } = trashImport({ made: going.map((n) => ({ id: n.id, status: n.status })), boards }, store);
+  store.pushUndo({
+    message: `Moved ${moved.length} sample ${moved.length === 1 ? "note" : "notes"} to the trash`,
+    steps: [],
+    run: () => untrashImport(moved, taken, store),
+  });
+  return moved.length;
 }

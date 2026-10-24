@@ -1353,6 +1353,31 @@ describe("merge dragging", () => {
   });
 });
 
+/** Review 2026-10-24, UX-07: the ordinary desktop ways to pick several notes. */
+describe("picking a card the way a desktop does", () => {
+  it.each([{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }])("%o-click picks it and does not open it", (mod) => {
+    const onLongPress = vi.fn();
+    const onOpen = vi.fn();
+    drawCard({ onLongPress, onOpen });
+    fireEvent.click(screen.getByRole("button"), mod);
+    expect(onLongPress).toHaveBeenCalledOnce();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("Space picks it, Enter still opens it", () => {
+    const onLongPress = vi.fn();
+    const onOpen = vi.fn();
+    drawCard({ onLongPress, onOpen });
+    const el = screen.getByRole("button");
+    expect(fireEvent.keyDown(el, { key: " " }), "the key's own click is refused").toBe(false);
+    expect(onLongPress).toHaveBeenCalledOnce();
+    expect(fireEvent.keyUp(el, { key: " " }), "so is its release").toBe(false);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(el, { detail: 0 });
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+});
+
 /**
  * Right-click is the desktop's long press, and it is the app's gesture rather
  * than the operating system's. The refusal used to sit *after* the selection

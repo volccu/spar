@@ -10,7 +10,7 @@ import type { Canvas, Note, UserBoard } from "../types";
 import { HIDABLE, type BuiltInKey } from "../lib/boards";
 import { buildInfo } from "../lib/build";
 import { useIsPhone } from "../lib/breakpoint";
-import { DEMO } from "../lib/demo";
+import { DEMO, removeSamples } from "../lib/demo";
 import { missingFilesLine, planArchive, writeArchive, type ArchiveResult } from "../lib/exportArchive";
 import { appBadgeOn, canBadge, installed, setAppBadgeOn } from "../lib/appBadge";
 import { canVibrate, hapticsOn, setHapticsOn } from "../lib/hapticsSwitch";
@@ -29,7 +29,7 @@ import { RUNTIME_CONFIG } from "../store/backend/config";
 import type { PushState } from "../store/push";
 import { locationAnswer } from "../store/weather";
 import { KeyCaps } from "./Hotkey";
-import { IconAbout, IconClear, IconDownload, IconImport, IconReminder, mark } from "./Icons";
+import { IconAbout, IconClear, IconDelete, IconDownload, IconImport, IconReminder, mark } from "./Icons";
 
 /* --- Settings ---------------------------------------------------------------
    Every switch the app has, in one place (2026-10-11, owner approved). The
@@ -745,10 +745,35 @@ export function Settings({
               advice: "Bring in a Google Takeout download, and choose which labels become boards.",
               control: (
                 <button type="button" className="btn mono settings-btn" onClick={onImportKeep}>
-                  Import
+                  <IconImport />
+                  <span>Import</span>
                 </button>
               ),
             },
+            // The demo's visitor, with the sample notes in and their own to
+            // bring: one row sends only the samples to the trash, offered back
+            // by the undo the board shows once this closes (review UX-08).
+            ...(DEMO && notes.some((n) => n.source === "sample" && n.status !== "trashed")
+              ? [
+                  {
+                    id: "samples",
+                    label: "Remove the sample notes",
+                    advice: "Only the sample notes go to the trash. Yours stay, and Undo brings them back.",
+                    control: (
+                      <button
+                        type="button"
+                        className="btn mono settings-btn"
+                        onClick={() => {
+                          void removeSamples().then(onClose);
+                        }}
+                      >
+                        <IconDelete />
+                        <span>Remove</span>
+                      </button>
+                    ),
+                  },
+                ]
+              : []),
             ...(onImportSpar
               ? [
                   {
@@ -761,7 +786,8 @@ export function Settings({
                         className="btn mono settings-btn"
                         onClick={onImportSpar}
                       >
-                        Choose
+                        <IconImport />
+                        <span>Choose</span>
                       </button>
                     ),
                   },

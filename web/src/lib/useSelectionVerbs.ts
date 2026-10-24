@@ -180,6 +180,28 @@ export function useSelectionVerbs({
   }
 
   /**
+   * Clearing the reminders of every picked note that has one (review
+   * 2026-10-24, UX-14): the time and the rule in one write, as the open note's
+   * clear does (`handleSetReminder`), so a pile of passed reminders goes in one
+   * go. Each note's own time and rule are what undo puts back.
+   */
+  function doClearReminder() {
+    const had = selectedNotes.filter((n) => Boolean(n.reminder_at));
+    if (had.length === 0) return;
+    const none = { reminder_at: null, reminder_repeat: null };
+    bulkUpdate(had.map((n) => n.id), none);
+    setSelected([]);
+    pushUndo({
+      message: `Cleared ${had.length} ${had.length === 1 ? "reminder" : "reminders"}`,
+      steps: had.map((n) => ({
+        id: n.id,
+        expect: none,
+        revert: { reminder_at: n.reminder_at, reminder_repeat: n.reminder_repeat },
+      })),
+    });
+  }
+
+  /**
    * Filing a selection into a board sets `board_id` and nothing else — no
    * text is touched, so this deliberately does not bump the `body` clock and
    * does not reorder a board sorted on the last edit (`sortForBoard`,
@@ -352,6 +374,7 @@ export function useSelectionVerbs({
     doCopy,
     doPriority,
     doTodo,
+    doClearReminder,
     doMove,
     doMoveLinks,
     doMoveCreate,

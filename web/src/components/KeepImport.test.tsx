@@ -48,6 +48,7 @@ function harness({
   const onClose = vi.fn();
   const onTidyNow = vi.fn();
   const onLeaveThem = vi.fn();
+  const onShowNotes = vi.fn();
   const view = render(
     <KeepImport
       notes={notes}
@@ -55,6 +56,7 @@ function harness({
       inboxSince={inboxSince}
       onTidyNow={onTidyNow}
       onLeaveThem={onLeaveThem}
+      onShowNotes={onShowNotes}
       waiting={waiting}
       stalled={stalled}
       onImport={onImport}
@@ -63,7 +65,7 @@ function harness({
       restoreTo={createRef<HTMLButtonElement>()}
     />,
   );
-  return { state, store, written, onImport, onClose, onTidyNow, onLeaveThem, view };
+  return { state, store, written, onImport, onClose, onTidyNow, onLeaveThem, onShowNotes, view };
 }
 
 async function pickZip(file: File) {
@@ -77,7 +79,9 @@ async function fixtureZip(): Promise<File> {
 describe("Import from Google Keep", () => {
   it("says what comes across and, plainly, what does not", () => {
     harness();
-    expect(screen.getByRole("dialog", { name: "Import from Google Keep" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Import from Keep" })).toBeTruthy();
+    // One line on a phone, with no word left alone on a second (review UI-07).
+    expect(screen.getByRole("heading", { name: "Import from Keep" })).toBeTruthy();
     const page = screen.getByRole("dialog").textContent ?? "";
     expect(page).toContain("read here, on this device");
     expect(page).toMatch(/Colours, because spår has none/);
@@ -189,6 +193,36 @@ describe("Import from Google Keep", () => {
     // The boards it made are empty now and off the shelf; Kitchen was not its.
     expect(state.boards.map((b) => b.name)).toEqual(["Kitchen"]);
     expect(screen.queryByRole("button", { name: "Undo this import" })).toBeNull();
+  });
+
+  it("opens the label step with two short lines and says what each label will do (review UX-18)", async () => {
+    const kitchen: UserBoard = { id: "b-kitchen", name: "Kitchen", position: 0 };
+    harness({ folders: [kitchen] });
+    await pickZip(await fixtureZip());
+    const labels = (await screen.findByRole("heading", { name: "Labels" })).nextElementSibling as HTMLElement;
+    expect(labels.textContent).toBe(
+      "Choose where each label goes; a label on one or two notes starts in the Inbox. A note goes into one board only, and its other labels are kept on its last line.",
+    );
+
+    const row = (label: string) =>
+      screen.getByRole("combobox", { name: `Where the notes labelled ${label} go` }).closest(".keep-label") as HTMLElement;
+    expect(row("Kitchen").textContent).toContain("3 notes go to Kitchen");
+    expect(row("House").textContent).toContain("1 note stays in the Inbox");
+    fireEvent.change(screen.getByRole("combobox", { name: "Where every label goes" }), { target: { value: "new" } });
+    expect(row("House").textContent).toContain("1 note goes to a new board House");
+  });
+
+  it("ends by saying where the notes went, and Show my notes goes there (review UX-19)", async () => {
+    const { onShowNotes, onClose } = harness();
+    await pickZip(await fixtureZip());
+    fireEvent.click(await screen.findByRole("button", { name: `Import ${FIXTURE_NOTES} notes` }));
+    const heading = await screen.findByRole("heading", { name: "Imported" });
+    // Each note once: the archived one that was also filed counts as archived only.
+    expect(heading.nextElementSibling?.textContent).toBe("4 in the Inbox, 2 in boards, 1 in the Archive");
+    expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show my notes" }));
+    expect(onShowNotes).toHaveBeenCalledWith(null);
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("says there is nothing to import when every note is already here", async () => {

@@ -417,6 +417,25 @@
   padding-right: 52px;
 }
 
+/* Where the words go, in the field's top margin (review 2026-10-24, UX-11),
+   drawn only while the board row at the foot has stood down for the keyboard.
+   Above the first line of words, which starts 17px down; the ✕ that would
+   share this corner is not drawn on a phone. */
+.capture-dest {
+  position: absolute;
+  top: var(--s-2);
+  right: var(--s-6);
+  z-index: 2;
+  max-width: 50%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--t-data);
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
 /* The vertical padding is what makes a one-row field exactly --bar-h tall:
    58 = 17 + (16.5 × 1.4) + 17, rounded. Change one and change the other. */
 .capture textarea {
@@ -426,7 +445,7 @@
   z-index: 1;
   flex: 1 1 auto;
   min-width: 0;
-  padding: 17px 15px;
+  padding: 17px 15px 17px var(--gutter);
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -643,6 +662,20 @@
   border-left: 1px solid var(--rule-soft);
 }
 
+/* When the chosen reminder will ring, beside the clock (review 2026-10-24,
+   UX-10): data, so mono and muted, in the room the row has left. It gives way
+   with an ellipsis before the marks or Save do. */
+.capture-when {
+  align-self: center;
+  min-width: 0;
+  overflow: hidden;
+  padding-inline: var(--s-3);
+  color: var(--muted);
+  font-size: var(--t-data);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 /* --- the phone's bar: the words on top, the marks and Save underneath -------
    The owner's call on 2026-09-29, with the Claude app's message box as the
    reference for its structure (not its looks: no radius, no colour here).
@@ -690,14 +723,14 @@
     grid-area: field;
   }
 
-  /* The first glyph stands on the words' own left edge: the textarea's 15px
+  /* The first glyph stands on the words' own left edge: the textarea's --gutter
      less the room either side of a 20px glyph in a 44px cell. No hairline
      before it, which on the desktop binds the group to the field beside it;
      here the field is above it, and a rule at the screen's edge binds nothing. */
   .capture[data-ready] .capture-marks {
     grid-area: marks;
     justify-self: start;
-    margin-left: calc(15px - (var(--hit) - var(--icon-inline)) / 2);
+    margin-left: calc(var(--gutter) - (var(--hit) - var(--icon-inline)) / 2);
   }
 
   .capture[data-ready] .capture-mark {
@@ -744,8 +777,9 @@
   }
 
   /* The board chooser opens over the mark that opened it, which on a phone
-     is at the left end of the row. */
-  .capture[data-ready] .capture-chooser {
+     is at the left end of the row. So does the Add menu. */
+  .capture[data-ready] .capture-chooser,
+  .capture[data-ready] .capture-add {
     right: auto;
     left: 0;
   }

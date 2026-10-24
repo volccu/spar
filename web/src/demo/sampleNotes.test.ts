@@ -1,11 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Note, UserBoard } from "../types";
 import { buildBoards, INBOX_ALL, isTodoNote, linksOnly, notesForBoard } from "../lib/boards";
 import { isBoardColor, markSet } from "../lib/boardLook";
 import { hasCode, hasOpenBox } from "../lib/blocks";
 import { isCanvasIdea } from "../lib/canvas";
 import { mergedPreviews } from "../lib/links";
-import { buildSampleSet, loadSampleNotes, recipePdf, type SampleStore } from "./sampleNotes";
+import { robotSaysWhenSeen } from "../lib/mascotMoments";
+import { UNDO_MS } from "../store/useUndo";
+import { buildSampleSet, loadSampleNotes, recipePdf, removeSampleNotes, type SampleSet, type SampleStore } from "./sampleNotes";
+
+// The creature's own module reaches for the browser; the test only asks whether it was told.
+vi.mock("../lib/mascotMoments", () => ({ robotSaysWhenSeen: vi.fn() }));
 
 /**
  * The public demo's sample notes (`sampleNotes.ts`): what the set contains, and
@@ -205,5 +210,125 @@ describe("loading it", () => {
     fake.undo[0].run();
     expect(fake.notes().every((n) => n.status === "trashed")).toBe(true);
     expect(fake.shelf().map((b) => b.id)).toEqual(["mine"]);
+  });
+
+  describe("the robot's one line about holding a note (review PL-03)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.mocked(robotSaysWhenSeen).mockClear();
+    });
+
+    it("says it once the undo offer has gone, never over it", async () => {
+      vi.useFakeTimers();
+      const fake = fakeStore();
+      await loadSampleNotes(fake.store, { now: NOW, file: async () => null });
+      vi.advanceTimersByTime(UNDO_MS - 1);
+      expect(robotSaysWhenSeen).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1_000);
+      expect(robotSaysWhenSeen).toHaveBeenCalledTimes(1);
+      expect(robotSaysWhenSeen).toHaveBeenCalledWith("Hm. Hold a note to pick it.");
+    });
+
+    it("says nothing when the samples were undone first", async () => {
+      vi.useFakeTimers();
+      const fake = fakeStore();
+      await loadSampleNotes(fake.store, { now: NOW, file: async () => null });
+      fake.undo[0].run();
+      vi.advanceTimersByTime(UNDO_MS + 1_000);
+      expect(robotSaysWhenSeen).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("removing it (review UX-08)", () => {
+  function theirs(id: string, extra: Partial<Note> = {}): Note {
+    const at = NOW.toISOString();
+    return {
+      id,
+      raw_content: id,
+      body: id,
+      source: "typed",
+      created_at: at,
+      updated_at: at,
+      note_type: null,
+      board_id: null,
+      status: "active",
+      priority: 0,
+      reminder_at: null,
+      reminder_repeat: null,
+      done: null,
+      merged_from: null,
+      keep_id: null,
+      attachments: [],
+      ...extra,
+    } as Note;
+  }
+
+  /** A device holding the sample set and two notes of its own, one in a board of its own. */
+  function holding(more: (set: SampleSet) => Note[] = () => []) {
+    const set = buildSampleSet(NOW, 1, null);
+    const own = [theirs("mine"), theirs("mine-filed", { board_id: "mine-board" }), ...more(set)];
+    let notes: Note[] = [...set.notes, ...own];
+    let shelf: UserBoard[] = [{ id: "mine-board", name: "Recipes", position: 0 }, ...set.boards];
+    const undo: { message: string; run: () => void }[] = [];
+    const store = {
+      notes: () => notes,
+      bulkUpdate: (ids: string[], patch: Partial<Note>) => {
+        notes = notes.map((n) => (ids.includes(n.id) ? { ...n, ...patch } : n));
+      },
+      editBoards: (change: (list: UserBoard[]) => UserBoard[]) => {
+        shelf = change(shelf);
+      },
+      pushUndo: (entry: { message: string; run: () => void }) => undo.push(entry),
+    };
+    return { set, store, undo, notes: () => notes, shelf: () => shelf };
+  }
+
+  it("sends only the sample notes to the trash, and their own boards off the shelf", () => {
+    const held = holding();
+    const inUse = held.set.notes.filter((n) => n.status !== "trashed").length;
+    const moved = removeSampleNotes(held.store);
+
+    expect(moved).toBe(inUse);
+    expect(held.notes().find((n) => n.id === "mine")?.status).toBe("active");
+    expect(held.notes().find((n) => n.id === "mine-filed")?.status).toBe("active");
+    for (const note of held.set.notes) {
+      expect(held.notes().find((n) => n.id === note.id)?.status).toBe("trashed");
+    }
+    expect(held.shelf().map((b) => b.id)).toEqual(["mine-board"]);
+  });
+
+  it("takes a merged idea along only when every source of it is a sample note", () => {
+    const held = holding((set) => {
+      const idea = set.notes.find((n) => n.source === "merge")!;
+      return [theirs("mixed", { source: "merge", merged_from: [idea.merged_from![0], "mine"] })];
+    });
+    const idea = held.set.notes.find((n) => n.source === "merge")!;
+    removeSampleNotes(held.store);
+    expect(held.notes().find((n) => n.id === idea.id)?.status).toBe("trashed");
+    expect(held.notes().find((n) => n.id === "mixed")?.status).toBe("active");
+  });
+
+  it("offers them back as one undo, each note to the status it had", () => {
+    const held = holding();
+    const before = new Map(held.notes().map((n) => [n.id, n.status]));
+    removeSampleNotes(held.store);
+    expect(held.undo).toHaveLength(1);
+    held.undo[0].run();
+    for (const note of held.set.notes) {
+      // The one sample note that was already in the trash stays there.
+      expect(held.notes().find((n) => n.id === note.id)?.status).toBe(before.get(note.id));
+    }
+    expect(held.shelf().map((b) => b.id)).toEqual(["mine-board", ...held.set.boards.map((b) => b.id)]);
+  });
+
+  it("does nothing, and offers nothing, when there are no sample notes", () => {
+    const held = holding();
+    held.store.bulkUpdate(
+      held.set.notes.map((n) => n.id),
+      { source: "typed" },
+    );
+    expect(removeSampleNotes(held.store)).toBe(0);
+    expect(held.undo).toHaveLength(0);
   });
 });

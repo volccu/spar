@@ -886,6 +886,11 @@
   font-variant-numeric: tabular-nums;
   color: var(--muted);
   margin-left: 8px;
+  /* Centred in the row, the count's baseline stood about a pixel above the
+     name's; a whole pixel down puts the two on one line (review 2026-10-24,
+     UI-12). */
+  position: relative;
+  top: 1px;
 }
 
 /* In the strip every tab after a count stands on that count's width, so a

@@ -775,10 +775,10 @@ The feature Keep can't do. Select 2+ notes → Merge:
 Nothing mutates, nothing is lost, and un-merge is trivially possible. This is why the block model
 isn't needed: merge is composition over text, and provenance lives in a column.
 
-**Un-merge** is offered on a composed idea (the canvas menu, beside Dissolve). Every source still
+**Separate** is offered on a composed idea (the canvas menu, beside Dissolve). Every source still
 archived into the idea goes back to active in the board it was on — merge never moved it — and the
 idea is **archived**, not trashed or destroyed, because its text may hold words written after the
-merge. Dissolve stays as the other answer: it sends the idea to the trash. Un-merge asks nothing
+merge. Dissolve stays as the other answer: it sends the idea to the trash. Separate asks nothing
 and is undone in one step.
 
 **New note from selection** is the inverse from the other side: in an open note, the selected words
@@ -817,7 +817,7 @@ as a one-tap toggle at its left end — off each time search opens, so "everythi
 search means. On, the results are what that board draws (`matchesBoard`) and nothing else. The
 Archive is included because its notes rank at half weight in an everywhere search, so someone
 standing there looking for an old note is exactly the person whose results come back buried. Links
-is offered it too, as "Only in Links": "that article about X" is a saved page, and an everywhere
+is offered it too (the chip reads "Only here"): "that article about X" is a saved page, and an everywhere
 search mixes in every note that merely says X (2026-10-05, owner approved, review FX-A-06). The
 Inbox, the other lenses and the Trash are not offered it (`canScopeSearch` in `web/src/lib/boards.ts`).
 

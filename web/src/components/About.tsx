@@ -41,6 +41,15 @@ interface Props {
 /** The public repository, for the demo's "Keep using spår". */
 const REPO = "https://github.com/volccu/spar";
 
+/** The touches that have no button on the board, for a device with no keyboard: what you do, what it does (review PL-03). */
+const TOUCHES = [
+  ["Hold a note", "Picks it"],
+  ["Hold a note and carry it onto another", "Joins them"],
+  ["Hold a note and carry it to a board name", "Files it there"],
+  ["Swipe sideways", "Next board"],
+  ["Swipe right on the Inbox", "Opens the boards"],
+] as const;
+
 export function About({ synced, onClose, restoreTo, at = "top", mood = "idle" }: Props) {
   const { layerRef, close, trapTab } = useModeLayer({ count: 1, origin: null, onClose, restoreTo });
   const keyboard = useHasKeyboard();
@@ -194,6 +203,21 @@ export function About({ synced, onClose, restoreTo, at = "top", mood = "idle" }:
             is the page describing a machine the reader is not holding. The
             exception is arriving by `?`: whoever pressed it has a keyboard,
             whatever the pointer query says about a tablet with one paired. */}
+        {!keyboard && (
+          <>
+            <h3 className="about-h">The touches</h3>
+            <p>On a phone these are done by touch.</p>
+            <dl className="about-data about-keys about-touches">
+              {TOUCHES.map(([does, result]) => (
+                <div key={does}>
+                  <dt>{does}</dt>
+                  <dd>{result}</dd>
+                </div>
+              ))}
+            </dl>
+          </>
+        )}
+
         {showKeys && (
           <>
             <h3 className="about-h" id="about-keys" ref={keysRef}>

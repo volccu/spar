@@ -297,6 +297,27 @@ export function previewsFor(text: string): LinkPreviewData[] {
 }
 
 /**
+ * Whether a link box's title adds nothing to what the card already shows
+ * (review 2026-10-24, PL-05). Until a page's own title arrives — offline, or a
+ * site that refuses — the box is titled with the words beside the address
+ * (`nameFor`), and the card draws those same words as its lines: said twice.
+ * With no words at all it is titled with the site, which the box's domain row
+ * says already. True while the title is still the local one and is either the
+ * site, or words that are on the face. Whitespace is read as one space.
+ */
+export function titleAddsNothing(
+  preview: LinkPreviewData,
+  local: LinkPreviewData | undefined,
+  words: string,
+): boolean {
+  if (preview.title === preview.domain) return true;
+  if (!local || preview.title !== local.title) return false;
+  // `previewsFor` ends a long title in an ellipsis; the note does not.
+  const head = local.title.replace(/\.{3}$/, "");
+  return head !== "" && words.replace(/\s+/g, " ").includes(head);
+}
+
+/**
  * The previews a note draws: the local unfurl for every address in its text,
  * each overlaid with whatever the server has since saved for that address.
  *

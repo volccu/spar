@@ -12,6 +12,7 @@ import {
   previewsFor,
   RECHECK_AT_ONCE,
   RECHECK_DAYS,
+  titleAddsNothing,
   visiblePreviews,
   WALL_PICTURE_SINCE,
   BLANK_PICTURES_FROM,
@@ -443,5 +444,38 @@ describe("hiding a preview", () => {
     expect(drawn).toHaveLength(3);
     expect(hiddenCount(drawn)).toBe(1);
     expect(visiblePreviews(drawn).map((p) => p.href)).toEqual(["https://one.com", "https://three.com"]);
+  });
+});
+
+/** Review 2026-10-24, PL-05: a link box that has no real page title does not say the card's words again. */
+describe("titleAddsNothing", () => {
+  const text = "https://www.bbc.com/news check this later";
+  const local = previewsFor(text)[0];
+
+  it("is true while the box's title is still the words beside the address, and the card shows them", () => {
+    expect(local.title).toBe("check this later");
+    expect(titleAddsNothing(local, local, "check this later")).toBe(true);
+  });
+
+  it("is false once a real page title has arrived", () => {
+    const fetched = { ...local, title: "BBC News - Home" };
+    expect(titleAddsNothing(fetched, local, "check this later")).toBe(false);
+  });
+
+  it("is false when the card does not show those words", () => {
+    expect(titleAddsNothing(local, local, "")).toBe(false);
+  });
+
+  it("is true when the title is only the site, which the box already says", () => {
+    const bare = previewsFor("https://www.bbc.com/news")[0];
+    expect(bare.title).toBe(bare.domain);
+    expect(titleAddsNothing(bare, bare, "")).toBe(true);
+  });
+
+  it("knows a title the local unfurl cut short", () => {
+    const long = `https://example.com/a ${"word ".repeat(30)}`.trim();
+    const cut = previewsFor(long)[0];
+    expect(cut.title.endsWith("...")).toBe(true);
+    expect(titleAddsNothing(cut, cut, "word ".repeat(30).trim())).toBe(true);
   });
 });
