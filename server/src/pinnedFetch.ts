@@ -22,6 +22,14 @@ import { createBrotliDecompress, createGunzip, createInflate } from "node:zlib";
 import { isPrivateAddress, publicUrlShape } from "./netguard";
 
 /** The address is not a public web address (answered 400 by link previews). */
+/** The name could not be looked up this time; answered 502, which the app asks again after. */
+export class LookupFailedError extends Error {
+  constructor() {
+    super("The address could not be looked up");
+    this.name = "LookupFailedError";
+  }
+}
+
 export class NotPublicError extends Error {
   constructor(message: string) {
     super(message);
@@ -82,8 +90,13 @@ export async function checkedAddress(url: URL, deps: PinnedFetchDeps): Promise<s
   } else {
     try {
       addresses = await deps.resolve(host);
-    } catch {
-      throw new NotPublicError("The host name does not resolve");
+    } catch (error) {
+      // Only a name that does not exist is a verdict. A timeout or a resolver
+      // failing (EAI_AGAIN, SERVFAIL) says nothing about the page, and answered
+      // 400 it stamped the link "no preview" on the client for good.
+      const code = (error as { code?: string } | null)?.code;
+      if (code === "ENOTFOUND" || code === "ENODATA") throw new NotPublicError("The host name does not resolve");
+      throw new LookupFailedError();
     }
   }
   if (addresses.length === 0) throw new NotPublicError("The host name does not resolve");

@@ -164,3 +164,20 @@ describe("a very long line of unpaired marks", () => {
     }
   });
 });
+
+/** Owner, 2026-10-26: a `[image 2]` marker points at one of the note's files (`lib/attachRefs.ts`). */
+describe("file markers", () => {
+  it("are segments of their own, the characters unchanged", () => {
+    const src = "the crack [image 2] and **the bill [file 1]**";
+    const segs = parseInline(src);
+    expect(rebuild(src)).toBe(src);
+    expect(segs.filter((s) => s.att).map((s) => [s.text, s.att, Boolean(s.strong)])).toEqual([
+      ["[image 2]", { kind: "image", n: 2 }, false],
+      ["[file 1]", { kind: "file", n: 1 }, true],
+    ]);
+  });
+
+  it("are not read inside code, nor without a number", () => {
+    expect(parseInline("`[image 1]` and [image] and [image x]").some((s) => s.att)).toBe(false);
+  });
+});

@@ -34,6 +34,12 @@ export function WallViewer({ notes, startId, origin, register, onClose, onOpenNo
   const entries = useMemo(() => viewerEntries(notes), [notes]);
   const [id, setId] = useState(startId);
   const at = entries.findIndex((e) => e.noteId === id);
+  // The wall walks links and files together; the viewer keeps a place for
+  // each one's controls, so stepping from one kind to the other moves nothing.
+  const walkHolds = useMemo(
+    () => ({ links: entries.some((e) => e.kind === "link"), files: entries.some((e) => e.kind === "file") }),
+    [entries],
+  );
   const found = at >= 0 ? entries[at] : null;
   // A link entry with no link to draw is no entry: nothing to show, so it goes
   // the way a note that left the board goes.
@@ -83,6 +89,7 @@ export function WallViewer({ notes, startId, origin, register, onClose, onOpenNo
       count={entries.length}
       onStep={onStep}
       onOpenNote={() => onOpenNote(entry.noteId)}
+      walkHolds={walkHolds}
     />
   );
 }

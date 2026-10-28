@@ -459,6 +459,7 @@ export class Notes {
       .run(id, owner, this.now(), expected);
     const hadCanvas = this.db.prepare("delete from canvases where id = ?").run(id).changes > 0;
     this.db.prepare("delete from reminder_deliveries where note_id = ?").run(id);
+    this.db.prepare("delete from reminder_device_deliveries where note_id = ?").run(id);
     this.db.prepare("delete from notes where id = ? and owner_id = ?").run(id, owner);
     const old = JSON.stringify({ id });
     const signals: Signal[] = [{ table: "notes", event: "DELETE", newJson: null, oldJson: old }];

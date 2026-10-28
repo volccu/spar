@@ -2922,7 +2922,8 @@ describe("pasting a file into the open note", () => {
       clipboardData: { files: [file] },
     });
 
-    expect(onAttach).toHaveBeenCalledWith("f1", [file]);
+    // The note has words, so the picture's marker goes in and its number with it.
+    expect(onAttach).toHaveBeenCalledWith("f1", [file], [1]);
     // Taking the event is also what tells App's window-level handler to stand
     // down, so the same screenshot does not become a new note as well.
     expect(taken).toBe(false);
@@ -2958,9 +2959,10 @@ describe("pasting a file into the open note", () => {
       },
     });
 
-    // Line endings as a native paste into a textarea would leave them.
-    expect(field.value).toBe("hello a\tb\nc\td");
-    expect(onAttach).toHaveBeenCalledWith("f1", [file]);
+    // Line endings as a native paste into a textarea would leave them; the
+    // picture's marker follows the words (owner, 2026-10-26).
+    expect(field.value).toBe("hello a\tb\nc\td [image 1]");
+    expect(onAttach).toHaveBeenCalledWith("f1", [file], [1]);
     expect(taken).toBe(false);
   });
 });
@@ -4268,5 +4270,44 @@ describe("closing", () => {
     expect(container.querySelector(".sheet")?.hasAttribute("data-closing")).toBe(false);
     rerender(<NoteView {...props} closing />);
     expect(container.querySelector(".sheet")?.hasAttribute("data-closing")).toBe(true);
+  });
+});
+
+/** Owner, 2026-10-26: a file added while the note has words leaves a `[image 1]` marker that opens it. */
+describe("a file marker in the open note", () => {
+  const file = new File(["x"], "crack.png", { type: "image/png" });
+
+  it("writes the marker at the end of a note being read, numbered after the note's own, and adds the file under it", () => {
+    const onEditBody = vi.fn();
+    const onAttach = vi.fn();
+    const { container } = viewWith(fileNote({ body: "the crack is here", attachments: [{ ...shot, ref: 1 }] }), { onAttach }, onEditBody);
+    fireEvent.paste(container.querySelector(".reader")!, { clipboardData: { files: [file], getData: () => "" } });
+    expect(onEditBody).toHaveBeenLastCalledWith("n1", "the crack is here [image 2]");
+    expect(onAttach).toHaveBeenCalledWith("n1", [file], [2]);
+    // A second picture before the first has landed takes the next number.
+    fireEvent.paste(container.querySelector(".reader")!, { clipboardData: { files: [file], getData: () => "" } });
+    expect(onAttach).toHaveBeenLastCalledWith("n1", [file], [3]);
+  });
+
+  it("writes nothing into a note with no words", () => {
+    const onEditBody = vi.fn();
+    const onAttach = vi.fn();
+    const { container } = viewWith(fileNote({ body: "", attachments: [] }), { onAttach }, onEditBody);
+    fireEvent.paste(container.querySelector(".sheet-body")!, { clipboardData: { files: [file], getData: () => "" } });
+    expect(onEditBody).not.toHaveBeenCalled();
+    expect(onAttach).toHaveBeenCalledWith("n1", [file], [1]);
+  });
+
+  it("opens its file by pressing the file's square", () => {
+    const { container } = viewWith(fileNote({ body: "see [image 1] and [image 2]", attachments: [{ ...shot, ref: 1 }] }));
+    const square = screen.getByLabelText(`View ${shot.name}`);
+    const pressed = vi.fn();
+    square.addEventListener("click", pressed);
+    fireEvent.click(screen.getByRole("button", { name: `Open image 1, ${shot.name}` }));
+    expect(pressed).toHaveBeenCalledOnce();
+    // The second points at nothing the note carries: plain text, and the reader is still the note.
+    expect(container.querySelectorAll(".att-ref")).toHaveLength(1);
+    expect(container.querySelector(".reader")?.textContent).toBe("see [image 1] and [image 2]");
+    expect(screen.queryByRole("textbox", { name: "Note text" })).toBeNull();
   });
 });

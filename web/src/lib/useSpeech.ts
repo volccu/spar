@@ -19,6 +19,10 @@ import { itIsLate } from "../components/mascot-element";
  *
  *  1. the undo offer, or a notice with nothing to undo ("Copied 3 notes");
  *  2. where a capture went, when the screen cannot show it ("Saved to Inbox · Go");
+ *     then, for as long as notes are picked, how many ("3 selected · Cancel"),
+ *     which stood in the header's corner until 2026-10-26 (owner) and is
+ *     edited in place as the count changes; nothing below it covers it, and a
+ *     selection begun after an offer is said over it (Ctrl+Z still reaches it);
  *  3. a link being written that is already saved ("You saved this 3 days ago · Open");
  *     and, level with these three, a moment (`lib/mascotMoments.ts`: "12 filed,
  *     3 left", "Emptied 14 notes", "Nothing for …") — the newest of them wins,
@@ -123,6 +127,10 @@ interface Options {
   openNote?: (id: string) => void;
   /** Something is being written, read or tidied: the weather waits (`useWeatherLine`). */
   quiet?: boolean;
+  /** How many notes are picked; 0 when none are. */
+  selected?: number;
+  /** Ends the selection, for the line's Cancel. */
+  onEndSelection?: () => void;
 }
 
 const NO_NOTES: readonly Note[] = [];
@@ -251,8 +259,11 @@ export function useSpeech(o: Options): { said: Said | null; onPoke: () => void }
   // said: a capture made while an older offer still stands names where it
   // went. Arriving together — a capture carrying a reminder — the receipt wins,
   // and the reminder's undo stays on Ctrl+Z.
-  const order = useRef({ n: 0, offerKey: -1, offerAt: 0, landedKey: "", landedAt: 0, momentKey: "", momentAt: 0 });
+  const order = useRef({ n: 0, offerKey: -1, offerAt: 0, landedKey: "", landedAt: 0, momentKey: "", momentAt: 0, selectAt: 0 });
   const seen = order.current;
+  const picked = (o.selected ?? 0) > 0;
+  if (!picked) seen.selectAt = 0;
+  else if (seen.selectAt === 0) seen.selectAt = seen.n += 1;
   if (offer && offer.key !== seen.offerKey) {
     seen.offerKey = offer.key;
     seen.offerAt = seen.n += 1;
@@ -266,12 +277,17 @@ export function useSpeech(o: Options): { said: Said | null; onPoke: () => void }
     seen.momentAt = seen.n += 1;
   }
   const receiptFirst = Boolean(landed && !landed.leaving) && seen.landedAt > seen.offerAt;
+  // Picking notes after an offer was made is moving on from it: the count and
+  // its Cancel are what the picking needs, so they are said over the offer.
+  const selectFirst = picked && seen.selectAt > seen.offerAt && seen.selectAt > seen.landedAt;
   // A moment is said over an older notice or receipt, and gives way to a newer
   // one. Never over an offer that can still be undone: that is the one thing
   // here that loses something if it goes unseen.
   const momentFirst =
     moment !== null &&
     !(offer && undoable(offer)) &&
+    // Nor over the count of a selection, which stands until it ends.
+    !o.selected &&
     // A poke is a question asked just now: its answer is said, not a moment.
     poke === 0 &&
     asked === null &&
@@ -279,7 +295,7 @@ export function useSpeech(o: Options): { said: Said | null; onPoke: () => void }
     seen.momentAt > (offer ? seen.offerAt : 0) &&
     seen.momentAt > (landed && !landed.leaving ? seen.landedAt : 0);
   return {
-    said: momentFirst ? moment : chosen(o, { poke, asked, synced, link, receiptFirst, twin, headsUp, moment, weather, pokeWeather }),
+    said: momentFirst ? moment : chosen(o, { poke, asked, synced, link, receiptFirst, selectFirst, twin, headsUp, moment, weather, pokeWeather }),
     onPoke,
   };
 }
@@ -290,6 +306,8 @@ interface Moment {
   synced: number | null;
   link: Passing | null;
   receiptFirst: boolean;
+  /** A selection begun after the offer and the receipt: its count goes first. */
+  selectFirst: boolean;
   twin: BarLine | null;
   headsUp: Said | null;
   moment: Said | null;
@@ -302,6 +320,18 @@ function chosen(o: Options, m: Moment): Said | null {
   const { landed, online, syncs } = o;
   const { poke, link, receiptFirst, twin } = m;
   const offer = receiptFirst ? null : o.offer;
+  const selection: Said | null =
+    o.selected && o.onEndSelection
+      ? {
+          // One key for the whole selection, so a new count edits the bubble
+          // in place rather than arriving afresh on every tap. No clock: it
+          // stands until the selection ends.
+          key: "select:",
+          words: `${o.selected} selected`,
+          act: { verb: "Cancel", label: `Cancel, ${o.selected} selected`, run: o.onEndSelection },
+        }
+      : null;
+  if (selection && m.selectFirst) return selection;
 
   if (offer) {
     const plain = spokenUndo(offer.message);
@@ -327,6 +357,8 @@ function chosen(o: Options, m: Moment): Said | null {
     const words = landed.place ? `Tucked into ${landed.place}` : landed.said;
     return { key: landed.key, words, act: { verb: landed.verb, label: `${landed.verb}: ${words}`, run: landed.act } };
   }
+
+  if (selection) return selection;
 
   if (twin) {
     const words = twinWords(twin.said);

@@ -62,6 +62,8 @@ import ArrowRightOnRectangleIcon from "@heroicons/react/24/outline/ArrowRightOnR
 import ArrowTopRightOnSquareIcon from "@heroicons/react/24/outline/ArrowTopRightOnSquareIcon";
 import ArrowUpIcon from "@heroicons/react/24/outline/ArrowUpIcon";
 import ArrowUturnLeftIcon from "@heroicons/react/24/outline/ArrowUturnLeftIcon";
+import ArrowUturnRightIcon from "@heroicons/react/24/outline/ArrowUturnRightIcon";
+import Square2StackIcon from "@heroicons/react/24/outline/Square2StackIcon";
 import ArrowsPointingOutIcon from "@heroicons/react/24/outline/ArrowsPointingOutIcon";
 import CalendarIcon from "@heroicons/react/24/outline/CalendarIcon";
 import ScissorsIcon from "@heroicons/react/24/outline/ScissorsIcon";
@@ -84,6 +86,7 @@ import Squares2X2Icon from "@heroicons/react/24/outline/Squares2X2Icon";
 import RectangleStackIcon from "@heroicons/react/24/outline/RectangleStackIcon";
 
 import type { FileIconKey } from "../lib/files";
+import type { ShapeKind } from "../types";
 
 import ArrowPathIcon from "@heroicons/react/24/outline/ArrowPathIcon";
 import ArrowPathRoundedSquareIcon from "@heroicons/react/24/outline/ArrowPathRoundedSquareIcon";
@@ -532,6 +535,86 @@ export function IconUndo({ tier = "nav" }: IconProps) {
   return mark(ArrowUturnLeftIcon, tier);
 }
 
+/** Redo, on a canvas: Undo's own arrow, turned the other way. */
+export function IconRedo({ tier = "nav" }: IconProps) {
+  return mark(ArrowUturnRightIcon, tier);
+}
+
+/** Duplicate, on a canvas: two of the same, one over the other. */
+export function IconDuplicate({ tier = "inline" }: IconProps = {}) {
+  return mark(Square2StackIcon, tier);
+}
+
+/**
+ * The canvas's Select tool. Heroicons has no lasso, so it is drawn: a loop in short dashes,
+ * the way a selection is drawn on the canvas itself, with the rope hanging from it.
+ */
+export function IconLasso({ tier = "inline" }: IconProps) {
+  return drawn(
+    tier,
+    <>
+      <ellipse cx="12.5" cy="9" rx="8" ry="5" strokeDasharray="2.5 2.5" />
+      <path d="M7 12.8c-1 1.4-.8 3.1.6 4 1.3.8 1.5 2.4.6 3.7" />
+    </>,
+  );
+}
+
+/**
+ * The highlighter, drawn: a marker with a cut tip, tipped as a hand holds it, over the
+ * broad stroke it lays down.
+ */
+export function IconHighlighter({ tier = "inline" }: IconProps) {
+  return drawn(
+    tier,
+    <>
+      <g transform="rotate(35 12 11)">
+        <path d="M8.75 1.75h6.5v11.5l-1.75 3.5h-3l-1.75-3.5z" />
+        <path d="M8.75 9h6.5" />
+      </g>
+      <path d="M3 21.25h11" />
+    </>,
+  );
+}
+
+/**
+ * Show everything: four corners closing in on what is there, the frame a camera draws.
+ * `IconUnmerge` already wears the arrows pointing out, and a mark keeps one meaning.
+ */
+export function IconFit({ tier = "inline" }: IconProps) {
+  return drawn(tier, <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" />);
+}
+
+/** The Shapes tool itself: a square and a ring, any shape rather than the one in hand. */
+export function IconShapes({ tier = "inline" }: IconProps) {
+  return drawn(
+    tier,
+    <>
+      <rect x="3.5" y="3.5" width="10" height="10" />
+      <circle cx="15.5" cy="15.5" r="5" />
+    </>,
+  );
+}
+
+/**
+ * A shape the Shapes tool draws, drawn as itself — the button is a sample of what it makes,
+ * as the pen's colour and thickness controls are. `filled` is the Fill switch's mark.
+ */
+export function IconShape({ kind, filled = false, tier = "inline" }: IconProps & { kind: ShapeKind; filled?: boolean }) {
+  const fill = filled ? "currentColor" : "none";
+  return drawn(
+    tier,
+    kind === "rect" ? (
+      <rect x="4" y="6" width="16" height="12" fill={fill} />
+    ) : kind === "ellipse" ? (
+      <ellipse cx="12" cy="12" rx="8.5" ry="6.5" fill={fill} />
+    ) : kind === "line" ? (
+      <path d="M5 19 19 5" />
+    ) : (
+      <path d="M5 19 19 5M11 5h8v8" />
+    ),
+  );
+}
+
 /**
  * The eraser, for the drawing screen. Heroicons has none, so it is drawn here
  * on the same 24 grid with the same round caps: a block tipped on its corner,
@@ -889,8 +972,8 @@ export function IconFileType({ kind, tier = "nav" }: { kind: FileIconKey; tier?:
 }
 
 /** Saving a file out of a note — and the whole archive out of the app. */
-export function IconDownload() {
-  return mark(ArrowDownTrayIcon, "inline");
+export function IconDownload({ tier = "inline" }: IconProps = {}) {
+  return mark(ArrowDownTrayIcon, tier);
 }
 
 /** The viewer's way out to the page a picture came from. */
@@ -1001,6 +1084,11 @@ export function IconPencil({ tier = "inline" }: IconProps) {
 /** The canvas's move tool: pan the sheet, the resting state beside Draw. */
 export function IconHand({ tier = "inline" }: IconProps) {
   return mark(HandRaisedIcon, tier);
+}
+
+/** A picture set onto a canvas: the same drawing an image file wears. */
+export function IconPicture({ tier = "inline" }: IconProps) {
+  return mark(PhotoIcon, tier);
 }
 
 /** A text label dropped onto a canvas — the same lines-of-text drawing

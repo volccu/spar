@@ -26,6 +26,7 @@ import {
   type DueReminder as DueAt,
 } from "../../supabase/functions/_shared/notification";
 import { sendPush, type VapidKeys } from "../../supabase/functions/_shared/webpush";
+import { devicesToSend, doneAfter } from "../../supabase/functions/_shared/deliveries";
 import { lastOccurrence } from "../../web/src/lib/reminders";
 import type { Db } from "./db";
 import { badRequest, rowRefused } from "./http";
@@ -203,12 +204,33 @@ export class Push {
          on conflict (note_id) do update set owner_id = excluded.owner_id, reminder_at = excluded.reminder_at, fired_at = excluded.fired_at`,
       )
       .run({ ...delivery, now: this.now() });
+    // Closed: the per-device rows for it have done their job.
+    this.db.prepare("delete from reminder_device_deliveries where note_id = ?").run(delivery.note_id);
+  }
+
+  /** The devices that already took this very occurrence. */
+  deliveredTo(noteId: string, at: Micros): Set<string> {
+    const rows = this.db
+      .prepare("select endpoint from reminder_device_deliveries where note_id = ? and reminder_at = ?")
+      .all(noteId, at) as { endpoint: string }[];
+    return new Set(rows.map((r) => r.endpoint));
+  }
+
+  /** Records that one device took an occurrence (`_shared/deliveries.ts`). */
+  recordDeviceDelivery(delivery: { note_id: string; owner_id: string; reminder_at: Micros }, endpoint: string): void {
+    this.db
+      .prepare(
+        `insert into reminder_device_deliveries (note_id, endpoint, owner_id, reminder_at, fired_at)
+         select @note_id, @endpoint, @owner_id, @reminder_at, @now where exists (select 1 from notes where id = @note_id)
+         on conflict (note_id, endpoint) do update set reminder_at = excluded.reminder_at, fired_at = excluded.fired_at`,
+      )
+      .run({ ...delivery, endpoint, now: this.now() });
   }
 
   /**
-   * One run of the sweep: sends what is due to each live device of its owner,
-   * records an occurrence once any push service accepted it, retires endpoints
-   * answered 404/410. Never runs twice at once.
+   * One run of the sweep: sends what is due to each live device of its owner
+   * that has not taken it yet, records an occurrence once every device has it
+   * (`_shared/deliveries.ts`), retires endpoints answered 404/410. Never runs twice at once.
    */
   async sweep(): Promise<{ due: number; sent: number; retired: number }> {
     if (this.sweeping) return { due: 0, sent: 0, retired: 0 };
@@ -227,10 +249,23 @@ export class Push {
       const retire: string[] = [];
       let sent = 0;
       for (const reminder of reminders) {
-        const devices = byOwner.get(reminder.owner_id) ?? [];
+        const live = byOwner.get(reminder.owner_id) ?? [];
         // No device: not recorded, so a device registered within the grace
         // window still gets it.
-        if (devices.length === 0) continue;
+        if (live.length === 0) continue;
+        // Only the devices that have not taken this occurrence yet.
+        const before = this.deliveredTo(reminder.note_id, reminder.reminder_at);
+        const plan = devicesToSend(
+          live.map((d) => d.endpoint),
+          before,
+          reminder.reminder_at / 1000,
+          now / 1000,
+        );
+        if (plan.done) {
+          this.recordDelivery(reminder);
+          continue;
+        }
+        const devices = live.filter((d) => plan.send.includes(d.endpoint));
         const payload = notificationFor({
           note_id: reminder.note_id,
           reminder_at: formatInstant(reminder.reminder_at),
@@ -241,18 +276,19 @@ export class Push {
         const results = await Promise.all(
           devices.map(async (d) => ({ endpoint: d.endpoint, ...(await sendPush(d, payload, keys, ttl, this.transport)) })),
         );
-        let accepted = false;
         for (const result of results) {
           if (result.ok) {
-            accepted = true;
             sent += 1;
+            this.recordDeviceDelivery(reminder, result.endpoint);
           } else if (result.gone) {
             retire.push(result.endpoint);
           } else {
             console.error(`push to ${new URL(result.endpoint).host} failed: ${result.status}`);
           }
         }
-        if (accepted) this.recordDelivery(reminder);
+        // Closed once every device has it or is gone for good; a device that
+        // got no answer is tried again next sweep.
+        if (doneAfter(results, before.size)) this.recordDelivery(reminder);
       }
       if (retire.length > 0) this.retire(retire);
       return { due: reminders.length, sent, retired: retire.length };

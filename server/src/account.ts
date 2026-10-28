@@ -30,6 +30,7 @@ function attachmentsOf(value: unknown[]): Attachment[] {
     thumb: typeof a.thumb === "string" ? a.thumb : null,
     path: typeof a.path === "string" ? a.path : null,
     added_at: typeof a.added_at === "string" ? a.added_at : "",
+    ...(typeof a.ref === "number" ? { ref: a.ref } : {}),
   }));
 }
 

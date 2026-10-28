@@ -28,6 +28,8 @@ export const SETTINGS = {
   previews: { key: "spar.previews", values: ["fetch", "off"], fallback: "fetch" },
   /** The creature's weather lines (`lib/useWeatherLine.ts`). Off: no location is asked for and nothing is sent. */
   weather: { key: "spar.weather", values: ["on", "off"], fallback: "on" },
+  /** A rough line, ring or box drawn on a canvas and held still is tidied into a clean one (`lib/shapeSnap.ts`). */
+  tidyShapes: { key: "spar.tidyShapes", values: ["on", "off"], fallback: "on" },
 } as const;
 
 export type SettingName = keyof typeof SETTINGS;

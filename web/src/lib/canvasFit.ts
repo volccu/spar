@@ -41,3 +41,22 @@ export function fitView(
     top: box.y * zoom - top,
   };
 }
+
+/**
+ * Show everything: the zoom and scroll that put the whole of `box` in view, centred both
+ * ways. Unlike `fitView` it answers every time — asked for by a button, it must visibly do
+ * something — and it zooms in as far as 100% for a small drawing, never further.
+ */
+export function fitWhole(
+  box: { x: number; y: number; w: number; h: number },
+  view: { w: number; h: number },
+  edge: number,
+): { zoom: number; left: number; top: number } {
+  const want = Math.min((view.w - 2 * edge) / Math.max(box.w, 1), (view.h - 2 * edge) / Math.max(box.h, 1));
+  const zoom = clampZoom(Math.min(1, want));
+  return {
+    zoom,
+    left: (box.x + box.w / 2) * zoom - view.w / 2,
+    top: (box.y + box.h / 2) * zoom - view.h / 2,
+  };
+}

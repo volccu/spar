@@ -183,3 +183,48 @@ describe("a reminder that rang from the idea", () => {
     expect(get("parcel").reminder_at).toBe(LATER);
   });
 });
+
+/**
+ * An undo stays on the stack past its eight-second offer, so a later Ctrl+Z
+ * may meet notes that have moved on. Each verb's undo now puts back only what
+ * is still as the verb left it (bughunt 2026-10-24).
+ */
+describe("an idea verb undone after the notes moved on", () => {
+  it("keeps words typed into the idea after notes were added to it", () => {
+    const { result, get, undos } = setup([idea(), a(), parcel()]);
+    act(() => result.current.mergeNotes([get("idea"), get("parcel")]));
+    const typed = get("idea").body + "\n\nWritten afterwards";
+    act(() => {
+      // The user typing into the idea after the merge.
+      (get("idea") as Note).body = typed;
+    });
+    act(() => undos.at(-1)!.run!());
+    expect(get("idea").body).toBe(typed);
+    expect(get("idea").merged_from).toEqual(["a"]);
+    expect(get("parcel").status).toBe("active");
+  });
+
+  it("does not pull a released note back out of the trash", () => {
+    const { result, get, undos } = setup([{ ...idea(), merged_from: ["a", "b"] }, a(), note({ id: "b", status: "archived", merged_into: "idea" })]);
+    act(() => result.current.releaseNote("idea", "b"));
+    act(() => {
+      (get("b") as Note).status = "trashed";
+    });
+    act(() => undos.at(-1)!.run!());
+    expect(get("b").status).toBe("trashed");
+    expect(get("idea").merged_from).toEqual(["a"]);
+  });
+
+  it("leaves a source trashed since a dissolve in the trash, and brings the rest back", () => {
+    const b = note({ id: "b", status: "archived", merged_into: "idea" });
+    const { result, get, undos } = setup([{ ...idea(), merged_from: ["a", "b"] }, a(), b]);
+    act(() => result.current.dissolveIdea("idea"));
+    act(() => {
+      (get("b") as Note).status = "trashed";
+    });
+    act(() => undos.at(-1)!.run!());
+    expect(get("b").status).toBe("trashed");
+    expect(get("a")).toMatchObject({ status: "archived", merged_into: "idea" });
+    expect(get("idea")).toMatchObject({ status: "active", merged_from: ["a"] });
+  });
+});

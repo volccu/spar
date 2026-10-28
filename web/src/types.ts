@@ -30,9 +30,11 @@ export type ReminderRepeat = "daily" | "weekly" | "monthly";
 /**
  * A file carried by a note.
  *
- * An attachment is never written into the note's text. `raw_content` is the
+ * An attachment is never stored in the note's text. `raw_content` is the
  * immutable original capture and `body` is prose the user edits; a file is
- * neither, so it rides alongside them and the two invariants stay intact.
+ * neither, so it rides alongside them and the two invariants stay intact. A
+ * file added while there are words leaves a marker in the text, `[image 2]`,
+ * which is ordinary characters pointing at `ref` (`lib/attachRefs.ts`).
  *
  * `thumb` is the reason this works as a way to move a file between two
  * machines. It is a deliberately tiny JPEG carried *in the note row itself*,
@@ -54,6 +56,12 @@ export interface Attachment {
   /** Where the bytes live on the server. Null until the upload lands. */
   path: string | null;
   added_at: string;
+  /**
+   * Its number among the note's files of its kind, for a `[image 2]` marker
+   * (`lib/attachRefs.ts`). Given when the file is added and never changed;
+   * absent on files added before markers existed.
+   */
+  ref?: number;
 }
 
 export interface LinkPreview {
@@ -176,17 +184,32 @@ export interface DrawingStroke {
   points: [number, number][];
   color: string;
   width: number;
+  /**
+   * Set on a shape (`lib/shapes.ts`): `points` is then its outline, drawn straight rather
+   * than smoothed. Absent on a hand-drawn line. An older device draws the same points as a
+   * line, which is why the outline, not the shape's two corners, is what is stored.
+   */
+  shape?: ShapeKind;
+  /** A closed shape filled with its own pen colour (DESIGN.md §2b). */
+  fill?: true;
+  /** Drawn with the highlighter: the pen's colour, see-through, under the other strokes. */
+  highlight?: true;
 }
 
+export type ShapeKind = "rect" | "ellipse" | "line" | "arrow";
+
+export type CanvasTool = "move" | "select" | "draw" | "highlight" | "shape" | "erase" | "text";
+
 /**
- * A free-standing text label on the canvas. Created from the right-click
- * context menu. Coordinates are in world space, like everything else.
+ * A free-standing text label on the canvas. Coordinates are in world space,
+ * like everything else. Width is absent on labels made before the Text tool.
  */
 export interface CanvasText {
   id: string;
   x: number;
   y: number;
   text: string;
+  width?: number;
 }
 
 /** A merged idea can be opened as a spatial folder without changing the note model. */
@@ -196,6 +219,19 @@ export interface CanvasItem {
   y: number;
   /** Pixel width of the note card on the canvas. Absent means the default. */
   width?: number;
+}
+
+/**
+ * A picture placed straight onto a canvas. The bytes are an ordinary
+ * attachment on the idea note itself (a file is a note); this is only where it
+ * stands. Its width is `image_widths[attachment_id]`, as a note's picture's is.
+ * On the server it travels inside the `items` column (`canvasSync.ts`), so it
+ * needed no migration.
+ */
+export interface CanvasImage {
+  attachment_id: string;
+  x: number;
+  y: number;
 }
 
 /**
@@ -212,6 +248,8 @@ export interface Canvas {
   /** Attachment id -> display width in pixels, for resized images on the canvas. */
   image_widths: Record<string, number>;
   text_elements: CanvasText[];
+  /** Pictures placed on the canvas itself. Absent on canvases made before them. */
+  images?: CanvasImage[];
   created_at: string;
   updated_at: string;
 }

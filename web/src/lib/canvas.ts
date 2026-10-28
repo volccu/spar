@@ -1,4 +1,4 @@
-import type { Attachment, CanvasText, DrawingStroke, Note, Canvas, CanvasItem } from "../types";
+import type { Attachment, CanvasImage, CanvasText, DrawingStroke, Note, Canvas, CanvasItem } from "../types";
 import { isImage } from "./files";
 import { AVG_CHAR_PX } from "./metrics";
 
@@ -167,6 +167,7 @@ const DEFAULT_XS = new Set(
 export function looksArranged(folder: Canvas): boolean {
   if (folder.strokes?.length) return true;
   if (folder.text_elements?.length) return true;
+  if (folder.images?.length) return true;
   if (Object.keys(folder.image_widths ?? {}).length > 0) return true;
   return (folder.items ?? []).some(
     (item) => item.width !== undefined || item.y < 0 || !DEFAULT_XS.has(item.x),
@@ -363,7 +364,7 @@ export function addCanvasText(
 export function updateCanvasText(
   folder: Canvas,
   textId: string,
-  changes: Partial<Pick<CanvasText, "text" | "x" | "y">>,
+  changes: Partial<Pick<CanvasText, "text" | "x" | "y" | "width">>,
   now = new Date(),
 ): Canvas {
   return {
@@ -387,6 +388,84 @@ export function removeCanvasText(
   };
 }
 
+/**
+ * Pictures set down on the canvas. One already placed is left where it is: a
+ * second device's copy of the same placement must not stack a twin on it.
+ */
+export function addCanvasImages(
+  folder: Canvas,
+  images: CanvasImage[],
+  now = new Date(),
+): Canvas {
+  const held = new Set((folder.images ?? []).map((image) => image.attachment_id));
+  const fresh = images.filter((image) => !held.has(image.attachment_id));
+  if (fresh.length === 0) return folder;
+  return {
+    ...folder,
+    images: [...(folder.images ?? []), ...fresh],
+    updated_at: now.toISOString(),
+  };
+}
+
+export function moveCanvasImage(
+  folder: Canvas,
+  attachmentId: string,
+  x: number,
+  y: number,
+  now = new Date(),
+): Canvas {
+  const images = folder.images ?? [];
+  const placed = images.some((image) => image.attachment_id === attachmentId);
+  return {
+    ...folder,
+    // A picture with no placement yet (`picturesOf` stood it at a default) is
+    // given one by its first move.
+    images: placed
+      ? images.map((image) => (image.attachment_id === attachmentId ? { ...image, x, y } : image))
+      : [...images, { attachment_id: attachmentId, x, y }],
+    updated_at: now.toISOString(),
+  };
+}
+
+/** The placement and its width go together; the bytes are the note's (`detach`). */
+export function removeCanvasImage(
+  folder: Canvas,
+  attachmentId: string,
+  now = new Date(),
+): Canvas {
+  const { [attachmentId]: _gone, ...widths } = folder.image_widths ?? {};
+  return {
+    ...folder,
+    images: (folder.images ?? []).filter((image) => image.attachment_id !== attachmentId),
+    image_widths: widths,
+    updated_at: now.toISOString(),
+  };
+}
+
+/** Pictures with no placement stand in a column from the world's origin, in view on opening. */
+const LOOSE_GAP = 40;
+
+/**
+ * Every picture the idea note carries, each with the place it stands. A picture
+ * whose placement never arrived (an older device rewrote the canvas, or the
+ * placement is still on its way) is still drawn, in a column of its own, rather
+ * than being a file on the note nobody can see.
+ */
+export function picturesOf(
+  idea: Note | null | undefined,
+  folder: Canvas | undefined,
+): { att: Attachment; x: number; y: number }[] {
+  const placed = new Map((folder?.images ?? []).map((image) => [image.attachment_id, image]));
+  let looseY = 0;
+  return (idea?.attachments ?? []).map((att) => {
+    const at = placed.get(att.id);
+    if (at) return { att, x: at.x, y: at.y };
+    const y = looseY;
+    looseY += 240 + LOOSE_GAP;
+    return { att, x: 0, y };
+  });
+}
+
 /* --- the snapshot ------------------------------------------------------------
    An idea card stands for a canvas the way a card stands for a note: by being
    the thing at a smaller size, not by being a diagram of it. So the miniature
@@ -406,6 +485,11 @@ const FOOT_H = 18;
 const MIN_H = 206;
 export const DEFAULT_W = 260;
 export const IMG_W = 240;
+/** A label the Text tool sets down starts this wide; older labels carry no width. */
+export const TEXT_W = 240;
+/** How narrow and how wide a label can be stretched. */
+export const TEXT_MIN_W = 80;
+export const TEXT_MAX_W = 600;
 /**
  * The card face and the canvas have to agree about this, or the miniature on
  * an idea card shows an arrangement the canvas does not have. It was measured
@@ -437,12 +521,16 @@ export interface SnapshotLabel {
   x: number;
   y: number;
   lines: number[];
+  /** The column the label is set in: its own width, or the default. */
+  w: number;
 }
 
 export interface CanvasSnapshot {
   shapes: SnapshotShape[];
   strokes: DrawingStroke[];
   labels: SnapshotLabel[];
+  /** Pictures placed on the canvas itself, drawn under the strokes as there. */
+  pictures: { id: string; x: number; y: number; w: number; h: number }[];
 }
 
 /**
@@ -599,10 +687,17 @@ export function canvasSnapshot(
     id: text.id,
     x: text.x,
     y: text.y,
-    lines: ghostLines(text.text || " ", 40, 6),
+    lines: ghostLines(text.text || " ", Math.max(8, Math.floor((text.width ?? TEXT_W) / CHAR_W)), 6),
+    w: text.width ?? TEXT_W,
   }));
 
-  return { shapes, strokes: folder?.strokes ?? [], labels };
+  const pictures = picturesOf(idea, folder).map(({ att, x, y }) => {
+    const w = widths[att.id] ?? IMG_W;
+    const ratio = att.width && att.height ? att.height / att.width : 0.66;
+    return { id: att.id, x, y, w, h: Math.round(w * ratio) };
+  });
+
+  return { shapes, strokes: folder?.strokes ?? [], labels, pictures };
 }
 
 /** World-space geometry the miniature is drawn with, shared with the renderer. */

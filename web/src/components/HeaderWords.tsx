@@ -1,6 +1,5 @@
 import { useIsShort } from "../lib/breakpoint";
 import { Count } from "./Count";
-import { IconClear } from "./Icons";
 import { Speech, type Said } from "./Speech";
 
 /**
@@ -24,17 +23,16 @@ interface Props {
   updateReady: boolean;
   /** "This device only", or the demo's "Your notes stay in this browser". */
   quiet: { words: string; run: () => void } | null;
-  /** What the board row cannot count: "3 selected", "5 found", "2 reminders". */
+  /** What the board row cannot count: "5 found", "2 reminders" (a selection's is the creature's). */
   headerCount: string | null;
-  /** While notes are picked: the count is a button that ends the selection (review 2026-10-24, UX-15). */
-  onEndSelection?: () => void;
 }
 
-export function HeaderWords({ said, announcement, offerMessage, updateReady, quiet, headerCount, onEndSelection }: Props) {
+export function HeaderWords({ said, announcement, offerMessage, updateReady, quiet, headerCount }: Props) {
   // What the bubble says that no other region already does: a capture's
   // receipt, a link already saved, the answer to a poke or a double tap, a
   // reminder about to ring, the connection coming back, and a moment
-  // (`lib/mascotMoments.ts`). The sync
+  // (`lib/mascotMoments.ts`). A selection's count is not read out here: the
+  // burger's name ("Menu, 3 selected") and the bubble's Cancel carry it. The sync
   // words, the undo offer's message and the update each have a region below.
   const aloud = said && /^(landed|poke|link|saved|remind|sync|synced|moment):/.test(said.key) ? said.words : "";
   // On a short screen the words stand as a plate under the board row, with no
@@ -66,20 +64,7 @@ export function HeaderWords({ said, announcement, offerMessage, updateReady, qui
           {quiet.words}
         </button>
       )}
-      {headerCount && onEndSelection ? (
-        <button
-          type="button"
-          className="count count-end mono"
-          aria-label={`Cancel, ${headerCount}`}
-          title="Cancel"
-          onClick={onEndSelection}
-        >
-          <Count className="" text={headerCount} />
-          <IconClear />
-        </button>
-      ) : (
-        headerCount && <Count className="count mono" text={headerCount} />
-      )}
+      {headerCount && <Count className="count mono" text={headerCount} />}
       <span className="sr-only" role="status" aria-live="polite">
         {updateReady ? "A new version is ready. Reload to use it." : ""}
       </span>

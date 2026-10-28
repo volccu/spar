@@ -67,6 +67,7 @@ import {
 } from "../lib/motion";
 import { useNoteSwiping } from "../lib/useNoteSwiping";
 import { useNoteDrop } from "../lib/useNoteDrop";
+import { AttachRefsContext, useAttachMarkers } from "../lib/useAttachMarkers";
 import {
   IconArchive,
   IconBack,
@@ -117,7 +118,8 @@ interface Props {
    */
   onEmptied?: (id: string) => void;
   onTogglePriority: (note: Note) => void;
-  onAttach: (id: string, files: File[]) => void;
+  /** `refs`: the numbers the files' `[image 2]` markers were written with, by position. */
+  onAttach: (id: string, files: File[], refs?: number[]) => void;
   onDetach: (id: string, attachmentId: string) => void;
   /**
    * Puts the note's files in this order — the viewer's "Use as cover" moves a
@@ -1408,7 +1410,8 @@ export function NoteView({
 
   const archived = note.status === "archived";
   const trashed = note.status === "trashed";
-  const drop = useNoteDrop((files) => onAttach(note.id, files));
+  const marks = useAttachMarkers({ attachments, root: bodyRef, attach: (files, refs) => onAttach(note.id, files, refs), text: fieldText, write: apply });
+  const drop = useNoteDrop((files) => marks.attachAt(files, editorRef.current ? range()[1] : undefined));
   /**
    * The stamp counts from the last edit, because that is what the board is
    * ordered on and what you were about to ask. The capture date does not
@@ -1500,7 +1503,7 @@ export function NoteView({
             caret: from + text.length,
           });
         }
-        onAttach(note.id, files);
+        marks.attachAt(files, el ? range()[1] : undefined);
       }}
       // A file dragged onto the open note belongs to this note (`useNoteDrop`).
       {...drop.handlers}
@@ -1677,7 +1680,7 @@ export function NoteView({
           onFormat={applyFormat}
           onSplit={onSplit && splitting ? () => splitOut(splitting) : undefined}
           onAttach={() => {
-            pickerRef.current?.click();
+            marks.remember(editorRef.current ? range()[1] : null); pickerRef.current?.click();
             setInserting(false);
           }}
           onReminder={trashed ? undefined : () => {
@@ -1790,7 +1793,7 @@ export function NoteView({
           const picked = Array.from(e.currentTarget.files ?? []);
           // Cleared so picking the same file twice in a row still fires.
           e.currentTarget.value = "";
-          if (picked.length > 0) onAttach(note.id, picked);
+          if (picked.length > 0) marks.attachAt(picked);
         }}
       />
 
@@ -1934,6 +1937,8 @@ export function NoteView({
           <textarea
             ref={editorRef}
             className="editor"
+            // Not the default two rows: a one-line note grew a line when tapped.
+            rows={1}
             // In the field's own line endings (`fieldValue`). A note stored with
             // "\r\n" handed over as it stands differs from what the field
             // reports, and React, comparing the two on every render, writes the
@@ -2025,7 +2030,7 @@ export function NoteView({
           />
           </div>
         ) : (
-          <NoteReader
+          <AttachRefsContext.Provider value={marks.refs}><NoteReader
             blocks={blocks}
             text={draft}
             textRef={draftRef}
@@ -2033,7 +2038,7 @@ export function NoteView({
             onRewrite={rewrite}
             onStartEditing={startEditing}
             onFocusEdit={() => setEditing(true)}
-          />
+          /></AttachRefsContext.Provider>
         )}
 
         {/* Under the words (owner, 2026-10-17): the name and the text lead and

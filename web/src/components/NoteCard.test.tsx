@@ -249,7 +249,7 @@ describe("idea cards", () => {
         mergeTarget={false}
         trace={false}
         metrics={CARD_METRICS}
-        snapshot={{ shapes: [], strokes: [], labels: [] }}
+        snapshot={{ shapes: [], strokes: [], labels: [], pictures: [] }}
       />,
     );
 
@@ -287,6 +287,7 @@ describe("idea cards", () => {
           ],
           strokes: [],
           labels: [],
+          pictures: [],
         }}
       />,
     );
@@ -296,6 +297,42 @@ describe("idea cards", () => {
     // A blank line costs a line box and draws no rule.
     expect(container.querySelectorAll(".idea-snapshot-line")).toHaveLength(2);
     expect(container.querySelector(".idea-snapshot-priority")).toBeTruthy();
+  });
+
+  it("draws a sketch holding a picture as its canvas, not as the picture alone", () => {
+    const sketch = {
+      ...noteWrittenAgo(0, "# Sketch"),
+      source: "draw",
+      attachments: [
+        { id: "p1", name: "shot.png", mime: "image/png", size: 3, width: 10, height: 10, thumb: "data:image/jpeg;base64,xx", path: null, added_at: "2026-08-01T00:00:00.000Z" },
+      ],
+    } as Note;
+    const { container } = render(
+      <NoteCard
+        note={sketch}
+        onOpen={() => {}}
+        onLongPress={() => {}}
+        onMergeDragStart={() => {}}
+        onMergeDragMove={() => {}}
+        onMergeDragEnd={() => {}}
+        selecting={false}
+        selected={false}
+        mergeDragging={false}
+        mergeTarget={false}
+        trace={false}
+        metrics={CARD_METRICS}
+        snapshot={{
+          shapes: [],
+          strokes: [{ id: "s", points: [[0, 0], [50, 50]], color: "var(--ink)", width: 4 }],
+          labels: [],
+          pictures: [{ id: "p1", x: 0, y: 0, w: 240, h: 240 }],
+        }}
+      />,
+    );
+
+    expect(container.querySelector(".idea-snapshot")).toBeTruthy();
+    expect(container.querySelector(".card-shot")).toBeNull();
+    expect(container.querySelector(".idea-snapshot-image")).toBeTruthy();
   });
 
   /**
@@ -323,7 +360,7 @@ describe("idea cards", () => {
         mergeTarget={false}
         trace={false}
         metrics={CARD_METRICS}
-        snapshot={{ shapes: [], strokes: [], labels: [] }}
+        snapshot={{ shapes: [], strokes: [], labels: [], pictures: [] }}
       />,
     );
   }
@@ -1691,7 +1728,7 @@ describe("a filed card's footer names its folder by the folder's own mark (revie
 });
 
 describe("an unnamed idea card carries its first source's opening line (review UX-A-09)", () => {
-  const snapshot = { shapes: [], strokes: [], labels: [] };
+  const snapshot = { shapes: [], strokes: [], labels: [], pictures: [] };
   const ideaCard = (body: string) =>
     drawCard({
       note: {

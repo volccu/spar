@@ -235,8 +235,11 @@ const built = existsSync(join(DIST, "sw.js")) && existsSync(ASSETS);
  * run with the board: the selection's Cancel and Clear reminder, Ctrl-click and
  * Space picking a card, the carry's tag, search's "Did you mean", the robot in
  * Tidy up and Tick off. Measured 190.82 on the PC; ~2 KiB of room kept.
+ * Raised to 195.6 on 2026-10-26 for the owner's three asks: `[image 2]` markers
+ * (read with every line of text, card and note alike), the robot saying a
+ * selection's count. Measured 193.54 on the PC; ~2 KiB of room kept.
  */
-const INDEX_GZIP_CEILING_KB = 192.8;
+const INDEX_GZIP_CEILING_KB = 195.6;
 
 const jsChunks = () =>
   readdirSync(ASSETS).filter((name) => name.endsWith(".js") || name.endsWith(".mjs"));

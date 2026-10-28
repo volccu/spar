@@ -45,9 +45,23 @@ let droppedCanvases: { id: string; stamp: string }[] = [];
 let canvasOutbox: { id: string; stamp: string }[] = [];
 let received: { notes?: unknown; canvases?: unknown; prefs?: unknown } = {};
 
+/** When set, the upload stays on the wire until `landUpload()`. */
+let uploadHangs = false;
+let landUpload: (() => void) | null = null;
+/** What the held upload lands with, once. */
+let landsWith: Note[] = [];
+
 vi.mock("./attachments", () => ({
   uploadPending: async () => {
     calls.push("files");
+    if (uploadHangs) {
+      await new Promise<void>((resolve) => {
+        landUpload = resolve;
+      });
+      const landed = landsWith;
+      landsWith = [];
+      return { uploaded: landed, failed: uploadFailed };
+    }
     return { uploaded, failed: uploadFailed };
   },
 }));
@@ -177,6 +191,8 @@ beforeEach(() => {
   forgottenCanvases = [];
   droppedCanvases = [];
   canvasOutbox = [];
+  uploadHangs = false;
+  landUpload = null;
 });
 
 afterEach(() => {
@@ -418,6 +434,38 @@ describe("the loop's own rules", () => {
     await waitFor(() => expect(calls.filter((c) => c === "notes")).toHaveLength(2));
     await waitFor(() => expect(result.current.busy).toBe(false));
     expect(calls.filter((c) => c === "notes")).toHaveLength(2);
+  });
+});
+
+describe("a file upload that takes its time", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("does not hold the notes behind it, is not sent twice, and is applied when it lands", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
+    uploadHangs = true;
+    const { result, applyUploaded } = loop();
+    await waitFor(() => expect(landUpload).not.toBeNull());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000);
+    });
+    // The tick went on without it, and finished.
+    await waitFor(() => expect(calls).toContain("prefs"));
+    await waitFor(() => expect(result.current.busy).toBe(false));
+
+    // A tick while it is still on the wire syncs the notes and leaves the upload be.
+    await act(async () => {
+      await result.current.syncNow();
+    });
+    await waitFor(() => expect(calls.filter((c) => c === "notes")).toHaveLength(2));
+    expect(calls.filter((c) => c === "files")).toHaveLength(1);
+
+    landsWith = [note("a")];
+    uploadHangs = false;
+    await act(async () => {
+      landUpload?.();
+    });
+    await waitFor(() => expect(applyUploaded).toHaveBeenCalled());
+    await waitFor(() => expect(calls.filter((c) => c === "notes").length).toBeGreaterThan(2));
   });
 });
 

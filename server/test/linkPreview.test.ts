@@ -96,7 +96,7 @@ function deps(overrides: Partial<PinnedFetchDeps> = {}): PinnedFetchDeps & { loo
       if (host === "inside.test") return ["10.0.0.7"];
       if (host === "mixed.test") return ["127.0.0.1", "192.168.0.9"];
       if (host === "nat64.test") return ["64:ff9b::a00:7"];
-      throw new Error("ENOTFOUND");
+      throw Object.assign(new Error("getaddrinfo ENOTFOUND"), { code: "ENOTFOUND" });
     },
     allowed: (address) => address === "127.0.0.1",
     allowedPort: () => true,
@@ -130,6 +130,17 @@ describe("pinning", () => {
     expect(response.status).toBe(200);
     await response.text();
     expect(calls).toBe(1);
+  });
+
+  it("tells a lookup that failed apart from a name that does not exist", async () => {
+    const { LookupFailedError } = await import("../src/pinnedFetch");
+    const flaky = deps({
+      resolve: async () => {
+        throw Object.assign(new Error("getaddrinfo EAI_AGAIN"), { code: "EAI_AGAIN" });
+      },
+    });
+    await expect(checkedAddress(new URL("http://flaky.test/"), flaky)).rejects.toBeInstanceOf(LookupFailedError);
+    await expect(checkedAddress(new URL("http://nowhere.test/"), deps())).rejects.toBeInstanceOf(NotPublicError);
   });
 
   it("refuses a name when any of its addresses is private", async () => {

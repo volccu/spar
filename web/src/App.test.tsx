@@ -361,6 +361,33 @@ describe("App", () => {
     await waitFor(() => expect(cards()).toBe(before));
   });
 
+  it("keeps a sketch closed while its only words were still being typed into a label", async () => {
+    render(<App />);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".card").length).toBeGreaterThan(0),
+    );
+    const cards = () => document.querySelectorAll(".card").length;
+    const before = cards();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Draw" }));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "Idea canvas" })).toBeTruthy(), {
+      timeout: 10_000,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Text" }));
+    const surface = document.querySelector<HTMLElement>(".canvas-surface")!;
+    fireEvent.pointerDown(surface, { pointerId: 1, button: 0, clientX: 80, clientY: 80, pointerType: "mouse" });
+    const field = await screen.findByLabelText("Text on the idea");
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    fireEvent.change(field, { target: { value: "milk" } });
+    // Closed with the words still in the editor, never blurred by hand.
+    fireEvent.click(screen.getByRole("button", { name: "Close idea" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Idea canvas" })).toBeNull());
+    expect(cards()).toBe(before + 1);
+  });
+
   it("keeps a sketch once a stroke exists, and its card reopens the canvas", async () => {
     render(<App />);
     await waitFor(() =>
@@ -1219,9 +1246,10 @@ describe("App", () => {
     const copy = await screen.findByRole("button", { name: /^copy$/i });
     fireEvent.click(copy);
 
+    // The selection's own "1 selected · Cancel" stood there first; wait for the notice.
     const bubble = await waitFor(() => {
       const el = document.querySelector<HTMLElement>(".topbar .speech");
-      if (!el) throw new Error("no notice");
+      if (!el || !/cop(ied|y)/i.test(el.querySelector(".speech-words")?.textContent ?? "")) throw new Error("no notice");
       return el;
     });
     expect(bubble.querySelector("button")).toBeNull();

@@ -288,10 +288,12 @@ export function Ticker({
         {/* The whole list at once, beside the count they change: Untick all
             for the list used again every week, Clear done for the one that
             only ever grows. Named in words, on a row of their own above the
-            count on a phone; drawn only while something is ticked, and both offered back by the ordinary undo. */}
-        {onRewrite && ticked > 0 && (
+            count on a phone; drawn only while something is ticked, and both offered back by the ordinary undo.
+            The row itself stays while they are away, so the first tick does
+            not lift the foot under the thumb (ui-sweep 2026-10-28). */}
+        {onRewrite && (
           <div className="ticker-verbs">
-            <ListVerbs done={ticked} className="ticker-verb" worded onRewrite={rewriteList} />
+            {ticked > 0 && <ListVerbs done={ticked} className="ticker-verb" worded onRewrite={rewriteList} />}
           </div>
         )}
         {/* The end of a finished list. Archiving destroys nothing, keeps the

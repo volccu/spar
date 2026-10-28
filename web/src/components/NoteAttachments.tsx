@@ -231,6 +231,8 @@ function AttachmentTile({
     <button
       type="button"
       className="attach-tile"
+      // What a `[image 2]` marker in the text presses to open this file (`useAttachMarkers`).
+      data-att={att.id}
       data-warn={warning ? true : undefined}
       aria-label={`View ${att.name}`}
       title={att.name}
@@ -319,7 +321,7 @@ function AttachmentRow({
     // A player is drawn in the same box before and after its bytes arrive —
     // `.attach-media` wraps the placeholder too — so the rows and the footer
     // under it do not move when they land.
-    <div className="attach" data-media={audio ? "audio" : video ? "video" : undefined}>
+    <div className="attach" data-att={att.id} data-media={audio ? "audio" : video ? "video" : undefined}>
       {media &&
         (url && !unshowable ? (
           <div className="attach-media">

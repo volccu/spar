@@ -140,33 +140,56 @@ async function stash(form) {
   await caches.delete(SHARE_INBOX);
   const cache = await caches.open(SHARE_INBOX);
 
-  await cache.put(
-    new Request(new URL("/__share/text", self.location.origin).href),
-    new Response(JSON.stringify(words), { headers: { "content-type": "application/json" } }),
-  );
+  const wordsKey = new Request(new URL("/__share/text", self.location.origin).href);
+  const putWords = () =>
+    cache.put(
+      wordsKey,
+      new Response(JSON.stringify(words), { headers: { "content-type": "application/json" } }),
+    );
+  await putWords();
 
   for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    // Zero-padded so the reader can sort the keys back into the order the
-    // pictures were picked in. Ten photos must not come back 1, 10, 2.
-    const key = new URL(`/__share/f/${String(i).padStart(4, "0")}`, self.location.origin).href;
-    await cache.put(
-      new Request(key),
-      new Response(file, {
-        headers: {
-          "content-type": file.type || "application/octet-stream",
-          // Percent-encoded, because a header value must be ASCII and a
-          // filename here very often is not — "Räkna om.jpg" is an ordinary
-          // name on this phone. The reader decodes it back.
-          "x-share-name": encodeURIComponent(file.name || "file"),
-          // The type again, verbatim, including the empty string Android hands
-          // over surprisingly often. `content-type` above cannot carry that —
-          // it had to be given a fallback to be a legal header.
-          "x-share-type": encodeURIComponent(file.type || ""),
-        },
-      }),
-    );
+    try {
+      await parkFile(cache, files[i], i);
+    } catch (error) {
+      // Out of room (a phone's storage quota) partway through: the files
+      // already parked stay, and the rest are named as left out, so the note
+      // says what did not come rather than landing short without a word.
+      console.error("could not park a shared file", error);
+      const rest = files.slice(i).map((f) => ({
+        name: String(f.name || "file"),
+        size: typeof f.size === "number" ? f.size : 0,
+      }));
+      const all = [...left, ...rest];
+      words.left = all.slice(0, MAX_LEFT_NAMED);
+      words.leftCount = all.length;
+      words.leftFull = true;
+      await putWords();
+      return;
+    }
   }
+}
+
+async function parkFile(cache, file, i) {
+  // Zero-padded so the reader can sort the keys back into the order the
+  // pictures were picked in. Ten photos must not come back 1, 10, 2.
+  const key = new URL(`/__share/f/${String(i).padStart(4, "0")}`, self.location.origin).href;
+  await cache.put(
+    new Request(key),
+    new Response(file, {
+      headers: {
+        "content-type": file.type || "application/octet-stream",
+        // Percent-encoded, because a header value must be ASCII and a
+        // filename here very often is not — "Räkna om.jpg" is an ordinary
+        // name on this phone. The reader decodes it back.
+        "x-share-name": encodeURIComponent(file.name || "file"),
+        // The type again, verbatim, including the empty string Android hands
+        // over surprisingly often. `content-type` above cannot carry that —
+        // it had to be given a fallback to be a legal header.
+        "x-share-type": encodeURIComponent(file.type || ""),
+      },
+    }),
+  );
 }
 
 function text(value) {

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NoteInline } from "./NoteInline";
 import { markHits } from "../../lib/face";
 import { plainInline } from "../../lib/inline";
+import { AttachRefsContext, type AttachRefs } from "../../lib/useAttachMarkers";
+import type { Attachment } from "../../types";
 
 afterEach(cleanup);
 
@@ -45,5 +47,43 @@ describe("a snippet inside a searched line", () => {
     expect(container.textContent).toBe("call `deriveFace()` first");
     expect(container.querySelectorAll(".note-mark")).toHaveLength(2);
     expect(container.querySelectorAll("[hidden]")).toHaveLength(0);
+  });
+});
+
+/** Owner, 2026-10-26: in the open note a `[image 2]` marker opens its file; on a card it is text. */
+describe("a file marker", () => {
+  const pic = { id: "p1", name: "crack.jpg", mime: "image/jpeg", ref: 2 } as Attachment;
+  const refs = (open: (id: string) => void): AttachRefs => ({
+    find: (kind, n) => (kind === "image" && n === 2 ? pic : undefined),
+    open,
+  });
+
+  it("opens the file it points at, drawn as the same characters", () => {
+    const open = vi.fn();
+    const { container, getByRole } = render(
+      <AttachRefsContext.Provider value={refs(open)}>
+        <NoteInline text="see [image 2] here" interactive />
+      </AttachRefsContext.Provider>,
+    );
+    expect(container.textContent).toBe("see [image 2] here");
+    fireEvent.click(getByRole("button", { name: "Open image 2, crack.jpg" }));
+    expect(open).toHaveBeenCalledWith("p1");
+  });
+
+  it("is plain text on a card, and once its file is gone", () => {
+    const card = render(
+      <AttachRefsContext.Provider value={refs(() => {})}>
+        <NoteInline text="see [image 2]" />
+      </AttachRefsContext.Provider>,
+    );
+    expect(card.container.querySelector("button")).toBeNull();
+    cleanup();
+    const gone = render(
+      <AttachRefsContext.Provider value={refs(() => {})}>
+        <NoteInline text="see [image 3]" interactive />
+      </AttachRefsContext.Provider>,
+    );
+    expect(gone.container.querySelector("button")).toBeNull();
+    expect(gone.container.textContent).toBe("see [image 3]");
   });
 });

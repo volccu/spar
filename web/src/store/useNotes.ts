@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Attachment, Note } from "../types";
 import { buildMerge } from "../lib/merge";
 import { capitalizeCapture } from "../lib/capitalize";
+import { numberAttachments } from "../lib/attachRefs";
 import { expiredInTrash } from "../lib/trash";
 import { askToKeep } from "../lib/keepStorage";
 import { clearUnsaved, readUnsaved, stashUnsaved, withUnsaved } from "./unsavedStash";
@@ -530,7 +531,7 @@ export function useNotes() {
    * user wrote and now has to delete.
    */
   const createWithFiles = useCallback(
-    async (files: File[], text = "", fields: CaptureFields = {}): Promise<Note | null> => {
+    async (files: File[], text = "", fields: CaptureFields = {}, refs: readonly (number | undefined)[] = []): Promise<Note | null> => {
       if (files.length === 0) return null;
       const note = newNote(capitalizeCapture(text.trim()), "web", fields);
       const atts: Attachment[] = [];
@@ -563,7 +564,9 @@ export function useNotes() {
       // through `localPatch` (`attachTo`), and that is an edit.
       const withFiles: Note = {
         ...note,
-        attachments: atts,
+        // Numbered as the capture bar's `[image 1]` markers were written:
+        // the numbers handed in, else 1… per kind (`lib/attachRefs.ts`).
+        attachments: numberAttachments([], atts, refs),
         field_updated_at: { ...note.field_updated_at, attachments: note.created_at },
       };
       commit([withFiles, ...notesRef.current]);
@@ -596,14 +599,15 @@ export function useNotes() {
    * thumbnails into `localStorage`. Running the import again skips what landed.
    */
   const importNotes = useCallback(
-    async (chunk: { note: Note; files: File[] }[]): Promise<Note[]> => {
+    async (chunk: { note: Note; files: File[]; refs?: (number | undefined)[] }[]): Promise<Note[]> => {
       if (chunk.length === 0) return [];
       const files = chunk.flatMap((entry) => entry.files);
       const atts = files.length > 0 ? await describeAll(files) : [];
       if (atts.length > 0) await putFiles(atts.map((att, i) => [att.id, files[i]]));
       let at = 0;
-      const made = chunk.map(({ note, files: own }) => {
-        const mine = atts.slice(at, (at += own.length));
+      const made = chunk.map(({ note, files: own, refs }) => {
+        // A restored file keeps the number its `[image 2]` markers point at.
+        const mine = atts.slice(at, (at += own.length)).map((a, i) => (refs?.[i] !== undefined ? { ...a, ref: refs[i] } : a));
         // Ahead of any the note already carries — a restored download keeps
         // the record of a file it could not bring back (`lib/sparImport.ts`);
         // a Keep note carries none.
@@ -686,10 +690,14 @@ export function useNotes() {
     [updateBody],
   );
 
-  /** Adds files to a note that already exists. Same order: bytes, then note. */
+  /**
+   * Adds files to a note that already exists. Same order: bytes, then note.
+   * `refs` are the numbers the open note wrote their markers with
+   * (`useAttachMarkers`); a file without one is numbered after the note's own.
+   */
   const attachTo = useCallback(
-    async (id: string, files: File[]) => {
-      if (files.length === 0) return;
+    async (id: string, files: File[], refs: readonly (number | undefined)[] = []): Promise<Attachment[]> => {
+      if (files.length === 0) return [];
       const added: Attachment[] = [];
       // The same unguarded write as `createWithFiles`, reached from the open
       // note instead of the bar, and it failed the same silent way.
@@ -699,11 +707,16 @@ export function useNotes() {
       } catch (error) {
         console.error("could not write an attachment to this device", error);
         setStorageError("There was no room on this device for that file, so nothing was added. Free some space, then add it again.");
-        return;
+        return [];
       }
       bump();
-      const changed = patchOne(id, (n) => ({ attachments: [...(n.attachments ?? []), ...added] }));
+      let numbered: Attachment[] = [];
+      const changed = patchOne(id, (n) => {
+        numbered = numberAttachments(n.attachments ?? [], added, refs);
+        return { attachments: [...(n.attachments ?? []), ...numbered] };
+      });
       if (changed) void persist(changed);
+      return changed ? numbered : [];
     },
     [bump, patchOne, persist],
   );
@@ -974,6 +987,13 @@ export function useNotes() {
       );
       return 0;
     }
+    // A note whose write had failed is still held for retry and stashed in
+    // localStorage; left there, the next open laid it back in from the stash.
+    for (const id of eligibleIds) {
+      failedWrites.current.delete(id);
+      pendingWrites.current.delete(id);
+    }
+    clearUnsaved(eligibleIds);
     return eligibleIds.length;
   }, [commit]);
 

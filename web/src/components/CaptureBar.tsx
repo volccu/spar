@@ -14,7 +14,8 @@ import { CaptureLine, type BarLine, type BusyLine } from "./CaptureLine";
 import { setTwin } from "../lib/twinSaid";
 import { savedWords } from "../lib/savedLinks";
 import { filesSaid } from "../lib/files";
-import { asChecklist, autoformat, continueList } from "../lib/autoformat";
+import { autoformat, continueList } from "../lib/autoformat";
+import { dropMarkers, pendingMarkers, wantsMarkers, withMarkers } from "../lib/attachRefs";
 import { fitTextarea } from "../lib/fitTextarea";
 import { writeThrough } from "../lib/editText";
 import { LAMP_STYLE, useLamp } from "../lib/useLamp";
@@ -371,10 +372,22 @@ export function CaptureBar({
   /** Files handed over by the picker or a paste, to wait for Save. */
   function attach(files: File[]) {
     if (files.length === 0) return;
+    // Added in the middle of writing, each file leaves its marker at the caret
+    // ("[image 1]"), so the words can say which picture they mean; into an
+    // empty field, or one of nothing but an address, nothing (`wantsMarkers`;
+    // owner, 2026-10-26). A caret never placed in the words (0) means the end.
+    const el = field.current;
+    const words = textNow.current;
+    if (wantsMarkers(words)) {
+      const at = el && el.value === words && el.selectionEnd > 0 ? el.selectionEnd : words.length;
+      const next = withMarkers(words, at, pendingMarkers(pendingFiles, files));
+      put(next.value);
+      requestAnimationFrame(() => field.current?.setSelectionRange(next.caret, next.caret));
+    }
     setPendingFiles((now) => [...now, ...files]);
     setAttaching(false);
     // The caret goes to the words, so the next thing is to say why.
-    field.current?.focus({ preventScroll: true });
+    el?.focus({ preventScroll: true });
   }
 
   /** The bar itself, which carries the visible height the phone's cap is
@@ -476,7 +489,11 @@ export function CaptureBar({
             said: filesSaid(pendingFiles, "attached"),
             files: pendingFiles,
             verb: "Remove",
-            act: () => setPendingFiles([]),
+            act: () => {
+              setPendingFiles([]);
+              // Their markers go with them.
+              if (textNow.current !== dropMarkers(textNow.current)) put(dropMarkers(textNow.current));
+            },
           }
         : null,
     [hasFiles, pendingFiles],
@@ -680,7 +697,7 @@ export function CaptureBar({
   async function takeFiles(files: File[], said = text, marks = choice) {
     if (files.length === 0) return;
     const held = text;
-    const made = await onCaptureFiles(files, marks.todo ? asChecklist(said) : said, marks);
+    const made = await onCaptureFiles(files, said, marks);
     if (made && textNow.current === held) put("");
     setAttaching(false);
     return made;
@@ -755,12 +772,10 @@ export function CaptureBar({
       return;
     }
     if (!trimmed) return;
-    // To-do pressed on several lines is a list to tick (`asChecklist`); the
-    // press is the asking, so nothing changes on a capture without it. The one
-    // other asking is the board itself: a line written on Todos, with no other
-    // board chosen, starts as a box.
-    const onTodosBoard = onTodos && choice.board === undefined && !trimmed.includes("\n");
-    onCapture(choice.todo || onTodosBoard ? asChecklist(trimmed, onTodosBoard) : trimmed, choice);
+    // The words go in as written, the To-do mark included: a to-do is the
+    // note's `note_type`, never tick boxes the app wrote for you, so a short
+    // one stays a compact slip on Todos (owner, 2026-10-26).
+    onCapture(trimmed, choice);
     put("");
   }
 
@@ -779,7 +794,7 @@ export function CaptureBar({
       return;
     }
     if (!trimmed) return;
-    onCapture(marks.todo ? asChecklist(trimmed) : trimmed, marks);
+    onCapture(trimmed, marks);
     put("");
   }
 

@@ -123,6 +123,8 @@ function cleanAttachment(raw: unknown): Attachment | null {
     thumb: thumb && thumb.startsWith("data:image/") ? thumb : null,
     path: str(raw.path),
     added_at: stamp(raw.added_at) ?? new Date(0).toISOString(),
+    // The number a `[image 2]` marker in the text points at (`lib/attachRefs.ts`).
+    ...(Number.isInteger(raw.ref) && (raw.ref as number) > 0 ? { ref: raw.ref as number } : {}),
   };
 }
 
@@ -211,6 +213,18 @@ function cleanCanvas(raw: unknown): Canvas | null {
           isObject(t) && typeof t.id === "string" && typeof t.text === "string" && num(t.x) !== null && num(t.y) !== null,
       )
     : [];
+  // A download from the self-hosted server keeps pictures inside `items`,
+  // as the server row does (`canvasSync.ts`); the app's own keeps `images`.
+  const placed = [
+    ...(Array.isArray(raw.images) ? raw.images : []),
+    ...(Array.isArray(raw.items) ? raw.items : []),
+  ];
+  const images = placed.length > 0
+    ? placed.filter(
+        (i): i is NonNullable<Canvas["images"]>[number] =>
+          isObject(i) && typeof i.attachment_id === "string" && num(i.x) !== null && num(i.y) !== null,
+      )
+    : [];
   const widths: Record<string, number> = {};
   if (isObject(raw.image_widths)) {
     for (const [att, w] of Object.entries(raw.image_widths)) {
@@ -225,6 +239,7 @@ function cleanCanvas(raw: unknown): Canvas | null {
     strokes: Array.isArray(raw.strokes) ? (raw.strokes.filter(isObject) as unknown as Canvas["strokes"]) : [],
     image_widths: widths,
     text_elements: texts,
+    ...(images.length > 0 ? { images } : {}),
     created_at: created,
     updated_at: stamp(raw.updated_at) ?? created,
   };
@@ -460,6 +475,7 @@ export async function runSparImport(
     let restored = 0;
     for (const original of plan.fresh.slice(start, start + IMPORT_CHUNK)) {
       const files: File[] = [];
+      const refs: (number | undefined)[] = [];
       const kept: Attachment[] = [];
       for (const att of original.attachments) {
         const at = paths.get(att.id);
@@ -477,13 +493,14 @@ export async function runSparImport(
         try {
           const bytes = found.file ?? ((await found.read()) as Uint8Array<ArrayBuffer>);
           files.push(new File([bytes], att.name, { type: att.mime }));
+          refs.push(att.ref);
         } catch {
           kept.push(att);
           left.push({ note: recognise(original.body, original.created_at), name: att.name, why: "damaged" });
         }
       }
       restored += files.length;
-      chunk.push({ note: { ...original, attachments: kept }, files });
+      chunk.push({ note: { ...original, attachments: kept }, files, refs });
     }
     let made: Note[];
     try {

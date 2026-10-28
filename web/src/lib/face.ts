@@ -1,4 +1,5 @@
 import type { Attachment, Note } from "../types";
+import { stripMarkers } from "./attachRefs";
 import { hasCode, headingOf, markerOf, parseBlocks } from "./blocks";
 import { plainInline, type InlineSeg } from "./inline";
 import { countLinks, domainFor, firstLink, linkify, SAVED_LINK_PREFIX } from "./links";
@@ -197,7 +198,9 @@ export interface CardFace {
 function ownWords(text: string, atts: Attachment[]): string {
   if (atts.length === 0) return text.trim();
   const names = new Set(atts.map((a) => a.name));
-  return text
+  // A `[image 2]` marker points at a file and is not words of the note's own:
+  // a note left with nothing but markers is still the file's card.
+  return stripMarkers(text)
     .split("\n")
     .filter((line) => !names.has(line.trim()))
     .join("\n")
@@ -600,8 +603,7 @@ function computeFace(note: Note, metrics: CardMetrics, terms: string[] = []): Ca
   // the text face loses nothing: that face already draws a tick box as a tick
   // box, in its place, with the words around it kept.
   // A title above the boxes ("Packing:", or a line a blank one sets off) gets
-  // the name's row, by the same rule the To-do mark titles a list with
-  // (`listTitle`): one title line, and everything under it a box.
+  // the name's row (`listTitle`): one title line, and everything under it a box.
   const title = named ? null : listTitle(text.split("\n"));
   const rows = title === null ? underName : text.split("\n").slice(1).join("\n");
   const written = rows.split("\n").filter((line) => line.trim() !== "").length;

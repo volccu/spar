@@ -78,6 +78,39 @@ describe("which sentence it says", () => {
     expect(result.current.said).toBeNull();
   });
 
+  /** Owner, 2026-10-26: the count of a selection moved from the header's corner to the creature. */
+  it("says how many notes are picked, with Cancel, edited in place as the count changes", () => {
+    const end = vi.fn();
+    const { result, rerender } = renderHook((p: { n: number }) => useSpeech({ ...base, updateReady: true, selected: p.n, onEndSelection: end }), {
+      initialProps: { n: 1 },
+    });
+    expect(result.current.said?.words).toBe("1 selected");
+    const key = result.current.said?.key;
+    rerender({ n: 3 });
+    expect(result.current.said).toMatchObject({ key, words: "3 selected", act: { verb: "Cancel", label: "Cancel, 3 selected" } });
+    expect(result.current.said?.clockMs).toBeUndefined();
+    result.current.said?.act?.run();
+    expect(end).toHaveBeenCalledOnce();
+    rerender({ n: 0 });
+    expect(result.current.said?.key).toBe("update");
+  });
+
+  it("says an offer made during a selection over its count, and a selection begun after an offer over the offer", () => {
+    const end = () => {};
+    const during = renderHook((p: { offer: Undo | null }) => useSpeech({ ...base, offer: p.offer, selected: 2, onEndSelection: end }), {
+      initialProps: { offer: null as Undo | null },
+    });
+    during.rerender({ offer: undo });
+    expect(during.result.current.said?.act?.verb).toBe("Undo");
+
+    const after = renderHook((p: { n: number }) => useSpeech({ ...base, offer: undo, selected: p.n, onEndSelection: end }), {
+      initialProps: { n: 0 },
+    });
+    expect(after.result.current.said?.act?.verb).toBe("Undo");
+    after.rerender({ n: 1 });
+    expect(after.result.current.said?.words).toBe("1 selected");
+  });
+
   it("asks about the undo first, over everything that is merely true", () => {
     const { result } = renderHook(() =>
       useSpeech({ ...base, offer: undo, updateReady: true, failed: { label: "x", open: () => {} } }),

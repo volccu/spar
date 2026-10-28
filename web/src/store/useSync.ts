@@ -98,6 +98,15 @@ const BACKOFF_MS = [0, 5_000, 20_000, 60_000, 300_000];
  */
 const UNREACHABLE_RETRY_MS = 15_000;
 
+/**
+ * How long a tick waits on its file uploads before going on without them. A
+ * film on a poor connection held the whole tick — and every note edit queued
+ * behind it — for up to the fifteen-minute file deadline (bughunt 2026-10-24).
+ * Past this the upload carries on by itself, and what it lands is applied when
+ * it does.
+ */
+export const UPLOAD_WAIT_MS = 20_000;
+
 export type SyncState = "off" | "idle" | "working" | "offline" | "error";
 
 /**
@@ -226,6 +235,10 @@ export function useSync({
   heldCanvasesRef.current = heldCanvases;
   const running = useRef(false);
   const again = useRef(false);
+  /** The upload still on the wire, if a tick went on without it. */
+  const uploadLane = useRef<Promise<Awaited<ReturnType<typeof uploadPending>>> | null>(null);
+  /** What that upload failed with, raised by the next tick. */
+  const uploadLate = useRef<Error | null>(null);
   const startedAt = useRef(0);
   const settle = useRef<number | undefined>(undefined);
   /** Consecutive failures, and when the last attempt began. Backoff reads both. */
@@ -328,17 +341,57 @@ export function useSync({
       // waiting behind a minute of upload. The note goes now and says "still on
       // the other device" per file; each batch's paths go up on the re-run.
       try {
-        const { uploaded, failed, landed } = await uploadPending(current);
-        if (failed) beside.add(failed);
-        late ??= failed;
-        // Straight back round, rather than waiting on the debounce or the
-        // minute's backstop: the paths that just landed are what the other
-        // device needs, and the rest of the pile may still be waiting. Only
-        // when something landed — a batch that failed whole waits for the
-        // backstop, or a missing bucket would spin here forever.
-        if (uploaded.length > 0) {
-          applyUploaded(uploaded, landed);
-          again.current = true;
+        if (uploadLate.current) {
+          const failed = uploadLate.current;
+          uploadLate.current = null;
+          beside.add(failed);
+          late ??= failed;
+        }
+        // One upload on the wire at a time: a tick that finds the last one
+        // still going leaves it be rather than sending the same files again.
+        if (!uploadLane.current) {
+          const lane = uploadPending(current);
+          uploadLane.current = lane;
+          lane
+            .finally(() => {
+              if (uploadLane.current === lane) uploadLane.current = null;
+            })
+            .catch(() => {});
+          let timer: number | undefined;
+          const waited = await Promise.race([
+            lane.then((result) => ({ result })),
+            new Promise<null>((resolve) => {
+              timer = window.setTimeout(() => resolve(null), UPLOAD_WAIT_MS);
+            }),
+          ]).finally(() => window.clearTimeout(timer));
+          if (waited) {
+            const { uploaded, failed, landed } = waited.result;
+            if (failed) beside.add(failed);
+            late ??= failed;
+            // Straight back round, rather than waiting on the debounce or the
+            // minute's backstop: the paths that just landed are what the other
+            // device needs, and the rest of the pile may still be waiting. Only
+            // when something landed — a batch that failed whole waits for the
+            // backstop, or a missing bucket would spin here forever.
+            if (uploaded.length > 0) {
+              applyUploaded(uploaded, landed);
+              again.current = true;
+            }
+          } else {
+            // Still going: the notes go on syncing, and the upload is applied,
+            // and followed by a tick, whenever it lands.
+            void lane.then(
+              ({ uploaded, failed, landed }) => {
+                if (failed) uploadLate.current = failed;
+                if (uploaded.length > 0) applyUploaded(uploaded, landed);
+                if (enabledRef.current) void run();
+              },
+              (error: unknown) => {
+                console.error("attachment upload failed", error);
+                uploadLate.current = asError(error);
+              },
+            );
+          }
         }
       } catch (error) {
         console.error("attachment upload failed", error);

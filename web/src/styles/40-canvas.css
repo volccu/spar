@@ -284,6 +284,31 @@
   outline-offset: -2px;
 }
 
+/* The two pickers leave one current-sample button in the bar and put the
+   choices in a small menu. The palette is four thumb-sized cells across on
+   every platform, with the selected swatch outlined as well as named to a
+   reader — colour itself is never the only selection signal. */
+.canvas-option-menu {
+  max-width: calc(100vw - var(--s-6));
+  max-height: calc(100vh - var(--s-6));
+  overflow-y: auto;
+}
+
+.canvas-palette {
+  display: grid;
+  grid-template-columns: repeat(4, var(--hit));
+  gap: var(--s-2);
+  padding: var(--s-2);
+}
+
+.canvas-palette-item {
+  width: var(--hit);
+}
+
+.canvas-width-option .canvas-width-rule {
+  flex: 0 0 auto;
+}
+
 .canvas-width-btn {
   flex: 0 0 auto;
   display: inline-flex;
@@ -441,22 +466,95 @@
 }
 
 .canvas-surface[data-tool="draw"],
+.canvas-surface[data-tool="highlight"],
+.canvas-surface[data-tool="shape"],
+.canvas-surface[data-tool="select"],
 .canvas-surface[data-tool="erase"] {
   cursor: var(--cursor-crosshair);
 }
 
 .canvas-surface[data-tool="draw"]:active,
+.canvas-surface[data-tool="highlight"]:active,
+.canvas-surface[data-tool="shape"]:active,
+.canvas-surface[data-tool="select"]:active,
 .canvas-surface[data-tool="erase"]:active {
   cursor: var(--cursor-crosshair);
+}
+
+/* With Text in hand the canvas is somewhere to write. */
+.canvas-surface[data-tool="text"],
+.canvas-surface[data-tool="text"] .canvas-text {
+  cursor: var(--cursor-text);
+}
+
+/* A picture set on the canvas is paper too: only Move picks it up. Every other
+   tool goes through it to the canvas, so a pen draws on it and Text writes on
+   it. */
+.canvas-surface:not([data-tool="move"]) .canvas-picture {
+  pointer-events: none;
 }
 
 /* With the pen or the eraser out, a note is ground to mark on, not a thing to
    pick up. */
 .canvas-surface[data-tool="draw"] .spatial-note,
 .canvas-surface[data-tool="draw"] .canvas-text,
+.canvas-surface[data-tool="highlight"] .spatial-note,
+.canvas-surface[data-tool="highlight"] .canvas-text,
+.canvas-surface[data-tool="shape"] .spatial-note,
+.canvas-surface[data-tool="shape"] .canvas-text,
+.canvas-surface[data-tool="select"] .spatial-note,
+.canvas-surface[data-tool="select"] .canvas-text,
 .canvas-surface[data-tool="erase"] .spatial-note,
 .canvas-surface[data-tool="erase"] .canvas-text {
   pointer-events: none;
+}
+
+/* The highlighter's stroke: its pen, seen through. */
+.canvas-highlight,
+.idea-snapshot-stroke[data-highlight] {
+  opacity: var(--highlight-opacity);
+}
+
+/* The loop or box being drawn round a selection, and the hairline round what it took: the
+   quiet rule, in short dashes, at one screen pixel whatever the zoom. Not a colour, not a
+   fill — the selection is the app's mark, not the user's. */
+.canvas-region {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1px;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.canvas-selection {
+  position: absolute;
+  pointer-events: none;
+  outline: calc(1px * var(--canvas-unzoom, 1)) dashed var(--muted);
+  outline-offset: calc(var(--s-1) * var(--canvas-unzoom, 1));
+}
+
+/* The one handle: a thumb-sized square at the bottom-right corner, stretching from the top-left. */
+.canvas-selection-handle {
+  position: absolute;
+  right: calc(var(--hit) * var(--canvas-unzoom, 1) / -2);
+  bottom: calc(var(--hit) * var(--canvas-unzoom, 1) / -2);
+  width: calc(var(--hit) * var(--canvas-unzoom, 1));
+  height: calc(var(--hit) * var(--canvas-unzoom, 1));
+  pointer-events: auto;
+  cursor: var(--cursor-resize);
+}
+
+.canvas-selection-handle::after {
+  content: "";
+  position: absolute;
+  inset: 30%;
+  background: var(--paper);
+  border: calc(1px * var(--canvas-unzoom, 1)) solid var(--ink);
+}
+
+/* A tool's own choices are spans so the separators travel with them; they lay out as their buttons. */
+.canvas-tool-group {
+  display: contents;
 }
 
 /* The sizing div a zoom needs: `.canvas-world` is transformed with
@@ -570,8 +668,37 @@
   border-bottom: 1px solid var(--muted);
 }
 
-.spatial-note:hover .spatial-resize-handle {
+.spatial-note:hover .spatial-resize-handle,
+.canvas-picture:hover .spatial-resize-handle,
+.canvas-text:hover .spatial-resize-handle {
   opacity: 1;
+}
+
+/* A picture set straight onto the canvas, under the strokes (`CanvasPicture`).
+   No frame of its own beyond the soft rule a note's picture has: it is the
+   thing being drawn on, not a card. */
+.canvas-picture {
+  position: absolute;
+  cursor: var(--cursor-grab);
+  user-select: none;
+  touch-action: none;
+}
+
+.canvas-picture[data-dragging="true"] {
+  cursor: var(--cursor-grabbing);
+}
+
+.canvas-picture:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.canvas-picture-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule-soft);
+  background: var(--raised);
 }
 
 .spatial-resize-handle--img {
@@ -675,9 +802,10 @@
    Free-standing text on the infinite canvas. Positioned in world coordinates
    like notes and strokes. Double-click to edit inline, right-click to delete,
    drag to reposition. */
+/* Its width is the label's own (`CanvasTextLabel`), or as wide as its words up
+   to 300px for a label made before labels had one. */
 .canvas-text {
   position: absolute;
-  max-width: 300px;
   min-width: 40px;
   cursor: var(--cursor-grab);
   user-select: none;
@@ -715,8 +843,9 @@
   font-size: var(--t-text);
   line-height: var(--lh-read);
   color: var(--ink);
-  resize: both;
-  overflow: auto;
+  /* The corner handle sets a label's width; a second, unsaved grip would not. */
+  resize: none;
+  overflow: hidden;
 }
 
 /* One hue, and it is a link. A focused field is not one. */

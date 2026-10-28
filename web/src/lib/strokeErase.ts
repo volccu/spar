@@ -30,7 +30,19 @@ export function strokeHit(stroke: DrawingStroke, x: number, y: number, reach: nu
   for (let i = 0; i < pts.length - 1; i++) {
     if (distanceToSegment(x, y, pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]) <= near) return true;
   }
-  return false;
+  // A filled shape is all ink: rubbing anywhere inside takes it, not only its edge.
+  return stroke.fill === true && insideOutline(x, y, pts);
+}
+
+/** Even-odd: is the point inside the outline the points close round? */
+function insideOutline(x: number, y: number, pts: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i];
+    const [xj, yj] = pts[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
 /**

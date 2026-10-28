@@ -15,6 +15,7 @@ import {
   pruneTombstones,
   putCanvasSynced,
   putCanvasLocalOnly,
+  putCanvasesFromServer,
   putFile,
   getFile,
   purgeTombstoneFiles,
@@ -53,6 +54,22 @@ describe("the folder outbox", () => {
 
     expect(await queued("quiet")).toBe(false);
     expect((await allCanvases()).some((f) => f.id === "quiet")).toBe(true);
+  });
+
+  /**
+   * A pulled arrangement must not land over a drag made on this device since
+   * the outbox was read: the check and the write are one transaction.
+   */
+  it("does not store a pulled canvas over one queued here", async () => {
+    await putCanvasSynced(folder("dragged", "2026-08-12T09:00:05.000Z"));
+    const stored = await putCanvasesFromServer([
+      folder("dragged", "2026-08-12T09:00:01.000Z"),
+      folder("other", "2026-08-12T09:00:01.000Z"),
+    ]);
+    expect(stored.map((f) => f.id)).toEqual(["other"]);
+    const all = await allCanvases();
+    expect(all.find((f) => f.id === "dragged")?.updated_at).toBe("2026-08-12T09:00:05.000Z");
+    expect(all.some((f) => f.id === "other")).toBe(true);
   });
 
   it("queues an arrangement the user made", async () => {

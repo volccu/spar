@@ -188,7 +188,7 @@ describe("the ramp is the only source of colour", () => {
         .sort();
     const themed = (value: string) =>
       /#[0-9a-fA-F]{6}\b|rgba\(|url\("data:image\/svg/.test(value);
-    const perTheme = ["--doc-filter", "--lamp-blend", "--lamp-scale", "--shot-opacity"];
+    const perTheme = ["--doc-filter", "--highlight-opacity", "--lamp-blend", "--lamp-scale", "--shot-opacity"];
     const dark = names(darkBlock, (v) => themed(v)).concat(perTheme).sort();
     const light = names(lightBlock, () => true);
     expect(light).toEqual(dark);
@@ -284,12 +284,12 @@ describe("the signal is a live address, and the ring", () => {
 
   it("is read by nothing else", () => {
     expect(usersOf("--signal"), "every use of --signal is named in DESIGN.md §3").toEqual(
-      [".reader a", ".reader a:hover", ":focus-visible"],
+      [".reader .att-ref", ".reader .att-ref:active", ".reader .att-ref:hover", ".reader a", ".reader a:hover", ":focus-visible"],
     );
   });
 
   it("keeps --signal-ink to the one place the signal becomes a fill", () => {
-    expect(usersOf("--signal-ink")).toEqual([".reader a:hover"]);
+    expect(usersOf("--signal-ink")).toEqual([".reader .att-ref:active", ".reader .att-ref:hover", ".reader a:hover"]);
   });
 });
 
@@ -528,16 +528,14 @@ describe("every exit mark stands in one place", () => {
  * marks and the first characters of every name with it, and nothing could
  * scroll to them: the overflow was past the viewport, not inside a box.
  */
-describe("Tidy up on a desktop stands the destinations under the note", () => {
-  it("does it for a wide window with a mouse only, on the app's one width", () => {
-    // The phone and any touch screen keep them on the floor (review 2026-10-24, PL-06).
-    const at = code.indexOf("@media (min-width: 700px) and (hover: hover) and (pointer: fine) {\n  .sorter-card {");
-    expect(at).toBeGreaterThan(-1);
-    const block = code.slice(at, code.indexOf("\n}\n", at));
-    expect(block).toContain("flex: 0 1 calc(10 * var(--lh-read) * var(--t-read))");
-    expect(block).toContain("margin-top: auto");
-    expect(block).toContain("margin-bottom: auto");
-    // The card's own rule still fills the screen's height elsewhere.
+describe("Tidy up on a wide window stands the note and the places side by side", () => {
+  it("rows the two halves, the places a column down the right edge (layout A, 2026-10-24)", () => {
+    expect(code).toMatch(/\n\.sorter-side \.sorter-body \{[^}]*flex-direction: row;/);
+    expect(code).toMatch(/\n\.sorter-side \.sorter-body > \.sorter-to \{[^}]*flex-direction: column;[^}]*border-left: 1px solid var\(--rule\);/);
+    // The list scrolls inside the column; Archive and Delete stay at its foot.
+    expect(code).toMatch(/\n\.sorter-side \.sorter-to-list \{[^}]*min-height: 0;/);
+    // The phone keeps one column, the note above the places.
+    expect(code).toMatch(/\n\.sorter-body \{[^}]*flex-direction: column;/);
     expect(code).toMatch(/\n\.sorter-card \{[^}]*flex: 1 1 auto;/);
   });
 });

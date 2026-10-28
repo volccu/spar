@@ -73,6 +73,14 @@ export const SELECT_ALL_KEY = "a";
 export const UNDO_KEY = "z";
 
 /**
+ * On a canvas only (`CanvasSheet.tsx`): Redo — Ctrl+Y, and Ctrl+Shift+Z beside it — and
+ * Duplicate, a copy of what the Select tool holds. The board has neither, so nothing there
+ * is shadowed.
+ */
+export const REDO_KEY = "y";
+export const DUPLICATE_KEY = "d";
+
+/**
  * Clearing a note from the keyboard (review 2026-10-04, FX-A-05): **e** archives,
  * **m** opens Move, **f** flags it Important. Bare on a focused card or a
  * selection (`useGridKeyboard`) and while the selection's panel is open, which

@@ -24,6 +24,10 @@
 import { adminClient } from "../_shared/db.ts";
 import { sendPush, type PushSubscription, type VapidKeys } from "../_shared/webpush.ts";
 import { notificationFor, ttlFor, type DueReminder } from "../_shared/notification.ts";
+import { devicesToSend, doneAfter } from "../_shared/deliveries.ts";
+
+/** How many reminders one sweep sends side by side. */
+const SENDING_AT_ONCE = 4;
 
 interface SubscriptionRow extends PushSubscription {
   owner_id: string;
@@ -112,18 +116,86 @@ Deno.serve(async (req) => {
     byOwner.set(s.owner_id, list);
   }
 
+  // The devices that already took each due occurrence (migration 0031). A
+  // server without that table yet is answered the old way: any one device
+  // accepting closes the occurrence.
+  const tookIt = new Map<string, Set<string>>();
+  let perDevice = true;
+  {
+    const { data, error } = await db
+      .from("reminder_device_deliveries")
+      .select("note_id, endpoint, reminder_at")
+      .in("note_id", reminders.map((r) => r.note_id));
+    if (error) {
+      perDevice = false;
+      console.error("per-device deliveries unreadable, closing on any device:", error.message);
+    } else {
+      const due = new Map(reminders.map((r) => [r.note_id, Date.parse(r.reminder_at)]));
+      for (const row of (data ?? []) as { note_id: string; endpoint: string; reminder_at: string }[]) {
+        if (Date.parse(row.reminder_at) !== due.get(row.note_id)) continue;
+        const set = tookIt.get(row.note_id) ?? new Set<string>();
+        set.add(row.endpoint);
+        tookIt.set(row.note_id, set);
+      }
+    }
+  }
+
   const retire: string[] = [];
-  const delivered: DueReminder[] = [];
   let sent = 0;
 
-  for (const reminder of reminders) {
-    const devices = byOwner.get(reminder.owner_id) ?? [];
-    if (devices.length === 0) {
+  // Each delivery is written the moment it is accepted, not in one batch after
+  // the whole loop: a sweep running past the next minute's tick, or cut off
+  // midway, used to leave every reminder it had already sent unrecorded, so
+  // the next sweep sent them all again (bughunt 2026-10-24).
+  const record = async (r: DueReminder) => {
+    const { error } = await db.from("reminder_deliveries").upsert(
+      {
+        note_id: r.note_id,
+        owner_id: r.owner_id,
+        reminder_at: r.reminder_at,
+        fired_at: new Date().toISOString(),
+      },
+      { onConflict: "note_id" },
+    );
+    if (error) console.error("recording a delivery failed:", error.message);
+    // Closed: the per-device rows for it have done their job.
+    if (perDevice) await db.from("reminder_device_deliveries").delete().eq("note_id", r.note_id);
+  };
+
+  const recordDevice = async (r: DueReminder, endpoint: string) => {
+    const { error } = await db.from("reminder_device_deliveries").upsert(
+      {
+        note_id: r.note_id,
+        endpoint,
+        owner_id: r.owner_id,
+        reminder_at: r.reminder_at,
+        fired_at: new Date().toISOString(),
+      },
+      { onConflict: "note_id,endpoint" },
+    );
+    if (error) console.error("recording a device's delivery failed:", error.message);
+  };
+
+  const deliver = async (reminder: DueReminder) => {
+    const live = byOwner.get(reminder.owner_id) ?? [];
+    if (live.length === 0) {
       // Nowhere to send it. Deliberately *not* recorded as delivered: the user
       // may allow notifications on a device tomorrow, and while the reminder
       // is still inside the grace window it should find them when they do.
-      continue;
+      return;
     }
+    const before = tookIt.get(reminder.note_id) ?? new Set<string>();
+    const plan = devicesToSend(
+      live.map((d) => d.endpoint),
+      before,
+      Date.parse(reminder.reminder_at),
+      Date.now(),
+    );
+    if (plan.done) {
+      await record(reminder);
+      return;
+    }
+    const devices = live.filter((d) => plan.send.includes(d.endpoint));
 
     // Composed once per reminder, sent once per device (`_shared/notification.ts`).
     const payload = notificationFor(reminder);
@@ -145,6 +217,7 @@ Deno.serve(async (req) => {
       if (r.ok) {
         anyOk = true;
         sent += 1;
+        if (perDevice) await recordDevice(reminder, r.endpoint);
       } else if (r.gone) {
         retire.push(r.endpoint);
       } else {
@@ -152,24 +225,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Written down only when it actually arrived somewhere. A sweep where
-    // every device was unreachable leaves the reminder due, and the next
-    // minute tries again.
-    if (anyOk) delivered.push(reminder);
-  }
+    // Written down only when every device has it (or is gone for good). A
+    // device that got no answer is tried again next minute; a sweep where
+    // every device was unreachable leaves the reminder due as it always did.
+    // Without the per-device table, any one device taking it closes it.
+    if (perDevice ? doneAfter(results, before.size) : anyOk) await record(reminder);
+  };
 
-  if (delivered.length > 0) {
-    const { error } = await db.from("reminder_deliveries").upsert(
-      delivered.map((r) => ({
-        note_id: r.note_id,
-        owner_id: r.owner_id,
-        reminder_at: r.reminder_at,
-        fired_at: new Date().toISOString(),
-      })),
-      { onConflict: "note_id" },
-    );
-    if (error) console.error("recording deliveries failed:", error.message);
-  }
+  // A few at a time rather than one after another, so a backlog or a slow
+  // push service does not stretch one sweep past the next.
+  const queue = [...reminders];
+  await Promise.all(
+    Array.from({ length: Math.min(SENDING_AT_ONCE, queue.length) }, async () => {
+      for (let next = queue.shift(); next; next = queue.shift()) await deliver(next);
+    }),
+  );
 
   if (retire.length > 0) {
     // Kept rather than deleted, so a device that comes back is one row to

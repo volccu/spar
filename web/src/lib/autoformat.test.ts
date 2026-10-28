@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asChecklist, autoformat, continueList, DASH } from "./autoformat";
+import { autoformat, continueList, DASH } from "./autoformat";
 
 /** Types `text` one character at a time, the way a person does. */
 function type(text: string, from = ""): string {
@@ -209,84 +209,5 @@ describe("continueList, numbered", () => {
   it("does not renumber the items below an insertion", () => {
     const src = "1. milk\n2. bread\n3. eggs";
     expect(continueList(src, 7)?.value).toBe("1. milk\n2. \n2. bread\n3. eggs");
-  });
-});
-
-/**
- * The to-do mark on a capture of several lines makes a list to tick (review
- * 2026-10-01, UX-05). The user asked for it by pressing To-do; nothing here
- * runs on the words of a plain capture.
- */
-describe("asChecklist", () => {
-  it("boxes a single line only when asked to (a capture on Todos), and never names it", () => {
-    expect(asChecklist("bread")).toBe("bread");
-    expect(asChecklist("bread", true)).toBe("[ ] bread");
-    expect(asChecklist("buy stamps.", true)).toBe("[ ] buy stamps.");
-    expect(asChecklist("– bread", true)).toBe("[ ] bread");
-    expect(asChecklist("[ ] bread", true)).toBe("[ ] bread");
-    expect(asChecklist("# Errands", true)).toBe("# Errands");
-  });
-
-  it("makes every line a tick box", () => {
-    expect(asChecklist("- screws\n- sandpaper\n- glue")).toBe("[ ] screws\n[ ] sandpaper\n[ ] glue");
-  });
-
-  it("boxes every line of a plain list, its first item too", () => {
-    expect(asChecklist("Milk\nEggs\nBread")).toBe("[ ] Milk\n[ ] Eggs\n[ ] Bread");
-    expect(asChecklist("Shopping\nmilk\neggs\nbread")).toBe("[ ] Shopping\n[ ] milk\n[ ] eggs\n[ ] bread");
-    expect(asChecklist("milk\neggs")).toBe("[ ] milk\n[ ] eggs");
-  });
-
-  it("makes a first line ending with a colon the note's name", () => {
-    expect(asChecklist("Shopping:\nmilk\neggs\nbread")).toBe("# Shopping\n[ ] milk\n[ ] eggs\n[ ] bread");
-    expect(asChecklist("Shopping :\nmilk\neggs")).toBe("# Shopping\n[ ] milk\n[ ] eggs");
-    expect(asChecklist("Shopping:\n\nmilk\neggs")).toBe("# Shopping\n\n[ ] milk\n[ ] eggs");
-  });
-
-  it("makes a first line with a blank line right under it the note's name", () => {
-    expect(asChecklist("Shopping\n\nmilk\neggs")).toBe("# Shopping\n\n[ ] milk\n[ ] eggs");
-    expect(asChecklist("Shopping\n\nmilk")).toBe("# Shopping\n\n[ ] milk");
-  });
-
-  it("names a list over a single item, but never a lone line", () => {
-    expect(asChecklist("Shopping:\nmilk")).toBe("# Shopping\n[ ] milk");
-    expect(asChecklist("Shopping:")).toBe("Shopping:");
-    expect(asChecklist("Shopping:\n\n")).toBe("Shopping:\n\n");
-  });
-
-  it("does not name a first line that is long, a marker, or a sentence", () => {
-    const long = "Everything we need from the shop on the way home:";
-    expect(asChecklist(`${long}\nmilk\neggs`)).toBe(`[ ] ${long}\n[ ] milk\n[ ] eggs`);
-    expect(asChecklist("- Shopping:\nmilk\neggs")).toBe("[ ] Shopping:\n[ ] milk\n[ ] eggs");
-    expect(asChecklist("Call the dentist about the crown.\nbook\nbuy")).toBe(
-      "[ ] Call the dentist about the crown.\n[ ] book\n[ ] buy",
-    );
-    expect(asChecklist("Call mom.\n\nbuy milk")).toBe("[ ] Call mom.\n\n[ ] buy milk");
-  });
-
-  it("does not name a first line whose blank line is further down", () => {
-    expect(asChecklist("Milk\nEggs\n\nBread")).toBe("[ ] Milk\n[ ] Eggs\n\n[ ] Bread");
-  });
-
-  it("leaves a single line alone", () => {
-    expect(asChecklist("call the dentist")).toBe("call the dentist");
-    expect(asChecklist("call the dentist\n\n")).toBe("call the dentist\n\n");
-  });
-
-  it("keeps blank lines blank and indentation where it was", () => {
-    expect(asChecklist("a\nb\n\n  c")).toBe("[ ] a\n[ ] b\n\n  [ ] c");
-  });
-
-  it("lets a box take over from a dash or a number", () => {
-    expect(asChecklist("– milk\n- eggs\n3. bread")).toBe("[ ] milk\n[ ] eggs\n[ ] bread");
-  });
-
-  it("leaves a list the writer already boxed exactly as written", () => {
-    const own = "Shopping\n[ ] milk\n[x] eggs";
-    expect(asChecklist(own)).toBe(own);
-  });
-
-  it("keeps a name on the first line as the name", () => {
-    expect(asChecklist("# Hardware\nscrews\nsandpaper")).toBe("# Hardware\n[ ] screws\n[ ] sandpaper");
   });
 });

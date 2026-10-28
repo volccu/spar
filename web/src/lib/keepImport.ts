@@ -800,7 +800,8 @@ export function whereToShow(
 }
 
 /** One chunk handed to the store: each note and the files to attach to it. */
-export type ImportChunk = { note: Note; files: File[] }[];
+/** `refs`: a restored file's number, for its `[image 2]` markers (`lib/attachRefs.ts`), by position. */
+export type ImportChunk = { note: Note; files: File[]; refs?: (number | undefined)[] }[];
 
 /** How many notes go to the store in one write: small enough that the page
  *  answers between chunks, large enough that 5,000 notes is a hundred writes. */

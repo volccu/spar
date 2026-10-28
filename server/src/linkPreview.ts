@@ -14,7 +14,7 @@
  */
 import { pageVerdict, wantsPicture } from "../../supabase/functions/_shared/linkStatus";
 import { readCapped, readHtml, readMeta } from "../../supabase/functions/_shared/pageMeta";
-import { NotPublicError, pinnedFetch, type PinnedFetchDeps } from "./pinnedFetch";
+import { LookupFailedError, NotPublicError, pinnedFetch, type PinnedFetchDeps } from "./pinnedFetch";
 
 /** How far into a page its tags are looked for. The function reads further
  *  (two megabytes, for Pinterest); this one has not been asked to. */
@@ -133,6 +133,7 @@ export class LinkPreviewer {
             this.deps,
           );
         } catch (error) {
+          if (error instanceof LookupFailedError) return { status: 502, body: { error: error.message } };
           if (error instanceof NotPublicError) {
             return {
               status: 400,
@@ -168,7 +169,8 @@ export class LinkPreviewer {
           return { status: 502, body: { error: "The page could not be fetched" } };
         }
         const type = response.headers.get("content-type") ?? "";
-        if (!type.includes("text/html") && !type.includes("application/xhtml+xml")) {
+        const lower = type.toLowerCase();
+        if (lower !== "" && !lower.includes("text/html") && !lower.includes("application/xhtml+xml")) {
           await response.body?.cancel();
           return { status: 415, body: { error: "The URL did not return a web page" } };
         }

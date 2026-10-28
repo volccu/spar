@@ -680,8 +680,8 @@ describe("a named checklist", () => {
 });
 
 describe("a checklist with a title line", () => {
-  // The To-do mark writes a first line ended with ':' as the title (`asChecklist`),
-  // and a person types the same thing by hand; the card draws both lists alike.
+  // A person types a first line ended with ':' above the boxes; the card draws
+  // it as the list's title (`listTitle`).
   it("keeps the checklist face when the first line ends with a colon", () => {
     const face = deriveFace(note({ body: "Packing:\n[ ] passport\n[x] sunglasses\n[ ] charger" }));
     expect(face.kind).toBe("checklist");

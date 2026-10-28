@@ -1,5 +1,5 @@
 import { nowIso } from "../lib/when";
-import type { CanvasText, DrawingStroke, Canvas, CanvasItem } from "../types";
+import type { CanvasImage, CanvasText, DrawingStroke, Canvas, CanvasItem } from "../types";
 import { getBackend, type Row } from "./backend";
 import { stampForUpload } from "./serverClock";
 import { columnProbe, probe } from "./capability";
@@ -20,7 +20,7 @@ import {
   clearCanvasDirtySent,
   dirtyCanvasEntries,
   getMeta,
-  putCanvasesLocalOnly,
+  putCanvasesFromServer,
   setMeta,
   type DirtyEntry,
 } from "./db";
@@ -63,7 +63,11 @@ function toRow(folder: Canvas) {
   // — the client never names an owner, so it can never name the wrong one.
   return {
     id: folder.id,
-    items: folder.items ?? [],
+    // Pictures placed on the canvas ride in `items` beside the notes, told
+    // apart by `attachment_id` — no column of their own, so no migration and
+    // nothing for the self-hosted server to learn. An older build skips them
+    // (it finds no note by that id) and writes them back untouched.
+    items: [...(folder.items ?? []), ...(folder.images ?? [])],
     strokes: folder.strokes ?? [],
     image_widths: folder.image_widths ?? {},
     text_elements: folder.text_elements ?? [],
@@ -74,12 +78,14 @@ function toRow(folder: Canvas) {
 
 export function canvasFromRow(row: Row): Canvas {
   const id = String(row.id);
+  const placed = (row.items as (Record<string, unknown> | null)[] | null) ?? [];
   return {
     id,
     // The folder *is* the idea's arrangement; the foreign key says so, and a
     // second stored copy of the same value could only ever drift from it.
     idea_id: id,
-    items: (row.items as CanvasItem[]) ?? [],
+    items: placed.filter((item) => typeof item?.note_id === "string") as unknown as CanvasItem[],
+    images: placed.filter((item) => typeof item?.attachment_id === "string") as unknown as CanvasImage[],
     strokes: (row.strokes as DrawingStroke[]) ?? [],
     image_widths: (row.image_widths as Record<string, number>) ?? {},
     // Absent from any row written before labels existed, and null reads as
@@ -294,7 +300,7 @@ export async function syncCanvasesOnce(
   // upload was in flight, and is the one thing a pull must not overwrite.
   const queued = new Set((await dirtyCanvasEntries()).map((entry) => entry.id));
 
-  const pulled = remote.folders.filter((folder) => {
+  const wanted = remote.folders.filter((folder) => {
     if (queued.has(folder.id)) return false;
     // Our own upload comes straight back down the pull. Applying it would be
     // harmless and identical, but it would re-render the canvas under the hand
@@ -314,7 +320,7 @@ export async function syncCanvasesOnce(
   // Persist only arrangements that won the outbox conflict rule. Advancing the
   // cursor after this durable write prevents a queued local canvas from being
   // replaced in IndexedDB by a remote row that was deliberately ignored.
-  if (pulled.length > 0) await putCanvasesLocalOnly(pulled);
+  const pulled = await putCanvasesFromServer(wanted);
   // Capped at the server's clock, as the notes cursor is: a canvas stamped by a
   // device whose clock runs fast must not carry this cursor into the future,
   // where everything written in the meantime sits behind it for good.

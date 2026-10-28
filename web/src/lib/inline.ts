@@ -1,3 +1,4 @@
+import { MARKER_RE, type AttachKind } from "./attachRefs";
 import { linkify } from "./links";
 
 /**
@@ -39,6 +40,8 @@ export interface InlineSeg {
   code?: boolean;
   /** Where this points, for a segment linkify() claimed. */
   href?: string;
+  /** Which of the note's files a `[image 2]` marker points at (`lib/attachRefs.ts`). */
+  att?: { kind: AttachKind; n: number };
   /**
    * Part of what the user just searched for (`markHits` in face.ts). Set on a
    * card face while a search is running, and on the open note's reader when
@@ -186,7 +189,15 @@ function push(text: string, style: Style, out: InlineSeg[]): void {
       out.push({ text: seg.text, ...style, href: seg.href });
       continue;
     }
-    out.push({ text: seg.text, ...style });
+    // A marker for one of the note's files, `[image 2]`: its own segment, the
+    // characters unchanged, so the open note can draw it as a way to the file.
+    let last = 0;
+    for (const m of seg.text.matchAll(MARKER_RE)) {
+      if (m.index > last) out.push({ text: seg.text.slice(last, m.index), ...style });
+      out.push({ text: m[0], ...style, att: { kind: m[1] as AttachKind, n: Number(m[2]) } });
+      last = m.index + m[0].length;
+    }
+    if (last < seg.text.length) out.push({ text: seg.text.slice(last), ...style });
   }
 }
 

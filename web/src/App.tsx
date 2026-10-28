@@ -272,6 +272,7 @@ import { viewerEntries } from "./lib/wall";
 import { useAppUpdate } from "./lib/useAppUpdate";
 import { showInboxBadge } from "./lib/appBadge";
 import { Hotkey } from "./components/Hotkey";
+import { finishCanvasTyping, useCanvasImages } from "./lib/useCanvasImages";
 
 /** A selection with one note picked, or unpicked if it already was. */
 function toggled(selected: string[], id: string): string[] {
@@ -335,12 +336,16 @@ export default function App() {
     restoreItem,
     addStroke,
     removeStroke,
-    restoreStrokes,
+    changeCanvas,
     resizeItem,
     setImageWidth,
     addText,
     editText,
     removeText,
+    canvasNow,
+    addImages,
+    moveImage,
+    removeImage,
   } = useCanvases();
   // The user's own folder boards — real boards, not saved filters (SPEC §6).
   // A note is filed into one directly, from the Move mark or the Move panel.
@@ -1233,7 +1238,7 @@ export default function App() {
   visibleRef.current = visible;
   foundRef.current = gridSearching ? visible.length : 0;
   const { headerCount, fieldCount } = headerWords({
-    selecting, selected: selected.length, remindersOpen, shown: visible.length, gridSearching, isPhone,
+    remindersOpen, shown: visible.length, gridSearching, isPhone,
   });
   const selectAll = useCallback(() => {
     const ids = visibleRef.current.map((n) => n.id);
@@ -1629,6 +1634,7 @@ export default function App() {
    *  is swept on the way (`sweepSketch`). */
   const dropCanvas = () => {
     if (!canvasId) return;
+    finishCanvasTyping();
     sweepSketch.current(canvasId);
     setCanvasId(null);
   };
@@ -2022,7 +2028,7 @@ export default function App() {
   // sheet — and the size limit they all ask (lib/useCapture.ts). The share is
   // collected only once the preferences are read, so Inspiration, the target
   // of its offer, is known if it exists on this device.
-  const { withinLimit, takeFiles, dropping, capture, incoming, offer: offerWords, heldLine } = useCapture({
+  const { keptWithin, takeFiles, dropping, capture, incoming, offer: offerWords, heldLine } = useCapture({
     filing,
     here,
     board,
@@ -2993,8 +2999,10 @@ export default function App() {
   // that stays — deleting it is then the user's call, through the trash like
   // everything else. Silent on purpose: nothing the user made is being taken,
   // so there is nothing to offer back.
+  const canvasImages = useCanvasImages({ keptWithin, attachTo, detach, addImages, removeImage });
   sweepSketch.current = (id: string) => {
-    const folder = folders.find((f) => f.id === id);
+    // As it stands now: a label written by closing has not been rendered yet.
+    const folder = canvasNow(id);
     const note = folder ? notesRef.current.find((n) => n.id === folder.idea_id) : undefined;
     if (!folder || !note || note.source !== "draw" || note.status !== "active") return;
     const untouched =
@@ -3003,7 +3011,7 @@ export default function App() {
       folder.items.length === 0 &&
       note.body === SKETCH_SEED &&
       note.attachments.length === 0;
-    if (!untouched) return;
+    if (!untouched || canvasImages.busy(id)) return;
     leaveMark.current = "trash";
     update(note.id, { status: "trashed" });
   };
@@ -3067,6 +3075,8 @@ export default function App() {
     notes,
     openNote: openSaved,
     quiet: writing || openId !== null || sorting || ticker,
+    selected: selected.length,
+    onEndSelection: () => setSelected([]),
   });
   // In Tidy up and Tick off the offer is said by the creature visiting the head
   // band, and the header's own (under the layer, and away) says nothing.
@@ -3461,6 +3471,11 @@ export default function App() {
             // What a carried tab scrolls when it is held near either end
             // (lib/useBoardPress.ts).
             data-shelf-scroll
+            // The folders are read off the device a moment after first paint,
+            // and they stand ahead of the app's own boards: drawn before then,
+            // every built-in tab slid half the strip sideways (ui-sweep
+            // 2026-10-28). The row keeps its height; its tabs wait.
+            data-waiting={prefsReady ? undefined : "true"}
             ref={(el) => { boardsScroll.current = el; }}
             onScroll={updateBoardsFade}
             // Focus arriving in the strip from outside keeps the board you
@@ -3742,7 +3757,6 @@ export default function App() {
           offerMessage={offer?.message ?? ""}
           updateReady={updateReady}
           headerCount={headerCount}
-          onEndSelection={selecting ? () => setSelected([]) : undefined}
           // The public demo has no server, so the quiet word says where the
           // notes are and opens the page that says the rest; a device that
           // could sync and does not is offered the sign-in.
@@ -4545,7 +4559,7 @@ export default function App() {
           onOpenNote={openFromCanvas}
           onAddStroke={addStroke}
           onRemoveStroke={removeStroke}
-          onRestoreStrokes={restoreStrokes}
+          onChangeCanvas={changeCanvas}
           onClearStrokes={(canvasId) => {
             const folder = folders.find((f) => f.id === canvasId);
             if (!folder) return;
@@ -4556,6 +4570,9 @@ export default function App() {
           onAddText={addText}
           onEditText={editText}
           onRemoveText={removeText}
+          onAddImages={(id, files, at) => void canvasImages.add(id, files, at)}
+          onMoveImage={moveImage}
+          onRemoveImage={canvasImages.remove}
         />
         </Suspense>
       )}
@@ -4577,11 +4594,7 @@ export default function App() {
           onSetStatus={handleSetStatus}
           onEmptied={handleEmptied}
           onTogglePriority={togglePriority}
-          onAttach={(id, files) => {
-            void withinLimit(files).then((ok) => {
-              if (ok.length > 0) return attachTo(id, ok);
-            });
-          }}
+          onAttach={(id, files, refs) => void keptWithin(files).then(({ files: ok, from }) => (ok.length > 0 ? attachTo(id, ok, from.map((i) => refs?.[i])) : []))}
           onDetach={detach}
           onReorderFiles={(id, attachments) => update(id, { attachments })}
           pictureTexts={pictureTexts}

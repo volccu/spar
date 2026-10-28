@@ -101,6 +101,30 @@ describe("the share worker's bounds (audit SEC-1)", () => {
     expect(shared?.left).toEqual({ names: [{ name: "huge.mov", size: MAX_FILE_BYTES + 1 }], count: 1 });
   });
 
+  it("names the files it ran out of room for, rather than landing short without a word", async () => {
+    const real = FakeCache.prototype.put;
+    let puts = 0;
+    FakeCache.prototype.put = async function (request, response) {
+      const url = typeof request === "string" ? request : request.url;
+      if (url.includes("/__share/f/") && ++puts > 1) throw new DOMException("full", "QuotaExceededError");
+      return real.call(this, request, response);
+    };
+    try {
+      const form = new FormData();
+      for (const name of ["one.jpg", "two.jpg", "three.jpg"]) form.append("files", sized(name, 1000));
+      await post(form);
+    } finally {
+      FakeCache.prototype.put = real;
+    }
+    const shared = await takeShared();
+    expect(shared?.files.map((f) => f.name)).toEqual(["one.jpg"]);
+    expect(shared?.left).toEqual({
+      names: [{ name: "two.jpg", size: 1000 }, { name: "three.jpg", size: 1000 }],
+      count: 2,
+      full: true,
+    });
+  });
+
   it("keeps no more than thirty files", async () => {
     const form = new FormData();
     for (let i = 0; i < 35; i++) form.append("files", sized(`p${i}.jpg`, 10));

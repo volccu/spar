@@ -117,12 +117,12 @@ describe("capture asks for one thing", () => {
     expect(container.querySelector(".capture-dest")?.textContent).toBe("In Inbox");
   });
 
-  it("starts a one-line capture on Todos as a tick box, and leaves one anywhere else alone", () => {
+  it("saves a one-line capture on Todos as written, with no tick box", () => {
     const todos = vi.fn();
     bar({ onCapture: todos, onTodos: true });
     fireEvent.change(screen.getByLabelText("Write a note"), { target: { value: "bread" } });
     fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    expect(todos).toHaveBeenCalledWith("[ ] bread", NO_CHOICE);
+    expect(todos).toHaveBeenCalledWith("bread", NO_CHOICE);
     cleanup();
 
     const elsewhere = vi.fn();
@@ -199,11 +199,10 @@ describe("capture asks for one thing", () => {
   });
 
   /**
-   * To-do on a note of several lines saves each line as a tick box (review
-   * 2026-10-01, UX-05) — the user asked by pressing it. Without the mark the
-   * words go up exactly as typed.
+   * To-do marks the note as a to-do and leaves its words alone: no tick boxes
+   * are written for you (owner, 2026-10-26; it used to box each line).
    */
-  it("saves a several-line to-do as a list to tick", () => {
+  it("saves a several-line to-do as written", () => {
     const onCapture = vi.fn();
     bar({ onCapture });
     fireEvent.change(screen.getByLabelText("Write a note"), {
@@ -211,7 +210,7 @@ describe("capture asks for one thing", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "To-do" }));
     fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    expect(onCapture).toHaveBeenCalledWith("[ ] screws\n[ ] sandpaper", { ...NO_CHOICE, todo: true });
+    expect(onCapture).toHaveBeenCalledWith("screws\nsandpaper", { ...NO_CHOICE, todo: true });
   });
 
   it("leaves the lines alone without the to-do mark", () => {
@@ -245,7 +244,8 @@ describe("capture asks for one thing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save note" }));
 
     await act(async () => {});
-    expect(onCaptureFiles).toHaveBeenCalledWith([file], "the receipt", {
+    // The picture came while there were words: its marker is written after them.
+    expect(onCaptureFiles).toHaveBeenCalledWith([file], "the receipt [image 1]", {
       ...NO_CHOICE,
       priority: true,
     });
@@ -798,7 +798,7 @@ describe("the field is emptied only for a capture that happened", () => {
 
     await attach(container);
 
-    expect(field.value).toBe("receipt for the tyres");
+    expect(field.value).toBe("receipt for the tyres [image 1]");
     expect(container.querySelector(".capture-line")?.textContent).toContain("1 picture attached");
   });
 
@@ -1471,6 +1471,19 @@ describe("a file picked in the bar waits for Save", () => {
     expect(container.querySelector(".capture-line")).toBeNull();
     expect(screen.queryByRole("button", { name: "Save note" })).toBeNull();
     expect(onCaptureFiles).not.toHaveBeenCalled();
+  });
+
+  /** Owner, 2026-10-26: a file added mid-sentence leaves its marker; Remove takes the markers too. */
+  it("marks each file added while writing, numbered by kind, and Remove takes the markers back out", () => {
+    const { container } = bar({ onCaptureFiles: vi.fn() });
+    const field = screen.getByLabelText("Write a note") as HTMLTextAreaElement;
+    fireEvent.change(field, { target: { value: "the crack and the bill" } });
+    field.setSelectionRange(9, 9);
+    pick(container, photo(), new File(["%PDF"], "a.pdf", { type: "application/pdf" }));
+    expect(field.value).toBe("the crack [image 1] [file 1] and the bill");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove: 2 files attached" }));
+    expect(field.value).toBe("the crack and the bill");
   });
 
   it("holds a pasted picture too, keeping the clipboard's words", async () => {

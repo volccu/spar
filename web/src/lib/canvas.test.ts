@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Note } from "../types";
+import { addCanvasImages, moveCanvasImage, picturesOf, removeCanvasImage } from "./canvas";
+import { attachment } from "../test/fixtures";
 import { addCanvasText, addCanvasItem, addStroke, anchorScroll, buildCanvas, clampZoom, canvasSnapshot, createSnapshotCache, isCanvasIdea, looksArranged, MAX_ZOOM, MIN_ZOOM, moveCanvasItem, placeForNewItem, removeCanvasItem, removeStroke, resizeCanvasItem, setCanvasImageWidth, worldFromClient } from "./canvas";
 import { note as base } from "../test/fixtures";
 import { fitView } from "./canvasFit";
@@ -464,5 +466,48 @@ describe("fitView", () => {
     const near = fitView({ x: 5000, y: 5000, w: 460, h: 200 }, { w: 390, h: 700 }, 16, 72, 0.75)!;
     expect(near.zoom).toBeCloseTo((390 - 32) / 460);
     expect(near.left + 390 / 2).toBeCloseTo((5000 + 230) * near.zoom);
+  });
+});
+
+describe("pictures set on a canvas", () => {
+  const idea = base({ id: "idea", attachments: [attachment({ id: "p1" }), attachment({ id: "p2" })] });
+  const empty = buildCanvas(idea, []);
+
+  it("are placed once, however often the same placement arrives", () => {
+    const one = addCanvasImages(empty, [{ attachment_id: "p1", x: 10, y: 20 }]);
+    expect(one.images).toEqual([{ attachment_id: "p1", x: 10, y: 20 }]);
+    expect(addCanvasImages(one, [{ attachment_id: "p1", x: 99, y: 99 }])).toBe(one);
+    expect(looksArranged(one)).toBe(true);
+  });
+
+  it("move, and a picture with no placement gets one by moving", () => {
+    const one = addCanvasImages(empty, [{ attachment_id: "p1", x: 10, y: 20 }]);
+    expect(moveCanvasImage(one, "p1", 30, 40).images).toEqual([{ attachment_id: "p1", x: 30, y: 40 }]);
+    expect(moveCanvasImage(one, "p2", 1, 2).images).toEqual([
+      { attachment_id: "p1", x: 10, y: 20 },
+      { attachment_id: "p2", x: 1, y: 2 },
+    ]);
+  });
+
+  it("take their width with them when removed", () => {
+    const one = setCanvasImageWidth(addCanvasImages(empty, [{ attachment_id: "p1", x: 0, y: 0 }]), "p1", 300);
+    const gone = removeCanvasImage(one, "p1");
+    expect(gone.images).toEqual([]);
+    expect(gone.image_widths).toEqual({});
+  });
+
+  it("are every file the idea holds, an unplaced one standing in a column of its own", () => {
+    const one = addCanvasImages(empty, [{ attachment_id: "p1", x: 10, y: 20 }]);
+    const drawn = picturesOf(idea, one);
+    expect(drawn.map((p) => [p.att.id, p.x, p.y])).toEqual([
+      ["p1", 10, 20],
+      ["p2", 0, 0],
+    ]);
+  });
+
+  it("are drawn on the idea card's miniature, at their width", () => {
+    const one = setCanvasImageWidth(addCanvasImages(empty, [{ attachment_id: "p1", x: 10, y: 20 }]), "p1", 100);
+    const snap = canvasSnapshot(idea, one, new Map());
+    expect(snap.pictures[0]).toEqual({ id: "p1", x: 10, y: 20, w: 100, h: 100 });
   });
 });

@@ -676,6 +676,17 @@ describe("a clock for a column the server has not got", () => {
     vi.resetModules();
   });
 
+  it("is not uploaded without clocks when the probe merely failed this tick", async () => {
+    const { syncOnce, resetServerCapabilities } = await import("./sync");
+    resetServerCapabilities();
+    probeError = { message: "Failed to fetch" };
+    await syncOnce([note()]);
+    expect(pushedRows).toEqual([]);
+    probeError = null;
+    await syncOnce([note()]);
+    expect(pushedRows.length).toBe(1);
+  });
+
   it("is not sent at all", async () => {
     missing = new Set(["merged_into"]);
     const { syncOnce } = await import("./sync");
@@ -831,6 +842,19 @@ describe("a note the server keeps refusing", () => {
     expect(upserts).toBe(0);
     expect(after.refused).toBeNull();
     expect(after.held).toHaveLength(1);
+  });
+
+  it("stops being reported once the note itself is gone, and its entry is forgotten", async () => {
+    const { syncOnce } = await import("./sync");
+    const mine = note();
+    for (let i = 0; i < HOLD_AFTER; i++) await syncOnce([mine]);
+    expect(book.get("n1")?.count).toBe(HOLD_AFTER);
+
+    // The trash emptied of it: the store holds other notes, not this one.
+    outbox = new Map();
+    const after = await syncOnce([note({ id: "someone-else" })]);
+    expect(after.held).toEqual([]);
+    expect(forgotten).toContain("n1");
   });
 
   it("is offered again the moment it is edited, because the count is per version", async () => {

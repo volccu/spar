@@ -315,9 +315,9 @@ function IdeaSnapshot({ snapshot }: { snapshot: CanvasSnapshot }) {
   const PAD = 36;
 
   const { viewBox, content } = useMemo(() => {
-    const { shapes, strokes, labels } = snapshot;
+    const { shapes, strokes, labels, pictures } = snapshot;
     const empty = { viewBox: "0 0 260 206", content: null };
-    if (shapes.length === 0 && strokes.length === 0 && labels.length === 0) {
+    if (shapes.length === 0 && strokes.length === 0 && labels.length === 0 && pictures.length === 0) {
       return empty;
     }
 
@@ -338,7 +338,11 @@ function IdeaSnapshot({ snapshot }: { snapshot: CanvasSnapshot }) {
     }
     for (const label of labels) {
       see(label.x, label.y);
-      see(label.x + 240, label.y + label.lines.length * SNAPSHOT_METRICS.LINE_H);
+      see(label.x + label.w, label.y + label.lines.length * SNAPSHOT_METRICS.LINE_H);
+    }
+    for (const picture of pictures) {
+      see(picture.x, picture.y);
+      see(picture.x + picture.w, picture.y + picture.h);
     }
     for (const stroke of strokes) {
       for (const [px, py] of stroke.points) see(px, py);
@@ -356,6 +360,17 @@ function IdeaSnapshot({ snapshot }: { snapshot: CanvasSnapshot }) {
       )}`,
       content: (
         <>
+          {/* Under everything, as on the canvas, where they are what is drawn on. */}
+          {pictures.map((picture) => (
+            <rect
+              className="idea-snapshot-image"
+              key={picture.id}
+              x={picture.x}
+              y={picture.y}
+              width={picture.w}
+              height={picture.h}
+            />
+          ))}
           {shapes.map((shape) => (
             <g key={shape.id}>
               <rect
@@ -406,13 +421,14 @@ function IdeaSnapshot({ snapshot }: { snapshot: CanvasSnapshot }) {
                   key={`${label.id}-${i}`}
                   x={label.x}
                   y={label.y + i * LINE_H + inset}
-                  width={240 * fill}
+                  width={label.w * fill}
                   height={GHOST_H}
                 />
               ),
             ),
           )}
-          {strokes.map((stroke) => {
+          {/* Highlights under the ink, filled shapes filled, as the canvas draws them. */}
+          {[...strokes.filter((s) => s.highlight), ...strokes.filter((s) => !s.highlight)].map((stroke) => {
             if (stroke.points.length < 2) return null;
             const [first, ...rest] = stroke.points;
             let d = `M ${first[0]} ${first[1]}`;
@@ -423,8 +439,10 @@ function IdeaSnapshot({ snapshot }: { snapshot: CanvasSnapshot }) {
               <path
                 key={stroke.id}
                 className="idea-snapshot-stroke"
+                data-highlight={stroke.highlight || undefined}
                 d={d}
                 stroke={stroke.color}
+                style={stroke.fill ? { fill: stroke.color } : undefined}
                 strokeWidth={Math.max(2, stroke.width)}
               />
             );
@@ -1092,7 +1110,12 @@ function NoteCardBase({
     [peek, note, metrics, reservedLines, rowLink, terms, peekLines],
   );
   const face = tall ?? flat;
-  const files = face.kind === "file" ? face.files : [];
+  /**
+   * An idea is drawn as its canvas, files and all: a picture set on a sketch
+   * is one thing on it among the strokes and the words, never the whole card.
+   */
+  const asCanvas = idea && snapshot !== undefined;
+  const files = face.kind === "file" && !asCanvas ? face.files : [];
   const depth = cutDepth(face);
   const cut = depth > 0;
   // Splitting the face into lines now also reads the emphasis in each one, and
@@ -1117,7 +1140,7 @@ function NoteCardBase({
    * Deliberately "local": a board that fetched every full-size photo in it
    * would be paying for the whole grid to open one card.
    */
-  const fileFace = face.kind === "file" ? face.file : null;
+  const fileFace = face.kind === "file" && !asCanvas ? face.file : null;
   // Only an image has real bytes an <img> can take. A PDF's face is its first
   // page, drawn once when it was attached and carried in the note ever since —
   // there is nothing on disk to reach for and nothing sharper to reach for it
@@ -1324,7 +1347,7 @@ function NoteCardBase({
             ) : null}
           </div>
         </>
-      ) : face.kind === "file" && face.file ? (
+      ) : face.kind === "file" && face.file && !asCanvas ? (
         // The picture is the card. A screenshot sent over from the other
         // machine is recognised at a glance, which is the whole reason this
         // beats hunting for the newest row in a file list.

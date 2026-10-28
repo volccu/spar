@@ -491,6 +491,19 @@
   flex: 0 0 auto;
 }
 
+/* The controls stand at the right edge, so a longer or shorter file name never
+   carries them along as the viewer walks (ui-sweep 2026-10-28: they slid with
+   every name). A phone turns this into the line break, below. */
+.lightbox-bar > .spacer {
+  flex: 1 1 auto;
+}
+
+/* A control another stop of the walk has, kept in its place on this one so
+   stepping along never slides the bar (`SPARE` in Lightbox.tsx). */
+.lightbox-bar > [data-spare="true"] {
+  visibility: hidden;
+}
+
 /* On a phone the facts and the controls take a line each: six controls and a
    name do not fit 360px, and the last one — Remove — went off the edge. The
    spacer becomes the line break, and the controls stand at the right. */

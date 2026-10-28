@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Canvas, DrawingStroke } from "../types";
-import { addStroke, removeStroke, restoreStrokes } from "../lib/canvas";
+import { addStroke, removeStroke } from "../lib/canvas";
 import { CanvasSheet } from "./CanvasSheet";
 import { note as base } from "../test/fixtures";
 
@@ -87,7 +87,7 @@ function props(overrides: Partial<React.ComponentProps<typeof CanvasSheet>> = {}
     onAddStroke: () => {},
     onClearStrokes: () => {},
     onRemoveStroke: () => {},
-    onRestoreStrokes: () => {},
+    onChangeCanvas: () => {},
     onResizeNote: () => {},
     onResizeImage: () => {},
     onAddText: () => {},
@@ -115,7 +115,7 @@ function Held({ strokes }: { strokes: DrawingStroke[] }) {
         initialTool: "draw",
         onAddStroke: (_id, s) => setFolder((f) => addStroke(f, s)),
         onRemoveStroke: (_id, sid) => setFolder((f) => removeStroke(f, sid)),
-        onRestoreStrokes: (_id, entries) => setFolder((f) => restoreStrokes(f, entries)),
+        onChangeCanvas: (_id, change) => setFolder((f) => change(f)),
         onClearStrokes: () => setFolder((f) => ({ ...f, strokes: [] })),
       })}
     />
@@ -136,15 +136,19 @@ describe("Undo", () => {
 
   it("takes back the stroke just drawn, by the id it was drawn with", () => {
     const onAddStroke = vi.fn();
-    const onRemoveStroke = vi.fn();
-    renderSheet({ initialTool: "draw", onAddStroke, onRemoveStroke });
+    const onChangeCanvas = vi.fn();
+    renderSheet({ initialTool: "draw", onAddStroke, onChangeCanvas });
 
     drag([[10, 10], [60, 40], [120, 40]]);
     expect(onAddStroke).toHaveBeenCalledTimes(1);
     const drew = onAddStroke.mock.calls[0][1] as DrawingStroke;
 
     fireEvent.click(undo());
-    expect(onRemoveStroke).toHaveBeenCalledWith("idea", drew.id);
+    expect(onChangeCanvas).toHaveBeenCalledTimes(1);
+    const change = onChangeCanvas.mock.calls[0][1] as (c: Canvas) => Canvas;
+    // Taken back by id: another stroke beside it is left where it is.
+    const other = stroke("other", [[0, 0], [9, 9]]);
+    expect(change({ ...empty, strokes: [other, drew] }).strokes).toEqual([other]);
     expect(undo().disabled).toBe(true);
   });
 
@@ -222,20 +226,18 @@ describe("the eraser", () => {
 
   it("takes every stroke a drag crosses as one step back", () => {
     const onRemoveStroke = vi.fn();
-    const onRestoreStrokes = vi.fn();
-    renderSheet({ folder: { ...empty, strokes: [top, low] }, onRemoveStroke, onRestoreStrokes });
+    const onChangeCanvas = vi.fn();
+    renderSheet({ folder: { ...empty, strokes: [top, low] }, onRemoveStroke, onChangeCanvas });
     fireEvent.click(screen.getByLabelText("Eraser"));
 
     drag([[50, -40], [50, 340]]);
     expect(onRemoveStroke).toHaveBeenCalledTimes(2);
 
     fireEvent.click(undo());
-    expect(onRestoreStrokes).toHaveBeenCalledTimes(1);
-    const entries = onRestoreStrokes.mock.calls[0][1] as { stroke: DrawingStroke; index: number }[];
-    expect(entries.map((e) => [e.stroke.id, e.index])).toEqual([
-      ["top", 0],
-      ["low", 1],
-    ]);
+    expect(onChangeCanvas).toHaveBeenCalledTimes(1);
+    const change = onChangeCanvas.mock.calls[0][1] as (c: Canvas) => Canvas;
+    // Both back from one press, each in its own place.
+    expect(change({ ...empty, strokes: [] }).strokes.map((s) => s.id)).toEqual(["top", "low"]);
     expect(undo().disabled).toBe(true);
   });
 
@@ -258,11 +260,69 @@ describe("the eraser", () => {
   });
 });
 
+describe("mouse buttons", () => {
+  it("never draws with the right button, and still opens the canvas menu", () => {
+    const onAddStroke = vi.fn();
+    renderSheet({ initialTool: "draw", onAddStroke });
+    const el = surface();
+    const atMouse = { pointerId: 81, pointerType: "mouse", button: 2, buttons: 2, clientX: 80, clientY: 80 };
+
+    fireEvent.pointerDown(el, atMouse);
+    fireEvent.pointerMove(el, { ...atMouse, clientX: 140, clientY: 130 });
+    fireEvent.pointerUp(el, { ...atMouse, clientX: 140, clientY: 130 });
+    expect(onAddStroke).not.toHaveBeenCalled();
+    expect(drawn()).toHaveLength(0);
+
+    fireEvent.contextMenu(el, { clientX: 140, clientY: 130 });
+    expect(screen.getByRole("menu", { name: "Canvas menu" })).toBeTruthy();
+  });
+
+  it("pans with the middle button while Draw is active, without making a stroke", () => {
+    const onAddStroke = vi.fn();
+    renderSheet({ initialTool: "draw", onAddStroke });
+    const el = surface();
+    const origin = { left: el.scrollLeft, top: el.scrollTop };
+    const atMouse = { pointerId: 82, pointerType: "mouse", button: 1, buttons: 4, clientX: 120, clientY: 120 };
+
+    fireEvent.pointerDown(el, atMouse);
+    fireEvent.pointerMove(el, { ...atMouse, clientX: 80, clientY: 90 });
+    expect(el.scrollLeft).toBe(origin.left + 40);
+    expect(el.scrollTop).toBe(origin.top + 30);
+    fireEvent.pointerUp(el, { ...atMouse, clientX: 80, clientY: 90 });
+    expect(onAddStroke).not.toHaveBeenCalled();
+    expect(drawn()).toHaveLength(0);
+  });
+
+  it("middle-pans over a note without dragging or opening it", () => {
+    const onOpenNote = vi.fn();
+    const onDragNoteTo = vi.fn();
+    renderSheet({
+      folder: { ...empty, items: [{ note_id: "a", x: 0, y: 0 }] },
+      notes: [base({ id: "a", body: "A note", raw_content: "A note" })],
+      onOpenNote,
+      onDragNoteTo,
+    });
+    const el = surface();
+    const capsule = screen.getByRole("button", { name: /open note: a note/i });
+    const origin = { left: el.scrollLeft, top: el.scrollTop };
+    const atMouse = { pointerId: 83, pointerType: "mouse", button: 1, buttons: 4, clientX: 120, clientY: 120 };
+
+    fireEvent.pointerDown(capsule, atMouse);
+    fireEvent.pointerMove(el, { ...atMouse, clientX: 80, clientY: 90 });
+    fireEvent.pointerUp(el, { ...atMouse, clientX: 80, clientY: 90 });
+
+    expect(el.scrollLeft).toBe(origin.left + 40);
+    expect(el.scrollTop).toBe(origin.top + 30);
+    expect(onOpenNote).not.toHaveBeenCalled();
+    expect(onDragNoteTo).not.toHaveBeenCalled();
+  });
+});
+
 describe("where the controls stand", () => {
   it("keeps every drawing control in the top bar on a desktop, and builds no foot bar", () => {
     renderSheet({ initialTool: "draw", folder: { ...empty, strokes: [top] } });
     const bar = within(document.querySelector<HTMLElement>(".canvas-bar")!);
-    for (const name of ["Move", "Draw", "Eraser", "Undo", "Ink", "Stroke width 4", "Clear drawings"]) {
+    for (const name of ["Move", "Draw", "Eraser", "Undo", "Pen colour: Ink", "Line thickness: 4", "Clear drawings"]) {
       expect(bar.getByLabelText(name), name).toBeTruthy();
     }
     expect(document.querySelector(".canvas-dock")).toBeNull();
@@ -284,12 +344,8 @@ describe("where the controls stand", () => {
       "Draw",
       "Eraser",
       "Undo",
-      "Ink",
-      "Muted",
-      "Faint",
-      "Stroke width 2",
-      "Stroke width 4",
-      "Stroke width 8",
+      "Pen colour: Ink",
+      "Line thickness: 4",
       "Clear drawings",
     ]) {
       expect(dock.getByLabelText(name), name).toBeTruthy();
@@ -311,14 +367,15 @@ describe("where the controls stand", () => {
     expect(dock.getByRole("button", { name: /zoomed to 200 percent/i })).toBeTruthy();
   });
 
-  it("shows the tones and weights only with the pen out, as the top bar always did", () => {
+  it("shows the colour and thickness controls only with the pen out, as the top bar always did", () => {
     window.innerWidth = 390;
     renderSheet();
     const dock = within(document.querySelector<HTMLElement>(".canvas-dock")!);
-    expect(dock.queryByLabelText("Ink")).toBeNull();
+    expect(dock.queryByLabelText("Pen colour: Ink")).toBeNull();
     fireEvent.click(dock.getByLabelText("Draw"));
-    expect(dock.getByLabelText("Ink")).toBeTruthy();
+    expect(dock.getByLabelText("Pen colour: Ink")).toBeTruthy();
+    expect(dock.getByLabelText("Line thickness: 4")).toBeTruthy();
     fireEvent.click(dock.getByLabelText("Eraser"));
-    expect(dock.queryByLabelText("Ink")).toBeNull();
+    expect(dock.queryByLabelText("Pen colour: Ink")).toBeNull();
   });
 });

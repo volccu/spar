@@ -1,0 +1,46 @@
+name: Something is wrong
+description: spår did something it should not, or did not do something it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. A security problem goes through the **Security** tab instead
+        (see SECURITY.md), never in a public issue. Please never paste the text of your own notes.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to see it again
+      placeholder: |
+        1. Open the Inbox
+        2. …
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where you run spår
+      options:
+        - The public demo
+        - One container (the spår server)
+        - My own Supabase project
+        - One device only, self-served
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: e.g. Pixel 8, Chrome 141, installed as an app
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Settings shows the build. A release tag or commit is fine too.

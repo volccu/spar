@@ -1,5 +1,6 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useContext, type ReactNode } from "react";
 import { parseInline, type InlineSeg } from "../../lib/inline";
+import { AttachRefsContext } from "../../lib/useAttachMarkers";
 import { leaveForLink } from "../../lib/returnState";
 
 interface Props {
@@ -27,6 +28,7 @@ interface Props {
 export function NoteInline({ segs, text = "", interactive = false }: Props) {
   const parts = segs ?? parseInline(text);
   const out: ReactNode[] = [];
+  const refs = useContext(AttachRefsContext);
 
   for (let i = 0; i < parts.length; i++) {
     const seg = parts[i];
@@ -77,6 +79,51 @@ export function NoteInline({ segs, text = "", interactive = false }: Props) {
           </span>
         ) : (
           <span key={at}>{box}</span>
+        ),
+      );
+      continue;
+    }
+
+    // --- a marker for one of the note's files, `[image 2]` ---------------------
+    // In the open note it opens that file; the characters are the marker's
+    // own, so the reader still matches the text. A search can split it into
+    // pieces (`markHits`), gathered back into the one button here. On a card,
+    // or once its file is gone, it is plain text.
+    const marked = seg.att && interactive && refs ? refs.find(seg.att.kind, seg.att.n) : undefined;
+    if (seg.att && marked) {
+      const at = i;
+      const { kind, n } = seg.att;
+      const run: InlineSeg[] = [];
+      while (i < parts.length && parts[i].att?.kind === kind && parts[i].att?.n === n) run.push(parts[i++]);
+      i--;
+      const button = (
+        <button
+          type="button"
+          className="att-ref"
+          aria-label={`Open ${kind} ${n}, ${marked.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            refs!.open(marked.id);
+          }}
+        >
+          {run.map((piece, k) =>
+            piece.hit ? (
+              <span data-hit="true" data-best={piece.best ? true : undefined} key={k}>
+                {piece.text}
+              </span>
+            ) : (
+              <Fragment key={k}>{piece.text}</Fragment>
+            ),
+          )}
+        </button>
+      );
+      out.push(
+        seg.strong || seg.em ? (
+          <span className="em" data-strong={seg.strong} data-em={seg.em} key={at}>
+            {button}
+          </span>
+        ) : (
+          <span key={at}>{button}</span>
         ),
       );
       continue;

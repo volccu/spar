@@ -363,4 +363,21 @@ describe("refreshPush", () => {
     expect(upsertedRows).toHaveLength(1);
     expect(upsertedRows[0]).toMatchObject({ endpoint: "https://push.example/refresh-me" });
   });
+
+  it("replaces a subscription made under an old signing key, here and on the server", async () => {
+    notificationPermission = "granted";
+    const old = Object.assign(subscription("https://push.example/old-key"), {
+      options: { applicationServerKey: new Uint8Array([1, 2, 3]).buffer },
+    });
+    const reg = registration({ existing: old, subscribeReturns: subscription("https://push.example/new-key") });
+    installServiceWorker(reg);
+
+    await refreshPush();
+
+    expect(old.unsubscribe).toHaveBeenCalled();
+    expect(deletedEndpoints).toEqual(["https://push.example/old-key"]);
+    expect(reg.pushManager.subscribe).toHaveBeenCalledTimes(1);
+    expect(upsertedRows).toHaveLength(1);
+    expect(upsertedRows[0]).toMatchObject({ endpoint: "https://push.example/new-key" });
+  });
 });

@@ -486,6 +486,9 @@
   order: -1;
   display: flex;
   gap: var(--s-4);
+  /* Held open while nothing is ticked, so the row arriving with the first
+     tick moves nothing (ui-sweep 2026-10-28). */
+  min-height: var(--hit);
 }
 
 .ticker-verbs .ticker-verb {
@@ -510,6 +513,7 @@
 @media (hover: hover) and (pointer: fine) {
   .iconbtn:hover:not(:disabled),
   .sorter-done:hover:not(:disabled),
+  .sorter-tool:hover,
   .sorter-skip:hover,
   .ticker-skip:hover,
   .ticker-done:hover,

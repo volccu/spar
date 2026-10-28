@@ -117,8 +117,15 @@ export function BoardChooser({
   }, []);
 
   // Hung under a mark near the right edge, pulled back in by its own width.
+  // Hung from the top, it also keeps the height it opened at: typing narrows
+  // the list, and a panel shrinking towards its top carried the field being
+  // typed in up with it (ui-sweep 2026-10-28). Standing on the floor, as on a
+  // phone, it shrinks downwards and the field already stays put.
   useLayoutEffect(() => {
-    if (under && panelRef.current) keepInside(panelRef.current, under);
+    const panel = panelRef.current;
+    if (!under || !panel) return;
+    keepInside(panel, under);
+    if (panel.offsetHeight > 0) panel.style.setProperty("--held-h", `${panel.offsetHeight}px`);
   }, [under]);
 
   /**
@@ -166,7 +173,7 @@ export function BoardChooser({
   return (
     <div
       ref={panelRef}
-      className={`selpanel ${under ? "selpanel-under" : "selpanel-right"}${over ? " selpanel-over" : ""}`}
+      className={`selpanel selpanel-chooser ${under ? "selpanel-under" : "selpanel-right"}${over ? " selpanel-over" : ""}`}
       style={under ? hangUnder(under) : style}
       role="group"
       aria-label="Move to a board"
@@ -277,11 +284,18 @@ export function BoardChooser({
           }}
         />
       </div>
-      {error && <p className="selpanel-hint mono">{error}</p>}
-      {target && !error && <p className="selpanel-hint mono">Enter to move to {target.name}</p>}
-      {query && !target && !error && (
-        <p className="selpanel-hint mono">Enter to create “{typed}”</p>
-      )}
+      {/* One line kept under the field whether or not it says anything, so
+          the first letter typed does not push the field up to make room for
+          it (ui-sweep 2026-10-28). */}
+      <p className="selpanel-hint mono">
+        {error
+          ? error
+          : target
+            ? `Enter to move to ${target.name}`
+            : query
+              ? `Enter to create “${typed}”`
+              : null}
+      </p>
     </div>
   );
 }

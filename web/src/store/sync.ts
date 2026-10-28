@@ -324,6 +324,10 @@ async function push(
 ): Promise<{ sent: number; refused: Error | null }> {
   const nothing = { sent: 0, refused: null };
   if (!(await getBackend())) return nothing;
+  // The field-clock probe failed in passing and is not yet answered either way.
+  // Sent without clocks, the upload writes every field outright and undoes
+  // another device's newer edit; the outbox keeps it for the next tick.
+  if (!caps.fieldVersions && known.fieldVersions === undefined) return nothing;
   const entries = await dirtyEntries();
   if (entries.length === 0) return nothing;
 
@@ -827,6 +831,23 @@ async function deferPull(ids: string[]): Promise<void> {
 }
 
 /**
+ * The held notes that still exist. A held note destroyed since — the trash
+ * emptied, or deleted for good on another device — kept its entry, so the
+ * held banner stood for a note that was gone until the user pressed retry
+ * (bughunt 2026-10-24). Its entry is forgotten here. An empty list is a store
+ * not read yet, not a store with nothing in it, and clears nothing.
+ */
+async function heldAmong(local: Note[]): Promise<HeldNote[]> {
+  const held = await heldNotes();
+  if (local.length === 0) return held;
+  const here = new Set(local.map((n) => n.id));
+  const gone = held.filter((h) => !here.has(h.id)).map((h) => h.id);
+  if (gone.length === 0) return held;
+  await clearRefusals(gone);
+  return held.filter((h) => here.has(h.id));
+}
+
+/**
  * One turn. `ahead` is what the combined pull already brought down this tick
  * (`pullChanges.ts`), or null; every rule below is applied the same either way.
  */
@@ -965,7 +986,7 @@ export async function syncOnce(local: Note[], ahead: Ahead | null = null): Promi
     return {
       pushed: pushed + tombstonesPushed,
       pulled: [...deletedIds].map(deletionMarker),
-      held: await heldNotes(),
+      held: await heldAmong(local),
       refused: refused ?? (error instanceof Error ? error : new Error(String(error))),
       notesPulled: false,
     };
@@ -1030,7 +1051,7 @@ export async function syncOnce(local: Note[], ahead: Ahead | null = null): Promi
   return {
     pushed: pushed + tombstonesPushed,
     pulled: [...stored, ...deletionMarkers],
-    held: await heldNotes(),
+    held: await heldAmong(local),
     refused,
   };
 }

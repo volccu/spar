@@ -67,28 +67,6 @@
   white-space: nowrap;
 }
 
-/* "3 selected" while notes are picked is the way out of picking: the count
-   with a cross after it, a 44px target centred in the row rather than hung
-   from its baseline, which would put its top above the screen. Chrome: muted
-   at rest, raised under the finger (review 2026-10-24, UX-15). */
-.count-end {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-4);
-  min-height: var(--hit);
-  padding: 0 var(--s-4);
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  cursor: var(--cursor-pointer);
-}
-
-.count-end:active {
-  background: var(--raised);
-  color: var(--ink);
-}
-
 /* Settings, in the corner opposite the creature (2026-10-12, owner). The
    board row's own icon controls (.board-burger, .board-search) say how: a
    muted mark with no box of its own at rest, the one raised step under the

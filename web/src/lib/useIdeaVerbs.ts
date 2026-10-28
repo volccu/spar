@@ -236,13 +236,14 @@ export function useIdeaVerbs({
         before.reminder_at = idea.reminder_at ?? null;
         before.reminder_repeat = idea.reminder_repeat ?? null;
       }
-      update(idea.id, {
+      const after: Partial<Note> = {
         body: appendToIdeaBody(idea.body, toAdd),
         merged_from: [...(idea.merged_from ?? []), ...toAdd.map((n) => n.id)],
         priority: Math.max(idea.priority, ...toAdd.map((n) => n.priority)),
         ...(hiddenPreviews ? { link_previews: hiddenPreviews } : {}),
         ...(reminder ?? {}),
-      });
+      };
+      update(idea.id, after);
 
       // Each incoming note is archived into the idea, exactly as an ordinary
       // merge archives its sources — nothing here is destroyed.
@@ -279,12 +280,35 @@ export function useIdeaVerbs({
       pushUndo({
         message: `Added ${toAdd.length} to idea`,
         steps: [],
+        // Guarded like merge's undo: the step stays on the stack past its
+        // offer, so each field goes back only while it is still what this
+        // absorption left. Words typed into the idea since, or a source taken
+        // out and trashed since, were wiped by a later Ctrl+Z (bughunt 2026-10-24).
         run: () => {
-          update(idea.id, before);
-          for (const b of beforeNotes) {
-            update(b.id, { status: b.status, merged_into: b.merged_into });
+          const now = notesRef.current.find((n) => n.id === idea.id);
+          if (!now) return;
+          const back = new Set(
+            beforeNotes
+              .filter((b) => {
+                const n = notesRef.current.find((x) => x.id === b.id);
+                return n?.status === "archived" && n.merged_into === idea.id;
+              })
+              .map((b) => b.id),
+          );
+          if (back.size === 0) return;
+          const patch: Partial<Note> = {
+            merged_from: (now.merged_from ?? []).filter((id) => !back.has(id)),
+          };
+          for (const key of ["body", "priority", "link_previews", "reminder_at", "reminder_repeat"] as const) {
+            if (key in after && key in before && now[key] === after[key]) {
+              (patch as Record<string, unknown>)[key] = before[key];
+            }
           }
-          for (const item of added) removeItem(folder.id, item.note_id);
+          update(idea.id, patch);
+          for (const b of beforeNotes) {
+            if (back.has(b.id)) update(b.id, { status: b.status, merged_into: b.merged_into });
+          }
+          for (const item of added) if (back.has(item.note_id)) removeItem(folder.id, item.note_id);
           putBackLeaves();
         },
       });
@@ -418,7 +442,14 @@ export function useIdeaVerbs({
       pushUndo({
         message: emptied ? "Dissolved the idea" : "Took 1 out",
         steps: [],
+        // Only while the note is still out and the idea still as the release
+        // left it: a note trashed since, or an idea restored or trashed by
+        // hand since, is not forced back (bughunt 2026-10-24).
         run: () => {
+          const noteNow = notesRef.current.find((n) => n.id === noteId);
+          const ideaNow = notesRef.current.find((n) => n.id === ideaId);
+          if (!noteNow || noteNow.status !== "active" || noteNow.merged_into) return;
+          if (!ideaNow || (ideaNow.status === "trashed") !== emptied) return;
           update(noteId, { status: "archived", merged_into: ideaId });
           restore();
         },
@@ -464,13 +495,23 @@ export function useIdeaVerbs({
       pushUndo({
         message: `Dissolved into ${before.length}`,
         steps: [],
+        // Only while the idea is still in the trash, and only the sources
+        // still out as the dissolve left them: one trashed since stays in the
+        // trash rather than being pulled back into the idea (bughunt 2026-10-24).
         run: () => {
-          for (const was of before) {
+          const ideaNow = notesRef.current.find((n) => n.id === ideaId);
+          if (!ideaNow || ideaNow.status !== "trashed") return;
+          const back = before.filter((was) => {
+            const n = notesRef.current.find((x) => x.id === was.id);
+            return n?.status === "active" && !n.merged_into;
+          });
+          const backIds = new Set(back.map((was) => was.id));
+          for (const was of back) {
             update(was.id, { status: was.status, merged_into: was.merged_into, ...was.reminder?.noteWas });
           }
           update(ideaId, {
             status: "active",
-            merged_from: sources,
+            merged_from: sources.filter((id) => backIds.has(id) || !before.some((was) => was.id === id)),
             ...(tookBack ? { reminder_at: idea.reminder_at, reminder_repeat: idea.reminder_repeat ?? null } : {}),
           });
         },

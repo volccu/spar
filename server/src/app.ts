@@ -271,7 +271,7 @@ export async function createApp(config: ServerConfig, options: AppOptions = {}):
     db.transaction(() => {
       // Foreign keys cascade from `users`; the explicit deletes keep this
       // correct even on a database opened without them.
-      for (const table of ["reminder_deliveries", "canvases", "notes", "tombstones", "prefs_history", "prefs", "push_subscriptions", "files", "sessions"]) {
+      for (const table of ["reminder_device_deliveries", "reminder_deliveries", "canvases", "notes", "tombstones", "prefs_history", "prefs", "push_subscriptions", "files", "sessions"]) {
         const column = table === "sessions" ? "user_id" : "owner_id";
         db.prepare(`delete from ${table} where ${column} = ?`).run(userId);
       }

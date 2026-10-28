@@ -7,10 +7,13 @@
    sitting above it — that band is destinations here, and App.tsx takes the bar
    off the screen for the duration.
 
-   Three bands, top to bottom: where you are in the pile, the note, and where it
-   can go. The note takes whatever height is left, which is what keeps the
-   destinations at the bottom of the screen on every size of phone without a
-   single measured number.
+   Layout A (2026-10-24, owner's pick of four): on a phone three bands, top to
+   bottom — where you are in the pile, the note with its own four controls
+   under it, and where it can go, with Leave, Archive and Delete on the floor.
+   On a wide window (`.sorter-side`, chosen in JS like the shelf) the note and
+   the places stand side by side: the note in its reading column on the left,
+   Back and Leave under it, the places as one column down the right edge. The
+   note takes whatever height is left, so nothing is a measured number.
    -------------------------------------------------------------------------- */
 .sorter {
   position: fixed;
@@ -48,15 +51,10 @@
   border-bottom: 1px solid var(--rule);
 }
 
-/* Two rows, on every width: the creature's, as the header's own band stands —
-   the creature, what it says, and the count at the far end — and under it the
-   controls as one group (`.sorter-tools`: Back, Open note, Important, To-do,
-   Remind, Leave), which never wraps and never squeezes the count (audit
-   2026-10-24, UX-002; review 2026-10-24, UX-02). The cross is in neither: it
-   stands where every exit stands (`.sorter-exit`). A phone's cells touch, six
-   of them and Leave take nearly all a 390px screen has (review 2026-10-04,
-   FX-B-01); the group's right edge is the screen's, reaching back over the
-   room the cross keeps beside the row above. */
+/* The creature's row: the creature, what it says, the count at the far end,
+   and the pile drawn beside it on a wide window, Back on a phone. The cross is
+   not in it: it stands where every exit stands (`.sorter-exit`). The Ticker's
+   head band is the same row. */
 .sorter-head-row,
 .ticker-head-row {
   display: flex;
@@ -81,16 +79,60 @@
   display: flex;
 }
 
-.sorter-tools {
+/* The pile, drawn: a hairline cell a note, the ones answered at --muted, the
+   one in hand at --ink, the rest at --rule-soft. Past forty it is one line
+   filling (`PROGRESS_CELLS`). Decoration for the eye; the count says it. */
+.sorter-progress {
+  flex: 0 0 auto;
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-right: calc(var(--hit) * -1);
+  gap: 3px;
+  width: 200px;
+  height: 2px;
+  background: transparent;
 }
 
-/* Nothing to do once the pile has ended: only the cross is left. */
-.sorter-tools:empty {
-  display: none;
+.sorter-progress-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--rule-soft);
+}
+
+.sorter-progress-cell[data-at="done"] {
+  background: var(--muted);
+}
+
+.sorter-progress-cell[data-at="here"] {
+  background: var(--ink);
+}
+
+/* The long pile: one track, filled to where you are. */
+.sorter-progress:has(.sorter-progress-fill) {
+  background: var(--rule-soft);
+}
+
+.sorter-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+}
+
+/* On a phone the count and the pile are a row of their own under the
+   creature's, the band's full width, so its words keep the room. */
+.sorter-pile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  margin-top: var(--s-4);
+  margin-right: calc(var(--exit-clear) * -1 + var(--head-x));
+}
+
+.sorter-pile-row .sorter-at {
+  margin-left: 0;
+}
+
+.sorter-pile-row .sorter-progress {
+  flex: 1 1 auto;
+  width: auto;
 }
 
 .sorter-at {
@@ -121,6 +163,94 @@
 
 .sorter-done:active {
   background: var(--raised);
+  color: var(--ink);
+}
+
+/* Back with its word, under the note on a wide window. */
+.sorter-done-word {
+  width: auto;
+  gap: var(--s-4);
+  padding: 0 var(--s-5);
+}
+
+/* The two halves of the screen. On a phone one column, the note above the
+   places; on a wide window a row, the note's half taking what the places'
+   column leaves. */
+.sorter-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sorter-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The note's own four — Open, Important, To-do, Remind — each a mark and its
+   word, in a row under the words. Not places: they change the note and leave
+   it where it is (Remind then shows the next). On a phone they share the
+   screen's width; on a wide window they keep to the note's column. */
+.sorter-tools {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+/* On a phone the four share the width, each centred in its share, so a 360px
+   screen holds every word. */
+.sorter-tool {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: var(--hit);
+  padding: 0 var(--s-2);
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: var(--cursor-pointer);
+}
+
+.sorter-tool:active {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* A control's word: the reading face at the text size, sentence case — the
+   rule every verb in the app follows (00-foundation, review UI-01). */
+.sorter-word {
+  font-family: var(--body);
+  font-size: var(--t-text);
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+/* Back and Leave, under the note on a wide window: the pair that walks the
+   pile, at opposite ends of the note's column, Leave the one with an edge. */
+.sorter-nav {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(33 * var(--t-read) + 2 * var(--s-6));
+  margin: auto auto 0;
+  padding: var(--s-6) var(--s-6) calc(var(--s-7) + env(safe-area-inset-bottom));
+}
+
+.sorter-nav .sorter-skip {
+  gap: var(--s-4);
+  padding: 0 var(--s-6);
+  border: 1px solid var(--rule);
   color: var(--ink);
 }
 
@@ -315,6 +445,33 @@
   border-top: 1px solid var(--rule);
 }
 
+/* The places, then the three answers that are not places. On a phone the
+   places are a grid two to a row and the answers a row of three at the floor:
+   Leave, Archive, Delete — Leave first, Delete last, Archive between them so
+   a thumb aiming for one end does not land on the other. */
+.sorter-to-list {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  max-height: 45dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sorter-to-list .sorter-dest-wide {
+  grid-column: 1 / -1;
+}
+
+.sorter-to-end {
+  flex: 1 1 100%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 1px;
+  border-top: 1px solid var(--rule);
+}
+
 /* A destination is a target before it is a word: 44px of thumb, the name in the
    display face because a folder is a named place. */
 .sorter-dest {
@@ -356,14 +513,6 @@
    two halves under it keep their places whatever the list holds. */
 .sorter-dest-wide {
   flex-basis: 100%;
-}
-
-/* The folders drawn directly (PL-02): two to a row on a phone, three on a wide
-   window, which is what `fitsBeneath` counts against. */
-@media (min-width: 700px) {
-  .sorter-to-direct .sorter-dest:not(.sorter-dest-wide) {
-    flex-basis: 30%;
-  }
 }
 
 /* The number that picks a place, on a machine with a keyboard (`.kbd` is drawn
@@ -511,16 +660,6 @@
   /* The Ticker's two bands are gathered the same way, in `95-keep-import.css`
      after their own rules: written here, a later `padding` shorthand there
      overrode them and left the bands full width on a big screen. */
-  .sorter-head {
-    padding-left: max(16px, calc((100% - 33 * var(--t-read)) / 2));
-    padding-right: max(6px, calc((100% - 33 * var(--t-read)) / 2));
-  }
-
-  .sorter-tools {
-    gap: 8px;
-    margin-right: 0;
-  }
-
   .sorter-to {
     width: 100%;
     max-width: calc(33 * var(--t-read));
@@ -535,23 +674,86 @@
   }
 }
 
-/* A wide window worked with a mouse stands the destinations right under the
-   note, the pile in the middle of the screen, instead of a screen's height
-   away on the floor: every note was a read at the top and a mouse trip to the
-   bottom and back (review 2026-10-24, PL-06). The card keeps one height, ten
-   lines, whatever the note, so the destinations never move between notes; a
-   long note scrolls inside it, and a short window lets it give. A touch
-   screen keeps them under the thumb at the floor. The width is the app's own
-   one breakpoint, so this is no second one (`breakpoint.test.ts`). */
-@media (min-width: 700px) and (hover: hover) and (pointer: fine) {
-  .sorter-card {
-    flex: 0 1 calc(10 * var(--lh-read) * var(--t-read));
-    margin-top: auto;
-  }
+/* Layout A on a wide window (`.sorter-side`, 2026-10-24, the owner's pick; it
+   replaces the destinations-under-the-note of review 2026-10-24, PL-06). The
+   note's half is a column: the words from near the top, the pile's edge and
+   the note's own four under them, Back and Leave at the foot. The places are
+   one column down the right edge, a row each, scrolling inside themselves,
+   with Archive and Delete side by side at its foot — every place the same
+   short trip from the note, and none of them ever moves between notes. */
+.sorter-side .sorter-head {
+  min-height: 0;
+  padding-bottom: var(--s-5);
+}
 
-  .sorter-to {
-    margin-bottom: auto;
-  }
+.sorter-side .sorter-body {
+  flex-direction: row;
+}
+
+.sorter-side .sorter-main {
+  padding-top: calc(2 * var(--s-8));
+}
+
+.sorter-side .sorter-card {
+  flex: 0 1 auto;
+}
+
+.sorter-side .sorter-tools {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(33 * var(--t-read) + 2 * var(--s-6));
+  margin-inline: auto;
+  padding: var(--s-2) var(--s-6) 0;
+  gap: var(--s-5);
+}
+
+.sorter-side .sorter-tool {
+  flex: 0 0 auto;
+  gap: var(--s-4);
+  padding: 0 var(--s-4);
+}
+
+.sorter-side .sorter-tool:first-child {
+  margin-left: calc(var(--s-4) * -1);
+}
+
+.sorter-side .sorter-body > .sorter-to {
+  flex: 0 0 min(380px, 34vw);
+  flex-wrap: nowrap;
+  flex-direction: column;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+  padding-top: var(--s-6);
+  background: var(--paper);
+  border-top: 0;
+  border-right: 0;
+  border-left: 1px solid var(--rule);
+}
+
+.sorter-side .sorter-to-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sorter-side .sorter-to-list .sorter-dest {
+  flex: 0 0 auto;
+  padding-inline: var(--s-7);
+}
+
+.sorter-side .sorter-to-end {
+  flex: 0 0 auto;
+}
+
+.sorter-side .sorter-to-end .sorter-dest {
+  min-height: calc(var(--hit) + var(--s-5));
+  padding-inline: var(--s-7);
 }
 
 /* A short window — a phone on its side — has no height to spare for a second
@@ -569,10 +771,6 @@
 
   .sorter-head-row {
     flex: 1 1 auto;
-  }
-
-  .sorter-tools {
-    margin-right: 0;
   }
 }
 

@@ -2,14 +2,47 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { cycleTab } from "../lib/focusTrap";
 import { shownRows, walkRows } from "../lib/rowKeys";
 import { useRestoreFocus } from "../lib/useRestoreFocus";
-import { hotkeyTitle, isTypingTarget, UNDO_KEY, useHasKeyboard } from "../lib/hotkeys";
+import { DUPLICATE_KEY, hotkeyTitle, isTypingTarget, REDO_KEY, UNDO_KEY, useHasKeyboard } from "../lib/hotkeys";
 import { useIsPhone } from "../lib/breakpoint";
 import { ERASE_REACH, pathBetween, strokeHit } from "../lib/strokeErase";
 import type { CSSProperties } from "react";
-import type { Attachment, Canvas, CanvasItem, CanvasText, DrawingStroke, Note } from "../types";
+import type { Attachment, Canvas, CanvasItem, CanvasText, CanvasTool, DrawingStroke, Note, ShapeKind } from "../types";
 import { cardLines } from "../lib/face";
-import { anchorScroll, clampZoom, DEFAULT_W, IMG_W, worldFromClient } from "../lib/canvas";
-import { fitView } from "../lib/canvasFit";
+import { anchorScroll, clampZoom, DEFAULT_W, IMG_W, picturesOf, TEXT_W, worldFromClient } from "../lib/canvas";
+import { fitView, fitWhole } from "../lib/canvasFit";
+import { strokePath } from "../lib/strokePath";
+import { constrainShape, isClosedShape, shapePoints, shapeStroke, tooSmall } from "../lib/shapes";
+import { recogniseShape, SNAP_HOLD_MS, SNAP_STILL_PX } from "../lib/shapeSnap";
+import {
+  pictureChanged,
+  redoStep,
+  strokeAdded,
+  strokeChanged,
+  strokeRemoved,
+  textAdded,
+  textChanged,
+  textRemoved,
+  undoStep,
+  UNDO_DEPTH,
+  type Change,
+  type Step,
+} from "../lib/canvasSteps";
+import {
+  boxBetween,
+  carryPicture,
+  carryStroke,
+  carryText,
+  isEmptySelection,
+  pick,
+  selectionBounds,
+  STILL,
+  stretchScale,
+  type Box,
+  type Carry,
+  type Placed,
+  type Selection,
+} from "../lib/canvasSelection";
+import { useSetting } from "../lib/settings";
 import { noteName } from "../lib/name";
 import { previewsFor } from "../lib/links";
 import { useTimeMark } from "../lib/clock";
@@ -20,21 +53,34 @@ import { useFileUrl } from "../store/useFileUrl";
 import {
   IconBack,
   IconDelete,
+  IconDownload,
+  IconDuplicate,
   IconEraser,
+  IconFit,
   IconFile,
   IconFileType,
   IconHand,
+  IconHighlighter,
+  IconLasso,
   IconLink,
   IconMerge,
   IconPencil,
+  IconPicture,
   IconPriority,
+  IconRedo,
   IconRelease,
+  IconShape,
+  IconShapes,
   IconText,
   IconUndo,
   IconUnmerge,
 } from "./Icons";
 import { isUnmergeable, unmergeSources } from "../lib/merge";
 import { CardBody } from "./shared/CardBody";
+import { CANVAS_COLOURS, CANVAS_WIDTHS, HIGHLIGHT_WIDTHS } from "../lib/canvasPalette";
+import { CanvasTextLabel } from "./CanvasTextLabel";
+import { CanvasPicture } from "./CanvasPicture";
+import { Dialog } from "./Dialog";
 
 const WORLD_SIZE = 100_000;
 const WORLD_ORIGIN = WORLD_SIZE / 2;
@@ -51,26 +97,7 @@ const IMG_MIN_W = 60;
 const NOTE_DEFAULT_W = DEFAULT_W;
 const IMG_DEFAULT_W = IMG_W;
 
-/**
- * A pencil has a weight, not a hue. `--signal` was in this list and it is the
- * one thing the app singles out — it means a live address and nothing else, so
- * a stroke drawn in it was the app saying "link" about a scribble. What is left
- * is the same tonal scale the rules are built from, which is what lets a
- * drawing sit on the page as annotation rather than as decoration.
- *
- * The quiet pencil is `--rule` and not `--rule-soft`. On the old light canvas a
- * soft rule was a perfectly good faint pencil; against the near-black one it is
- * 1.3:1 and you would draw a stroke and not be able to find it. A pencil you
- * cannot see is not a quiet pencil, it is a broken one.
- */
-const DRAW_COLORS = [
-  { label: "Ink", value: "var(--ink)" },
-  { label: "Muted", value: "var(--muted)" },
-  { label: "Faint", value: "var(--rule)" },
-];
-const DRAW_WIDTHS = [2, 4, 8];
-
-type Tool = "move" | "draw" | "erase";
+type Tool = CanvasTool;
 
 /** A stroke and the place it held in the list, so taking it back puts it where it was. */
 interface StrokeEntry {
@@ -79,14 +106,23 @@ interface StrokeEntry {
 }
 
 /**
- * One thing done to the drawing in this open session, and how to take it back.
- * Kept here and never stored or synced: the way back is for the sitting you are
- * in, the same as zoom.
+ * Strokes taken off, as one step. Highest place first, so Undo — which walks a step
+ * backwards — sets them back lowest first, and each lands where it stood.
  */
-type StrokeStep = { kind: "drew"; id: string } | { kind: "rubbed"; entries: StrokeEntry[] };
+function removals(entries: StrokeEntry[]): Step {
+  return [...entries].sort((a, b) => b.index - a.index).map((e) => strokeRemoved(e.stroke, e.index));
+}
 
-/** How many steps back Undo goes. A sitting's worth, not a history. */
-const UNDO_DEPTH = 100;
+/** The shapes the Shapes tool offers, in the order its picker lists them. */
+const SHAPES: readonly { kind: ShapeKind; label: string }[] = [
+  { kind: "rect", label: "Rectangle" },
+  { kind: "ellipse", label: "Ellipse" },
+  { kind: "line", label: "Line" },
+  { kind: "arrow", label: "Arrow" },
+];
+
+/** How far a copy stands from what it copies, so it is seen arriving. */
+const COPY_STEP = 24;
 
 interface Props {
   folder: Canvas;
@@ -119,13 +155,25 @@ interface Props {
   onClearStrokes: (canvasId: string) => void;
   /** One stroke off the drawing — the eraser, and the way back from a stroke drawn. */
   onRemoveStroke: (canvasId: string, strokeId: string) => void;
-  /** Strokes back where they stood — the way back from the eraser and from Clear. */
-  onRestoreStrokes: (canvasId: string, entries: StrokeEntry[]) => void;
+  /**
+   * Any change to the drawing, as one write: Undo and Redo, and everything the Select tool
+   * does. `useCanvases.changeCanvas` — the same queued write every other edit is.
+   */
+  onChangeCanvas: (canvasId: string, change: (canvas: Canvas) => Canvas) => void;
   onResizeNote: (canvasId: string, noteId: string, width: number) => void;
   onResizeImage: (canvasId: string, attachmentId: string, width: number) => void;
   onAddText: (canvasId: string, text: CanvasText) => void;
-  onEditText: (canvasId: string, textId: string, changes: Partial<Pick<CanvasText, "text" | "x" | "y">>) => void;
+  onEditText: (canvasId: string, textId: string, changes: Partial<Pick<CanvasText, "text" | "x" | "y" | "width">>) => void;
   onRemoveText: (canvasId: string, textId: string) => void;
+  /**
+   * Pictures pasted, dropped or picked onto the canvas, to stand at `at` (world
+   * coordinates). They become ordinary attachments of the idea note; without
+   * this the canvas takes no pictures and leaves a paste or a drop to the app.
+   */
+  onAddImages?: (canvasId: string, files: File[], at: [number, number]) => void;
+  onMoveImage?: (canvasId: string, attachmentId: string, x: number, y: number) => void;
+  /** Takes the picture off the canvas and destroys its file. Asked first, here. */
+  onRemoveImage?: (canvasId: string, attachmentId: string) => void;
   /**
    * The tool the sheet opens holding. A sketch opens with the pen already in
    * hand — drawing is what it is for — while a composed idea keeps opening in
@@ -163,10 +211,13 @@ interface DragState {
 }
 
 interface PanState {
+  pointerId: number;
   startX: number;
   startY: number;
   originLeft: number;
   originTop: number;
+  /** A middle-button pan works through any tool; an ordinary pan belongs to Move. */
+  middle: boolean;
 }
 
 interface ResizeState {
@@ -179,28 +230,6 @@ interface ImageResizeState {
   attachmentId: string;
   startX: number;
   originWidth: number;
-}
-
-function strokePath(points: [number, number][], origin: number): string {
-  if (points.length === 0) return "";
-  const [first, ...rest] = points;
-  let d = `M ${origin + first[0]} ${origin + first[1]}`;
-  if (rest.length === 0) return d;
-  if (rest.length === 1) {
-    const [p] = rest;
-    d += ` L ${origin + p[0]} ${origin + p[1]}`;
-    return d;
-  }
-  for (let i = 0; i < rest.length - 1; i++) {
-    const cp = rest[i];
-    const end = rest[i + 1];
-    const mx = (origin + cp[0] + origin + end[0]) / 2;
-    const my = (origin + cp[1] + origin + end[1]) / 2;
-    d += ` Q ${origin + cp[0]} ${origin + cp[1]} ${mx} ${my}`;
-  }
-  const last = rest[rest.length - 1];
-  d += ` L ${origin + last[0]} ${origin + last[1]}`;
-  return d;
 }
 
 const SpatialAttachment = memo(function SpatialAttachment({
@@ -435,138 +464,19 @@ const NoteCapsule = memo(function NoteCapsule({
   );
 });
 
-/** Memoized for the same reason `NoteCapsule` is — see its comment. */
-const CanvasTextLabel = memo(function CanvasTextLabel({
-  text,
-  canvasId,
-  zoomRef,
-  onEditText,
-  onRemoveText,
-}: {
-  text: CanvasText;
-  canvasId: string;
-  zoomRef: React.RefObject<number>;
-  onEditText: (canvasId: string, textId: string, changes: Partial<Pick<CanvasText, "text" | "x" | "y">>) => void;
-  onRemoveText: (canvasId: string, textId: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(text.text);
-  const [dragState, setDragState] = useState<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
-  const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const keyboard = useHasKeyboard();
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  function handleDoubleClick(event: React.MouseEvent) {
-    event.stopPropagation();
-    setDraft(text.text);
-    setEditing(true);
-  }
-
-  function handleBlur() {
-    setEditing(false);
-    if (draft.trim()) {
-      onEditText(canvasId, text.id, { text: draft });
-    } else {
-      onRemoveText(canvasId, text.id);
-    }
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      (event.target as HTMLTextAreaElement).blur();
-    }
-    if (event.key === "Escape") {
-      setEditing(false);
-      setDraft(text.text);
-    }
-  }
-
-  function handlePointerDown(event: React.PointerEvent) {
-    if (editing) return;
-    event.stopPropagation();
-    setDragState({
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: text.x,
-      originY: text.y,
-    });
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-  }
-
-  function handlePointerMove(event: React.PointerEvent) {
-    if (!dragState) return;
-    // Same reasoning as a note's own drag: the pointer moves in screen
-    // pixels, the label's position is a world one.
-    const dx = (event.clientX - dragState.startX) / zoomRef.current;
-    const dy = (event.clientY - dragState.startY) / zoomRef.current;
-    onEditText(canvasId, text.id, { x: dragState.originX + dx, y: dragState.originY + dy });
-  }
-
-  function handlePointerUp(event: React.PointerEvent) {
-    setDragState(null);
-    event.currentTarget.releasePointerCapture?.(event.pointerId);
-  }
-
-  function handleContextMenu(event: React.MouseEvent) {
-    event.stopPropagation();
-    event.preventDefault();
-    onRemoveText(canvasId, text.id);
-  }
-
-  /** Enter on the label itself starts the edit, as a double-click does. A key
-   *  from the field inside bubbles here too and is the field's own. */
-  function handleLabelKeyDown(event: React.KeyboardEvent) {
-    if (event.key !== "Enter" || event.target !== event.currentTarget || editing) return;
-    event.preventDefault();
-    setDraft(text.text);
-    setEditing(true);
-  }
-
-  return (
-    <div
-      className="canvas-text"
-      data-id={text.id}
-      style={{ left: WORLD_ORIGIN + text.x, top: WORLD_ORIGIN + text.y }}
-      // A button while it is a label; the field inside carries its own name.
-      role={editing ? undefined : "button"}
-      tabIndex={editing ? undefined : 0}
-      aria-label={editing ? undefined : text.text || "Empty text"}
-      onKeyDown={handleLabelKeyDown}
-      onDoubleClick={handleDoubleClick}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      onContextMenu={handleContextMenu}
-    >
-      {editing ? (
-        <textarea
-          ref={inputRef}
-          className="canvas-text-input"
-          aria-label="Text on the idea"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          rows={1}
-        />
-      ) : (
-        <span className="canvas-text-label">
-          {text.text || (keyboard ? "Double-click to edit" : "Tap twice to edit")}
-        </span>
-      )}
-    </div>
-  );
-});
-
 const CTX_ROWS = '[role^="menuitem"]:not(:disabled)';
+
+/**
+ * What the canvas takes: pictures, and only when everything that arrived is
+ * one. A paste or drop that also carries another kind of file is the app's,
+ * whole, as before — never half taken here and half lost.
+ */
+function picturesOnly(list: FileList | File[] | null | undefined): File[] {
+  const files = Array.from(list ?? []);
+  // An iPhone photograph can arrive with no type at all; its name still says.
+  const picture = (file: File) => file.type.startsWith("image/") || /\.(heic|heif)$/i.test(file.name);
+  return files.length > 0 && files.every(picture) ? files : [];
+}
 
 /**
  * A right-click menu as every other panel is one (`MenuPanel`): a menu of
@@ -578,11 +488,16 @@ const CTX_ROWS = '[role^="menuitem"]:not(:disabled)';
 function CtxMenu({
   x,
   y,
+  above = false,
+  className = "",
   label,
   children,
 }: {
   x: number;
   y: number;
+  /** Fixed distance from the viewport's bottom rather than from its top. */
+  above?: boolean;
+  className?: string;
   label: string;
   children: React.ReactNode;
 }) {
@@ -594,10 +509,10 @@ function CtxMenu({
   return (
     <div
       ref={ref}
-      className="ctx-menu"
+      className={`ctx-menu${className ? ` ${className}` : ""}`}
       role="menu"
       aria-label={label}
-      style={{ left: x, top: y }}
+      style={above ? { left: x, bottom: y } : { left: x, top: y }}
       onKeyDown={(e) => walkRows(e, CTX_ROWS)}
     >
       {children}
@@ -739,20 +654,29 @@ export function CanvasSheet({
   onAddStroke,
   onClearStrokes,
   onRemoveStroke,
-  onRestoreStrokes,
+  onChangeCanvas,
   onResizeNote,
   onResizeImage,
   onAddText,
   onEditText,
   onRemoveText,
+  onAddImages,
+  onMoveImage,
+  onRemoveImage,
   initialTool,
   justMerged = false,
   where,
 }: Props) {
   const [items, setItems] = useState(folder.items);
   const [tool, setTool] = useState<Tool>(initialTool ?? "move");
-  const [color, setColor] = useState(DRAW_COLORS[0].value);
-  const [width, setWidth] = useState(DRAW_WIDTHS[1]);
+  const [color, setColor] = useState(CANVAS_COLOURS[0].value);
+  const [width, setWidth] = useState<number>(CANVAS_WIDTHS[1]);
+  const [highlightWidth, setHighlightWidth] = useState<number>(HIGHLIGHT_WIDTHS[1]);
+  const [shapeKind, setShapeKind] = useState<ShapeKind>("rect");
+  const [shapeFill, setShapeFill] = useState(false);
+  /** The pen tidies a rough circle, box or line held still at its end (Settings can turn it off). */
+  const tidyShapes = useSetting("tidyShapes") === "on";
+  const [optionMenu, setOptionMenu] = useState<{ kind: "color" | "width" | "shape"; x: number; y: number; above: boolean } | null>(null);
   const [liveStroke, setLiveStroke] = useState<DrawingStroke | null>(null);
   /** The stroke being drawn, read at the lift. Beside the state, which only paints. */
   const liveRef = useRef<DrawingStroke | null>(null);
@@ -761,8 +685,37 @@ export function CanvasSheet({
    * once, so two quick presses never take back the same step; the state is only
    * there so the button knows whether it has anything to do.
    */
-  const stepsRef = useRef<StrokeStep[]>([]);
+  const stepsRef = useRef<Step[]>([]);
   const [stepCount, setStepCount] = useState(0);
+  /** What Redo would do again: the steps Undo took back, emptied by anything new. */
+  const redoRef = useRef<Step[]>([]);
+  const [redoCount, setRedoCount] = useState(0);
+  /** The pen held still: where it rests, the wait, and the rough stroke a snap replaced. */
+  const snap = useRef<{ x: number; y: number; timer: number | null; rough: DrawingStroke | null }>({
+    x: 0,
+    y: 0,
+    timer: null,
+    rough: null,
+  });
+  /** The shape being dragged out: the corner it started from. */
+  const shaping = useRef<[number, number] | null>(null);
+  /** What the Select tool holds, and the loop or box being drawn round it. */
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [region, setRegion] = useState<{ loop: [number, number][] } | { box: Box } | null>(null);
+  /** The selection being carried or stretched, drawn live and written once at the lift. */
+  const [carry, setCarry] = useState<Carry>(STILL);
+  const selecting = useRef<{
+    mode: "loop" | "box" | "move" | "stretch";
+    start: [number, number];
+    loop: [number, number][];
+    bounds: Box | null;
+    /** Labels as measured at the press: while they are stretched the page measures the stretch. */
+    texts: Placed[];
+  } | null>(null);
+  /** The carry as the last move left it, read at the lift: the state may not have painted yet. */
+  const carryRef = useRef<Carry>(STILL);
+  /** A line for a moment at the foot of the canvas: a picture that could not be made. */
+  const [notice, setNotice] = useState<string | null>(null);
   /** The rub in progress: where the finger last was, the list it began on, and what it has taken. */
   const erasing = useRef<{ last: [number, number] | null; start: DrawingStroke[]; gone: Map<string, StrokeEntry> } | null>(null);
   const strokesRef = useRef(folder.strokes);
@@ -779,6 +732,20 @@ export function CanvasSheet({
    * the grid answers with.
    */
   const [noteMenu, setNoteMenu] = useState<{ x: number; y: number; note: Note } | null>(null);
+  /** A label's own menu, and a placed picture's, both opened by right-clicking it. */
+  const [textMenu, setTextMenu] = useState<{ x: number; y: number; text: CanvasText } | null>(null);
+  const [pictureMenu, setPictureMenu] = useState<{ x: number; y: number; att: Attachment } | null>(null);
+  /** Removing a picture destroys its file, so it asks first, as the open note does. */
+  const [removing, setRemoving] = useState<Attachment[] | null>(null);
+  /** The label just set down and not yet written: an editor until it holds words. */
+  const [draftText, setDraftText] = useState<CanvasText | null>(null);
+  /** The label the menu's Edit text asked to open. */
+  const [editTextId, setEditTextId] = useState<string | null>(null);
+  const pickerRef = useRef<HTMLInputElement | null>(null);
+  /** Where a picked picture should land: the menu's spot, else the middle of the view. */
+  const pickAt = useRef<[number, number] | null>(null);
+  /** Pictures set down this sitting, so a second one lands beside the first, not on it. */
+  const placedCount = useRef(0);
   /**
    * How far this canvas is zoomed, on this device, right now. Not a fact
    * about the arrangement — two people never agree on it, and a canvas made
@@ -939,6 +906,13 @@ export function CanvasSheet({
   // itself did.
   const imageWidths = useMemo(() => folder.image_widths ?? {}, [folder.image_widths]);
 
+  /** Pictures set on the canvas itself: the idea note's own files, where each stands. */
+  const pictures = useMemo(() => picturesOf(idea, folder), [idea, folder]);
+  const moveImage = useCallback(
+    (canvasId: string, attachmentId: string, x: number, y: number) => onMoveImage?.(canvasId, attachmentId, x, y),
+    [onMoveImage],
+  );
+
   const updateItem = useCallback((noteId: string, x: number, y: number) => {
     setItems((current) => {
       const next = current.map((item) =>
@@ -965,23 +939,34 @@ export function CanvasSheet({
     });
   }
 
-  function startPan(event: React.PointerEvent<HTMLDivElement>) {
+  function startPan(event: React.PointerEvent<HTMLDivElement>, middle = false) {
     // Used to bail on anything but a mouse, because native touch scrolling
     // was doing the panning for a finger. `.canvas-surface` now takes
     // `touch-action: none` so a second finger can be seen for a pinch — which
     // means a touch pointer has nothing left to pan it but this handler.
-    if (event.target instanceof Element && event.target.closest(".spatial-note, .spatial-resize-handle")) return;
-    if (tool !== "move") return;
+    if (!middle && event.target instanceof Element && event.target.closest(".spatial-note, .spatial-resize-handle")) return;
+    if (!middle && tool !== "move") return;
+    if (event.pointerType === "mouse" && event.button !== (middle ? 1 : 0)) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     event.preventDefault();
     pan.current = {
+      pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       originLeft: canvas.scrollLeft,
       originTop: canvas.scrollTop,
+      middle,
     };
     event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  /** Middle-click is always a pan, never the tool in hand. Capture runs before
+   * a note or label can claim the press, and stops it reaching them at all. */
+  function startMiddlePan(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.pointerType !== "mouse" || event.button !== 1) return;
+    event.stopPropagation();
+    startPan(event, true);
   }
 
   function movePan(event: React.PointerEvent<HTMLDivElement>) {
@@ -993,65 +978,173 @@ export function CanvasSheet({
   }
 
   function endPan(event: React.PointerEvent<HTMLDivElement>) {
+    if (pan.current?.pointerId !== event.pointerId) return;
     pan.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   }
 
+  /** The pen and the highlighter: the same hand, a different line. */
+  const drawsLine = tool === "draw" || tool === "highlight";
+
   function startDraw(event: React.PointerEvent<HTMLDivElement>) {
-    if (tool !== "draw") return;
+    if (!drawsLine) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     if (event.target instanceof Element && event.target.closest(".spatial-note, .spatial-resize-handle")) return;
     if (event.pointerType !== "mouse" && event.pointerType !== "touch" && event.pointerType !== "pen") return;
     event.preventDefault();
     drawing.current = true;
     const [wx, wy] = toWorldCoords(event.clientX, event.clientY);
-    liveRef.current = {
-      id: crypto.randomUUID(),
-      points: [[wx, wy]],
-      color,
-      width,
-    };
+    liveRef.current =
+      tool === "highlight"
+        ? { id: crypto.randomUUID(), points: [[wx, wy]], color, width: highlightWidth, highlight: true }
+        : { id: crypto.randomUUID(), points: [[wx, wy]], color, width };
     setLiveStroke(liveRef.current);
+    restSnap(event.clientX, event.clientY);
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }
 
   function moveDraw(event: React.PointerEvent<HTMLDivElement>) {
     if (!drawing.current || !liveRef.current) return;
+    // Tidied: the shape stands as it was snapped until the lift.
+    if (snap.current.rough) return;
     const [wx, wy] = toWorldCoords(event.clientX, event.clientY);
     liveRef.current = { ...liveRef.current, points: [...liveRef.current.points, [wx, wy]] };
     setLiveStroke(liveRef.current);
+    if (Math.hypot(event.clientX - snap.current.x, event.clientY - snap.current.y) > SNAP_STILL_PX) {
+      restSnap(event.clientX, event.clientY);
+    }
   }
+
+  /**
+   * The pen came to rest at `x, y` (screen pixels): wait, and if it is still there when the
+   * wait is over, see whether what it drew was a line, a ring or a box, and tidy it. Only the
+   * pen, never the highlighter, and nothing at all when Settings says no.
+   */
+  function restSnap(x: number, y: number) {
+    stopSnapWait();
+    snap.current.x = x;
+    snap.current.y = y;
+    if (tool !== "draw" || !tidyShapes) return;
+    snap.current.timer = window.setTimeout(() => {
+      snap.current.timer = null;
+      const live = liveRef.current;
+      if (!drawing.current || !live || snap.current.rough) return;
+      const found = recogniseShape(live.points);
+      if (!found) return;
+      snap.current.rough = live;
+      liveRef.current = { ...live, points: shapePoints(found.kind, found.from, found.to, live.width), shape: found.kind };
+      setLiveStroke(liveRef.current);
+    }, SNAP_HOLD_MS);
+  }
+
+  function stopSnapWait() {
+    if (snap.current.timer !== null) window.clearTimeout(snap.current.timer);
+    snap.current.timer = null;
+  }
+
+  useEffect(() => stopSnapWait, []);
 
   function endDraw(event: React.PointerEvent<HTMLDivElement>) {
     if (!drawing.current) return;
     drawing.current = false;
+    stopSnapWait();
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    const done = liveRef.current;
+    const rough = snap.current.rough;
+    snap.current.rough = null;
+    liveRef.current = null;
+    setLiveStroke(null);
+    if (!done || done.points.length < 2) return;
+    const index = strokesRef.current.length;
+    onAddStroke(folder.id, done);
+    if (rough) {
+      // Two steps: the stroke as drawn, then its tidying — so one Undo gives the rough
+      // line back, which is the way out of a snap nobody wanted.
+      pushStep([strokeAdded(rough, index)]);
+      pushStep([strokeChanged(rough, done, index)]);
+    } else {
+      pushStep([strokeAdded(done, index)]);
+    }
+  }
+
+  /* --- shapes ------------------------------------------------------------- */
+
+  function startShape(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    shaping.current = toWorldCoords(event.clientX, event.clientY);
+    liveRef.current = null;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function moveShape(event: React.PointerEvent<HTMLDivElement>) {
+    const from = shaping.current;
+    if (!from) return;
+    const to = constrainShape(shapeKind, from, toWorldCoords(event.clientX, event.clientY), event.shiftKey);
+    if (tooSmall(from, to, zoomRef.current)) return;
+    liveRef.current = shapeStroke(liveRef.current?.id ?? crypto.randomUUID(), shapeKind, from, to, {
+      color,
+      width,
+      fill: shapeFill,
+    });
+    setLiveStroke(liveRef.current);
+  }
+
+  function endShape(event: React.PointerEvent<HTMLDivElement>) {
+    if (!shaping.current) return;
+    shaping.current = null;
     event.currentTarget.releasePointerCapture?.(event.pointerId);
     const done = liveRef.current;
     liveRef.current = null;
     setLiveStroke(null);
-    if (done && done.points.length > 1) {
-      onAddStroke(folder.id, done);
-      pushStep({ kind: "drew", id: done.id });
-    }
+    if (!done) return;
+    const index = strokesRef.current.length;
+    onAddStroke(folder.id, done);
+    pushStep([strokeAdded(done, index)]);
   }
 
-  /** Records a step Undo can take back. */
-  function pushStep(step: StrokeStep) {
+  /* --- undo and redo ------------------------------------------------------ */
+
+  /** Records a step Undo can take back. Anything new ends what Redo could do again. */
+  function pushStep(step: Step) {
+    if (step.length === 0) return;
     stepsRef.current = [...stepsRef.current, step].slice(-UNDO_DEPTH);
     setStepCount(stepsRef.current.length);
+    redoRef.current = [];
+    setRedoCount(0);
+  }
+
+  /** Does a step for the first time — what the Select tool changes — and records it. */
+  function doStep(step: Step) {
+    if (step.length === 0) return;
+    onChangeCanvas(folder.id, (canvas) => redoStep(canvas, step));
+    pushStep(step);
   }
 
   /**
-   * Takes back the last thing done to the drawing in this sitting: a stroke
-   * drawn goes, strokes rubbed out or cleared come back where they stood.
-   * Answers whether there was anything, which is what the key needs to know.
+   * Takes back the last thing done to the drawing in this sitting. Answers whether there was
+   * anything, which is what the key needs to know.
    */
   function undoStroke(): boolean {
     const last = stepsRef.current[stepsRef.current.length - 1];
     if (!last) return false;
     stepsRef.current = stepsRef.current.slice(0, -1);
     setStepCount(stepsRef.current.length);
-    if (last.kind === "drew") onRemoveStroke(folder.id, last.id);
-    else onRestoreStrokes(folder.id, last.entries);
+    redoRef.current = [...redoRef.current, last];
+    setRedoCount(redoRef.current.length);
+    onChangeCanvas(folder.id, (canvas) => undoStep(canvas, last));
+    return true;
+  }
+
+  /** Does again what Undo just took back. */
+  function redoStroke(): boolean {
+    const last = redoRef.current[redoRef.current.length - 1];
+    if (!last) return false;
+    redoRef.current = redoRef.current.slice(0, -1);
+    setRedoCount(redoRef.current.length);
+    stepsRef.current = [...stepsRef.current, last].slice(-UNDO_DEPTH);
+    setStepCount(stepsRef.current.length);
+    onChangeCanvas(folder.id, (canvas) => redoStep(canvas, last));
     return true;
   }
 
@@ -1059,7 +1152,7 @@ export function CanvasSheet({
     const entries = folder.strokes.map((stroke, index) => ({ stroke, index }));
     if (entries.length === 0) return;
     onClearStrokes(folder.id);
-    pushStep({ kind: "rubbed", entries });
+    pushStep(removals(entries));
   }
 
   /**
@@ -1069,6 +1162,7 @@ export function CanvasSheet({
    */
   function startErase(event: React.PointerEvent<HTMLDivElement>) {
     if (tool !== "erase") return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     if (event.target instanceof Element && event.target.closest(".spatial-note, .spatial-resize-handle")) return;
     if (event.pointerType !== "mouse" && event.pointerType !== "touch" && event.pointerType !== "pen") return;
     event.preventDefault();
@@ -1099,29 +1193,386 @@ export function CanvasSheet({
     if (!state) return;
     erasing.current = null;
     event?.currentTarget.releasePointerCapture?.(event.pointerId);
-    if (state.gone.size > 0) pushStep({ kind: "rubbed", entries: [...state.gone.values()] });
+    if (state.gone.size > 0) pushStep(removals([...state.gone.values()]));
+  }
+
+  /* --- select ------------------------------------------------------------- */
+
+  /**
+   * Labels and pictures as the page draws them, in world units: their place from the
+   * canvas, their size from the page (a label is as tall as its words), with a stand-in
+   * where nothing is laid out yet.
+   */
+  function placed(): { texts: Placed[]; images: Placed[] } {
+    const world = canvasRef.current?.querySelector(".canvas-world");
+    const sized = (selector: string, id: string) =>
+      world?.querySelector<HTMLElement>(`${selector}[data-id="${CSS.escape(id)}"]`) ?? null;
+    const texts = (folder.text_elements ?? []).map((t) => {
+      const el = sized(".canvas-text", t.id);
+      const w = el?.offsetWidth || t.width || TEXT_W;
+      return { id: t.id, box: { x: t.x, y: t.y, w, h: el?.offsetHeight || 32 } };
+    });
+    const images = pictures.map(({ att, x, y }) => {
+      const el = sized(".canvas-picture", att.id);
+      const w = imageWidths[att.id] ?? IMG_DEFAULT_W;
+      return { id: att.id, box: { x, y, w, h: el?.offsetHeight || Math.round(w * 0.75) } };
+    });
+    return { texts, images };
+  }
+
+  /** The box round what is selected — carried, if it is being moved — or null with nothing left. */
+  function selectedBox(withCarry: boolean): Box | null {
+    if (!selection || isEmptySelection(selection)) return null;
+    // Being carried, the page already shows the carry: the box is the one measured at the press.
+    const held = selecting.current?.bounds;
+    if (withCarry && carry !== STILL && held) {
+      const [ax, ay] = carry.anchor;
+      return {
+        x: ax + (held.x - ax) * carry.scale + carry.dx,
+        y: ay + (held.y - ay) * carry.scale + carry.dy,
+        w: held.w * carry.scale,
+        h: held.h * carry.scale,
+      };
+    }
+    const { texts, images } = placed();
+    const box = selectionBounds(selection, folder.strokes ?? [], texts, images);
+    if (!box || !withCarry || carry === STILL) return box;
+    const [ax, ay] = carry.anchor;
+    return {
+      x: ax + (box.x - ax) * carry.scale + carry.dx,
+      y: ay + (box.y - ay) * carry.scale + carry.dy,
+      w: box.w * carry.scale,
+      h: box.h * carry.scale,
+    };
+  }
+
+  /**
+   * The Select tool. Inside the box the press carries what is selected, on its corner it
+   * stretches it; anywhere else it draws round something new — a loop for a finger or a pen,
+   * a box for a mouse, the way each is used to.
+   */
+  function startSelect(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    const at = toWorldCoords(event.clientX, event.clientY);
+    const bounds = selectedBox(false);
+    const onHandle = event.target instanceof Element && event.target.closest(".canvas-selection-handle");
+    // A finger is wider than a hairline: a press a little outside the box still counts.
+    const slack = 12 / zoomRef.current;
+    const inside =
+      bounds !== null &&
+      at[0] >= bounds.x - slack &&
+      at[0] <= bounds.x + bounds.w + slack &&
+      at[1] >= bounds.y - slack &&
+      at[1] <= bounds.y + bounds.h + slack;
+    const mode = bounds && onHandle ? "stretch" : inside ? "move" : event.pointerType === "mouse" ? "box" : "loop";
+    selecting.current = { mode, start: at, loop: [at], bounds, texts: placed().texts };
+    carryRef.current = STILL;
+    // The old selection stands until the lift decides: a second finger may yet make this a pinch.
+    if (mode === "loop" || mode === "box") setRegion(mode === "loop" ? { loop: [at] } : { box: boxBetween(at, at) });
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function moveSelect(event: React.PointerEvent<HTMLDivElement>) {
+    const state = selecting.current;
+    if (!state) return;
+    const at = toWorldCoords(event.clientX, event.clientY);
+    if (state.mode === "loop") {
+      state.loop = [...state.loop, at];
+      setRegion({ loop: state.loop });
+    } else if (state.mode === "box") {
+      setRegion({ box: boxBetween(state.start, at) });
+    } else if (state.mode === "move") {
+      carryRef.current = { dx: at[0] - state.start[0], dy: at[1] - state.start[1], scale: 1, anchor: [0, 0] };
+      setCarry(carryRef.current);
+    } else if (state.bounds) {
+      const scale = stretchScale(state.bounds, at[0] - state.start[0], at[1] - state.start[1]);
+      carryRef.current = { dx: 0, dy: 0, scale, anchor: [state.bounds.x, state.bounds.y] };
+      setCarry(carryRef.current);
+    }
+  }
+
+  function endSelect(event: React.PointerEvent<HTMLDivElement>) {
+    const state = selecting.current;
+    if (!state) return;
+    selecting.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (state.mode === "loop" || state.mode === "box") {
+      setRegion(null);
+      const { texts, images } = placed();
+      let picked: Selection | null = null;
+      if (state.mode === "loop" && state.loop.length > 2) {
+        picked = pick({ loop: state.loop }, folder.strokes ?? [], texts, images);
+      } else if (state.mode === "box") {
+        const box = boxBetween(state.start, toWorldCoords(event.clientX, event.clientY));
+        // A click, not a drag: it lets go of what was selected and takes nothing new.
+        if ((box.w + box.h) * zoomRef.current > 6) picked = pick({ box }, folder.strokes ?? [], texts, images);
+      }
+      setSelection(picked && !isEmptySelection(picked) ? picked : null);
+      return;
+    }
+    const done = carryRef.current;
+    carryRef.current = STILL;
+    setCarry(STILL);
+    if (done.dx === 0 && done.dy === 0 && done.scale === 1) return;
+    // A picture never moved has no place of its own yet, only the one it is drawn at. It is given
+    // that place first, so the step finds it there — a step never touches a picture that is gone.
+    const placedIds = new Set((folder.images ?? []).map((i) => i.attachment_id));
+    const unplaced = pictures
+      .filter(({ att }) => selection?.images.includes(att.id) && !placedIds.has(att.id))
+      .map(({ att, x, y }) => ({ attachment_id: att.id, x, y }));
+    if (unplaced.length > 0) onChangeCanvas(folder.id, (canvas) => ({ ...canvas, images: [...(canvas.images ?? []), ...unplaced] }));
+    doStep(carried(done, state.texts));
+  }
+
+  /** What carrying the selection by `how` changes, item by item, as one step. `texts` as measured at the press. */
+  function carried(how: Carry, texts: Placed[]): Step {
+    if (!selection) return [];
+    const step: Change[] = [];
+    const strokeIds = new Set(selection.strokes);
+    (folder.strokes ?? []).forEach((s, i) => {
+      if (strokeIds.has(s.id)) step.push(strokeChanged(s, carryStroke(s, how), i));
+    });
+    const textIds = new Set(selection.texts);
+    (folder.text_elements ?? []).forEach((t, i) => {
+      if (!textIds.has(t.id)) return;
+      const w = texts.find((p) => p.id === t.id)?.box.w ?? t.width ?? TEXT_W;
+      step.push(textChanged(t, carryText(t, how, w), i));
+    });
+    const imageIds = new Set(selection.images);
+    const placedImages = folder.images ?? [];
+    for (const { att, x, y } of pictures) {
+      if (!imageIds.has(att.id)) continue;
+      const width = imageWidths[att.id] ?? IMG_DEFAULT_W;
+      const was = placedImages.findIndex((i) => i.attachment_id === att.id);
+      step.push(
+        pictureChanged(
+          { attachment_id: att.id, x, y, width },
+          { attachment_id: att.id, ...carryPicture({ x, y, width }, how, IMG_MIN_W) },
+          was === -1 ? placedImages.length : was,
+        ),
+      );
+    }
+    return step;
+  }
+
+  /** The selected strokes take the colour picked. */
+  function recolourSelection(next: string) {
+    if (!selection) return;
+    const ids = new Set(selection.strokes);
+    const step: Step = [];
+    (folder.strokes ?? []).forEach((s, i) => {
+      if (ids.has(s.id) && s.color !== next) step.push(strokeChanged(s, { ...s, color: next }, i));
+    });
+    doStep(step);
+  }
+
+  /** A copy of the selection beside it, which becomes the selection. Pictures are files, and stay single. */
+  function duplicateSelection() {
+    if (!selection) return;
+    const step: Step = [];
+    const strokeIds = new Set(selection.strokes);
+    const textIds = new Set(selection.texts);
+    const copies: Selection = { strokes: [], texts: [], images: [] };
+    let strokeAt = (folder.strokes ?? []).length;
+    for (const s of folder.strokes ?? []) {
+      if (!strokeIds.has(s.id)) continue;
+      const copy = carryStroke({ ...s, id: crypto.randomUUID() }, { ...STILL, dx: COPY_STEP, dy: COPY_STEP });
+      step.push(strokeAdded(copy, strokeAt++));
+      copies.strokes.push(copy.id);
+    }
+    let textAt = (folder.text_elements ?? []).length;
+    for (const t of folder.text_elements ?? []) {
+      if (!textIds.has(t.id)) continue;
+      const copy = { ...t, id: crypto.randomUUID(), x: t.x + COPY_STEP, y: t.y + COPY_STEP };
+      step.push(textAdded(copy, textAt++));
+      copies.texts.push(copy.id);
+    }
+    if (step.length === 0) return;
+    doStep(step);
+    setSelection(copies);
+  }
+
+  /**
+   * The selection off the canvas. Strokes and labels go as one step Undo sets back; a
+   * picture's file is destroyed with it, so pictures are asked about first, as Remove is.
+   */
+  function deleteSelection() {
+    if (!selection) return;
+    const strokeIds = new Set(selection.strokes);
+    const textIds = new Set(selection.texts);
+    const strokes = (folder.strokes ?? []).flatMap((stroke, index) => (strokeIds.has(stroke.id) ? [{ stroke, index }] : []));
+    const texts = (folder.text_elements ?? []).flatMap((t, i) => (textIds.has(t.id) ? [textRemoved(t, i)] : []));
+    doStep([...removals(strokes), ...texts.reverse()]);
+    const going = pictures.filter(({ att }) => selection.images.includes(att.id)).map(({ att }) => att);
+    if (going.length > 0) setRemoving(going);
+    setSelection(null);
   }
 
   // Ctrl+Z, while there is something to take back. Caught before the board's own
   // (useKeyboardUndo), which is the same key one layer down: the stroke you just
   // drew is the thing the key means here. With nothing left it falls through, so
   // it still undoes a merge. A field being typed in keeps its own, and so does a
-  // note open over the idea.
-  const undoRef = useRef(undoStroke);
-  undoRef.current = undoStroke;
+  // note open over the idea. Redo, Duplicate and Delete answer only while they have
+  // something to do, and the board has none of them, so nothing else is shadowed.
+  const keysRef = useRef({ undo: undoStroke, redo: redoStroke, duplicate: duplicateSelection, remove: deleteSelection, selected: false });
+  keysRef.current = {
+    undo: undoStroke,
+    redo: redoStroke,
+    duplicate: duplicateSelection,
+    remove: deleteSelection,
+    selected: !isEmptySelection(selection),
+  };
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
-      if (e.key.toLowerCase() !== UNDO_KEY) return;
-      if (isTypingTarget(e.target) || document.querySelector(".sheet")) return;
-      if (stepsRef.current.length === 0) return;
+      if (isTypingTarget(e.target) || document.querySelector(".sheet, .dialog-scrim")) return;
+      const mod = (e.ctrlKey || e.metaKey) && !e.altKey;
+      const letter = e.key.toLowerCase();
+      const keys = keysRef.current;
+      let done = false;
+      if (mod && !e.shiftKey && letter === UNDO_KEY) {
+        done = keys.undo();
+      } else if (mod && ((e.shiftKey && letter === UNDO_KEY) || (!e.shiftKey && letter === REDO_KEY))) {
+        done = keys.redo();
+      } else if (mod && !e.shiftKey && letter === DUPLICATE_KEY && keys.selected) {
+        keys.duplicate();
+        done = true;
+      } else if (!mod && !e.shiftKey && (e.key === "Delete" || e.key === "Backspace") && keys.selected) {
+        keys.remove();
+        done = true;
+      }
+      if (!done) return;
       e.preventDefault();
       e.stopPropagation();
-      undoRef.current();
     }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
+
+  /* --- fit and save ------------------------------------------------------- */
+
+  /**
+   * What the drawing covers, in world units: strokes from their points, and labels,
+   * pictures and notes from the page, which alone knows how tall each is.
+   */
+  function contentBox(): Box | null {
+    const world = canvasRef.current?.querySelector(".canvas-world");
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const s of folder.strokes ?? []) {
+      for (const [x, y] of s.points) {
+        left = Math.min(left, x - s.width / 2);
+        top = Math.min(top, y - s.width / 2);
+        right = Math.max(right, x + s.width / 2);
+        bottom = Math.max(bottom, y + s.width / 2);
+      }
+    }
+    if (world) {
+      const origin = world.getBoundingClientRect();
+      const z = zoomRef.current;
+      for (const el of world.querySelectorAll(".spatial-note, .canvas-text, .canvas-picture")) {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) continue;
+        left = Math.min(left, (r.left - origin.left) / z - WORLD_ORIGIN);
+        top = Math.min(top, (r.top - origin.top) / z - WORLD_ORIGIN);
+        right = Math.max(right, (r.right - origin.left) / z - WORLD_ORIGIN);
+        bottom = Math.max(bottom, (r.bottom - origin.top) / z - WORLD_ORIGIN);
+      }
+    }
+    return left === Infinity ? null : { x: left, y: top, w: right - left, h: bottom - top };
+  }
+
+  const hasContent =
+    (folder.strokes ?? []).length > 0 ||
+    (folder.text_elements ?? []).length > 0 ||
+    pictures.length > 0 ||
+    children.length > 0;
+
+  /** Everything on the canvas in view at once: further out for a big drawing, never past 100% for a small one. */
+  function fitAll() {
+    const canvas = canvasRef.current;
+    const box = contentBox();
+    if (!canvas || !box) return;
+    const fit = fitWhole(
+      { ...box, x: box.x + WORLD_ORIGIN, y: box.y + WORLD_ORIGIN },
+      { w: canvas.clientWidth, h: canvas.clientHeight },
+      FIT_EDGE * 2,
+    );
+    if (fit.zoom === zoomRef.current) {
+      canvas.scrollLeft = fit.left;
+      canvas.scrollTop = fit.top;
+      return;
+    }
+    pendingAnchor.current = fit;
+    setZoom(fit.zoom);
+  }
+
+  /** The drawing as a PNG: shared on a phone, downloaded on a desktop. */
+  async function savePictureOfCanvas() {
+    const box = contentBox();
+    const world = canvasRef.current?.querySelector(".canvas-world");
+    if (!box || !world || !sheetRef.current) return;
+    let exporter: typeof import("../lib/canvasExport");
+    try {
+      exporter = await import("../lib/canvasExport");
+    } catch {
+      setNotice("The picture maker did not load. Check the connection and try again.");
+      return;
+    }
+    const { renderCanvasPicture, savePicture, pictureName } = exporter;
+    const look = getComputedStyle(sheetRef.current);
+    const probe = document.createElement("span");
+    sheetRef.current.appendChild(probe);
+    const colour = (token: string) => {
+      probe.style.color = token;
+      return getComputedStyle(probe).color;
+    };
+    const sample = world.querySelector(".canvas-text-label, .canvas-text");
+    const type = getComputedStyle(sample ?? sheetRef.current);
+    const pad = 24;
+    const scene = {
+      box: { x: box.x - pad, y: box.y - pad, w: box.w + pad * 2, h: box.h + pad * 2 },
+      strokes: folder.strokes ?? [],
+      labels: placed().texts.flatMap(({ id, box: b }) => {
+        const t = (folder.text_elements ?? []).find((candidate) => candidate.id === id);
+        return t ? [{ x: b.x, y: b.y, width: b.w, text: t.text }] : [];
+      }),
+      pictures: pictures.flatMap(({ att, x, y }) => {
+        const el = world.querySelector<HTMLElement>(`.canvas-picture[data-id="${CSS.escape(att.id)}"]`);
+        const img = el?.querySelector("img");
+        if (!el || !img || !img.complete || img.naturalWidth === 0) return [];
+        return [{ img, x, y, w: el.offsetWidth, h: el.offsetHeight }];
+      }),
+      notes: children.flatMap(({ note, item }) => {
+        const el = world.querySelector<HTMLElement>(`.spatial-note[data-id="${CSS.escape(note.id)}"]`);
+        const w = el?.offsetWidth || item.width || NOTE_DEFAULT_W;
+        return [{ x: item.x, y: item.y, w, h: el?.offsetHeight || 160, text: note.body }];
+      }),
+    };
+    const blob = await renderCanvasPicture(scene, {
+      paper: colour("var(--paper)"),
+      ink: colour("var(--ink)"),
+      rule: colour("var(--rule)"),
+      colour,
+      font: type.font || `16px "Libre Baskerville"`,
+      lineHeight: parseFloat(type.lineHeight) || 24,
+      highlightOpacity: parseFloat(look.getPropertyValue("--highlight-opacity")) || 0.35,
+    });
+    probe.remove();
+    if (!blob) {
+      setNotice("This browser could not make a picture of the drawing.");
+      return;
+    }
+    await savePicture(blob, pictureName(idea ? noteName(idea.body) : null), !keyboard);
+  }
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), MERGED_LINE_MS);
+    return () => window.clearTimeout(t);
+  }, [notice]);
 
   /**
    * A second finger landing on the canvas always wins: whatever the first
@@ -1138,6 +1589,13 @@ export function CanvasSheet({
     drag.current = null;
     pan.current = null;
     drawing.current = false;
+    stopSnapWait();
+    snap.current.rough = null;
+    shaping.current = null;
+    selecting.current = null;
+    setRegion(null);
+    carryRef.current = STILL;
+    setCarry(STILL);
     liveRef.current = null;
     setLiveStroke(null);
     endErase();
@@ -1219,21 +1677,54 @@ export function CanvasSheet({
 
   function handleCanvasPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     setMergedLine(false);
+    // The capture-phase middle-pan handler stops that press before it gets
+    // here. Every other non-primary mouse button is a menu or no action at
+    // all, never the active drawing tool.
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     activePointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (activePointers.current.size >= 2) {
       beginPinch();
       return;
     }
-    if (tool === "draw") {
+    if (drawsLine) {
       startDraw(event);
+    } else if (tool === "shape") {
+      startShape(event);
+    } else if (tool === "select") {
+      startSelect(event);
     } else if (tool === "erase") {
       startErase(event);
+    } else if (tool === "text") {
+      startText(event);
     } else {
       startPan(event);
     }
   }
 
+  /**
+   * The Text tool: a press on the canvas sets a label down there and opens it
+   * for typing. A press while a label is being typed in only finishes that one
+   * — the second click is how a person says "done", not "another".
+   */
+  function startText(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.target instanceof Element && event.target.closest(".spatial-note, .canvas-text, .spatial-resize-handle")) return;
+    event.preventDefault();
+    const typing = document.activeElement;
+    if (typing instanceof HTMLElement && typing.classList.contains("canvas-text-input")) {
+      typing.blur();
+      return;
+    }
+    if (draftText) return;
+    const [x, y] = toWorldCoords(event.clientX, event.clientY);
+    // The press marks where the words start: the first line's middle, not the box's corner.
+    setDraftText({ id: crypto.randomUUID(), x: x - 9, y: y - 16, text: "", width: TEXT_W });
+  }
+
   function handleCanvasPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (pan.current?.middle && pan.current.pointerId === event.pointerId) {
+      movePan(event);
+      return;
+    }
     if (activePointers.current.has(event.pointerId)) {
       activePointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     }
@@ -1241,8 +1732,12 @@ export function CanvasSheet({
       continuePinch();
       return;
     }
-    if (tool === "draw") {
+    if (drawsLine) {
       moveDraw(event);
+    } else if (tool === "shape") {
+      moveShape(event);
+    } else if (tool === "select") {
+      moveSelect(event);
     } else if (tool === "erase") {
       rub(event);
     } else {
@@ -1251,12 +1746,20 @@ export function CanvasSheet({
   }
 
   function handleCanvasPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (pan.current?.middle && pan.current.pointerId === event.pointerId) {
+      endPan(event);
+      return;
+    }
     activePointers.current.delete(event.pointerId);
     // Fewer than two pointers left and the pinch is over — the next move
     // (if any) belongs to whatever tool is in hand.
     if (activePointers.current.size < 2) pinch.current = null;
-    if (tool === "draw") {
+    if (drawsLine) {
       endDraw(event);
+    } else if (tool === "shape") {
+      endShape(event);
+    } else if (tool === "select") {
+      endSelect(event);
     } else if (tool === "erase") {
       endErase(event);
     } else {
@@ -1266,9 +1769,11 @@ export function CanvasSheet({
 
   function handleContextMenu(event: React.MouseEvent<HTMLDivElement>) {
     event.preventDefault();
-    if (event.target instanceof Element && event.target.closest(".spatial-note, .canvas-text")) return;
+    if (event.target instanceof Element && event.target.closest(".spatial-note, .canvas-text, .canvas-picture")) return;
     const [worldX, worldY] = toWorldCoords(event.clientX, event.clientY);
     setNoteMenu(null);
+    setTextMenu(null);
+    setPictureMenu(null);
     setContextMenu({ x: event.clientX, y: event.clientY, worldX, worldY });
   }
 
@@ -1285,21 +1790,133 @@ export function CanvasSheet({
     setNoteMenu({ x: event.clientX, y: event.clientY, note });
   }, []);
 
+  /** The menu's Add text: the same unsaved editor the Text tool sets down. */
   function handleAddText() {
     if (!contextMenu) return;
-    const text: CanvasText = {
-      id: crypto.randomUUID(),
-      x: contextMenu.worldX,
-      y: contextMenu.worldY,
-      text: "",
-    };
-    onAddText(folder.id, text);
+    setDraftText({ id: crypto.randomUUID(), x: contextMenu.worldX, y: contextMenu.worldY, text: "", width: TEXT_W });
     setContextMenu(null);
+  }
+
+  // A label's words are its own (`CanvasTextLabel`); taking one off goes
+  // through here so Undo can set it back. Stable, for the labels' memo.
+  const textsRef = useRef(folder.text_elements);
+  textsRef.current = folder.text_elements;
+  const removeLabel = useCallback(
+    (canvasId: string, textId: string) => {
+      const index = (textsRef.current ?? []).findIndex((t) => t.id === textId);
+      const text = (textsRef.current ?? [])[index];
+      onRemoveText(canvasId, textId);
+      if (!text) return;
+      stepsRef.current = [...stepsRef.current, [textRemoved(text, index)]].slice(-UNDO_DEPTH);
+      setStepCount(stepsRef.current.length);
+      redoRef.current = [];
+      setRedoCount(0);
+    },
+    [onRemoveText],
+  );
+  const finishDraft = useCallback(() => setDraftText(null), []);
+  const doneEditRequest = useCallback(() => setEditTextId(null), []);
+
+  const handleTextMenu = useCallback((event: React.MouseEvent, text: CanvasText) => {
+    setContextMenu(null);
+    setNoteMenu(null);
+    setPictureMenu(null);
+    setTextMenu({ x: event.clientX, y: event.clientY, text });
+  }, []);
+
+  const handlePictureMenu = useCallback((event: React.MouseEvent, att: Attachment) => {
+    setContextMenu(null);
+    setNoteMenu(null);
+    setTextMenu(null);
+    setPictureMenu({ x: event.clientX, y: event.clientY, att });
+  }, []);
+
+  /* --- pictures ----------------------------------------------------------- */
+
+  /** The middle of what is on screen, in world coordinates. */
+  function viewMiddle(): [number, number] {
+    const canvas = canvasRef.current;
+    if (!canvas) return [0, 0];
+    const rect = canvas.getBoundingClientRect();
+    return toWorldCoords(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  /**
+   * Sets pictures down with `point` as the middle of the first one. Each one
+   * set down this sitting steps a little down and right of the last, so a
+   * second paste is seen arriving rather than hidden under the first.
+   */
+  function addPictures(files: File[], point: [number, number]) {
+    if (!onAddImages) return;
+    const step = (placedCount.current % 8) * 24;
+    placedCount.current += files.length;
+    onAddImages(folder.id, files, [point[0] - IMG_DEFAULT_W / 2 + step, point[1] - 80 + step]);
+  }
+
+  // A pasted picture belongs to the canvas, not to a new note on the board
+  // behind it: caught on the way down, before the app's own paste
+  // (`useFilePaste`) can see it. Words pasted into a label are the label's.
+  const pasteRef = useRef<(e: ClipboardEvent) => void>(() => {});
+  pasteRef.current = (e: ClipboardEvent) => {
+    if (!onAddImages || e.defaultPrevented) return;
+    // A note opened over the idea, or a question asked over it, takes its own.
+    if (document.querySelector(".sheet, .dialog-scrim")) return;
+    const files = picturesOnly(e.clipboardData?.files);
+    if (files.length === 0) return;
+    if (isTypingTarget(e.target) && Array.from(e.clipboardData?.types ?? []).includes("text/plain")) {
+      // The words go into the label; the picture riding with them (a caption
+      // copied with its image) must not become a note on the board behind.
+      e.stopPropagation();
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    addPictures(files, viewMiddle());
+  };
+  useEffect(() => {
+    const paste = (e: ClipboardEvent) => pasteRef.current(e);
+    window.addEventListener("paste", paste, true);
+    return () => window.removeEventListener("paste", paste, true);
+  }, []);
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    if (!onAddImages || !Array.from(event.dataTransfer?.types ?? []).includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  /** A picture dropped lands where it was let go. Anything else is the app's, as before. */
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    if (!onAddImages) return;
+    const files = picturesOnly(event.dataTransfer?.files);
+    if (files.length === 0) return;
+    event.preventDefault();
+    addPictures(files, toWorldCoords(event.clientX, event.clientY));
+  }
+
+  function pickPictures(at: [number, number] | null) {
+    pickAt.current = at;
+    pickerRef.current?.click();
+  }
+
+  function handlePicked(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = picturesOnly(event.target.files);
+    // Emptied, so picking the same file twice still says something changed.
+    event.target.value = "";
+    if (files.length > 0) addPictures(files, pickAt.current ?? viewMiddle());
+    pickAt.current = null;
   }
 
   function handleSetTool(next: Tool) {
     setTool(next);
+    if (next !== "select") {
+      setSelection(null);
+      setRegion(null);
+    }
     setContextMenu(null);
+    setOptionMenu(null);
+    setTextMenu(null);
+    setPictureMenu(null);
   }
 
   // The next three are `useCallback`-stable for the same reason
@@ -1308,6 +1925,7 @@ export function CanvasSheet({
   // fresh handler prop every time is not memoized at all.
   const startNoteDrag = useCallback((event: React.PointerEvent<HTMLElement>, item: CanvasItem) => {
     if (tool !== "move") return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     if (event.target instanceof Element && event.target.closest(".spatial-resize-handle")) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1381,47 +1999,39 @@ export function CanvasSheet({
   /**
    * The drawing controls, built once and set down in one of two places: in the
    * bar at the top on a desktop, where there is room for all of them in a row,
-   * and in a bar at the foot on a phone, where the thumb is and where the row
-   * would otherwise run off the edge with Clear and the zoom past it. One set
-   * of buttons, never both bars at once (the same reason the shelf branches in
-   * JavaScript and not in CSS: two copies are two of everything to a reader).
+   * and at the foot on a phone, where the thumb is — the tools on one row, what
+   * they do (Undo, Redo, a picture, Fit) on the next, the tool's own choices
+   * under that. One set of buttons, never both bars at once (the same reason the
+   * shelf branches in JavaScript and not in CSS: two copies are two of
+   * everything to a reader).
    */
-  const mainTools = (
+  const toolButton = (name: Tool, label: string, icon: React.ReactNode) => (
+    <button
+      type="button"
+      className="canvas-tool-btn"
+      data-on={tool === name}
+      aria-pressed={tool === name}
+      aria-label={label}
+      title={label}
+      onClick={() => handleSetTool(name)}
+    >
+      {icon}
+    </button>
+  );
+  const toolButtons = (
     <>
-      <button
-        type="button"
-        className="canvas-tool-btn"
-        data-on={tool === "move"}
-        aria-pressed={tool === "move"}
-        aria-label="Move"
-        title="Move"
-        onClick={() => setTool("move")}
-      >
-        <IconHand />
-      </button>
-      <button
-        type="button"
-        className="canvas-tool-btn"
-        data-on={tool === "draw"}
-        aria-pressed={tool === "draw"}
-        aria-label="Draw"
-        title="Draw"
-        onClick={() => setTool("draw")}
-      >
-        <IconPencil />
-      </button>
-      <button
-        type="button"
-        className="canvas-tool-btn"
-        data-on={tool === "erase"}
-        aria-pressed={tool === "erase"}
-        aria-label="Eraser"
-        title="Eraser"
-        onClick={() => setTool("erase")}
-      >
-        <IconEraser />
-      </button>
-      {/* Disabled, not hidden, so nothing beside it moves when the first stroke
+      {toolButton("move", "Move", <IconHand />)}
+      {toolButton("select", "Select", <IconLasso />)}
+      {toolButton("draw", "Draw", <IconPencil />)}
+      {toolButton("highlight", "Highlighter", <IconHighlighter />)}
+      {toolButton("shape", "Shapes", <IconShapes />)}
+      {toolButton("text", "Text", <IconText />)}
+      {toolButton("erase", "Eraser", <IconEraser />)}
+    </>
+  );
+  const actionButtons = (
+    <>
+      {/* Disabled, not hidden, so nothing beside them moves when the first stroke
           is drawn or the last is taken back. */}
       <button
         type="button"
@@ -1433,49 +2043,180 @@ export function CanvasSheet({
       >
         <IconUndo />
       </button>
+      <button
+        type="button"
+        className="canvas-tool-btn"
+        aria-label="Redo"
+        title={keyboard ? `Redo, ${hotkeyTitle(REDO_KEY)}` : "Redo"}
+        disabled={redoCount === 0}
+        onClick={() => redoStroke()}
+      >
+        <IconRedo />
+      </button>
+      {/* Actions, not tools: they leave the tool in hand as it was. */}
+      {onAddImages && (
+        <button
+          type="button"
+          className="canvas-tool-btn"
+          aria-label="Add picture"
+          title="Add picture"
+          onClick={() => pickPictures(null)}
+        >
+          <IconPicture />
+        </button>
+      )}
+      <button
+        type="button"
+        className="canvas-tool-btn"
+        aria-label="Show everything"
+        title="Show everything"
+        disabled={!hasContent}
+        onClick={fitAll}
+      >
+        <IconFit />
+      </button>
     </>
   );
-  const colorTools = DRAW_COLORS.map((c) => (
+  const currentColour = CANVAS_COLOURS.find((candidate) => candidate.value === color) ?? CANVAS_COLOURS[0];
+  const selected = selection && !isEmptySelection(selection) ? selection : null;
+  /** The colour the picker marks: the pen's, or with strokes selected, theirs when they share one. */
+  const selectedColours = selected
+    ? new Set((folder.strokes ?? []).filter((s) => selected.strokes.includes(s.id)).map((s) => s.color))
+    : null;
+  const shownColour =
+    selectedColours && selectedColours.size === 1
+      ? (CANVAS_COLOURS.find((c) => selectedColours.has(c.value)) ?? currentColour)
+      : currentColour;
+  const recolours = tool === "select" && selected !== null && selected.strokes.length > 0;
+
+  function openOptionMenu(event: React.MouseEvent<HTMLButtonElement>, kind: "color" | "width" | "shape") {
+    const rect = event.currentTarget.getBoundingClientRect();
+    // On a phone it stands above the whole dock, never over the tools' own row.
+    const dockTop = event.currentTarget.closest(".canvas-dock")?.getBoundingClientRect().top ?? rect.top;
+    setContextMenu(null);
+    setNoteMenu(null);
+    setOptionMenu({
+      kind,
+      x: phone ? 8 : Math.max(8, Math.min(rect.left, window.innerWidth - 240)),
+      y: phone ? window.innerHeight - dockTop + 4 : rect.bottom + 4,
+      above: phone,
+    });
+  }
+
+  const colourWord = recolours ? "Colour of the selection" : "Pen colour";
+  const colorTool = (
     <button
-      key={c.value}
       type="button"
       className="canvas-color-btn"
-      data-on={color === c.value}
-      // `aria-pressed`, like the tools and the three weights beside it. Every
-      // control in this bar says whether it is on and this one said it only in
-      // `data-on`, a CSS hook, so the one row where the state *is* the whole
-      // message was silent to a reader.
-      aria-pressed={color === c.value}
-      aria-label={c.label}
-      title={c.label}
-      // The tone rides in as a custom property rather than as the button's own
-      // fill: the button is a thumb's worth tall and the swatch is still the
-      // 22px sample, drawn by `.canvas-color-btn::after`.
-      style={{ "--pen": c.value } as CSSProperties}
-      onClick={() => setColor(c.value)}
+      data-on={optionMenu?.kind === "color"}
+      aria-label={`${colourWord}: ${shownColour.label}`}
+      aria-haspopup="menu"
+      aria-expanded={optionMenu?.kind === "color"}
+      title={`${colourWord}: ${shownColour.label}`}
+      style={{ "--pen": shownColour.value } as CSSProperties}
+      onClick={(event) => openOptionMenu(event, "color")}
     />
-  ));
+  );
 
-  const widthTools = DRAW_WIDTHS.map((w) => (
+  const shownWidth = tool === "highlight" ? highlightWidth : width;
+  const widthTool = (
     <button
-      key={w}
       type="button"
       className="canvas-width-btn"
-      data-on={width === w}
-      aria-pressed={width === w}
-      aria-label={`Stroke width ${w}`}
-      title={`Width ${w}`}
-      onClick={() => setWidth(w)}
+      data-on={optionMenu?.kind === "width"}
+      aria-label={`Line thickness: ${shownWidth}`}
+      aria-haspopup="menu"
+      aria-expanded={optionMenu?.kind === "width"}
+      title={`Line thickness: ${shownWidth}`}
+      onClick={(event) => openOptionMenu(event, "width")}
     >
       {/* The control is the stroke: a rule at the weight it draws, not a circle
-          standing in for one. Nothing is rounded. */}
-      <span className="canvas-width-rule" style={{ height: w }} />
+          standing in for one. Nothing is rounded. A highlighter's is drawn at a
+          third of its weight, or the bar would have to grow round it. */}
+      <span className="canvas-width-rule" style={{ height: tool === "highlight" ? shownWidth / 3 : shownWidth }} />
     </button>
-  ));
+  );
+
+  const currentShape = SHAPES.find((s) => s.kind === shapeKind) ?? SHAPES[0];
+  const shapeTool = (
+    <button
+      type="button"
+      className="canvas-tool-btn"
+      data-on={optionMenu?.kind === "shape"}
+      aria-label={`Shape: ${currentShape.label}`}
+      aria-haspopup="menu"
+      aria-expanded={optionMenu?.kind === "shape"}
+      title={`Shape: ${currentShape.label}`}
+      onClick={(event) => openOptionMenu(event, "shape")}
+    >
+      <IconShape kind={shapeKind} />
+    </button>
+  );
+
+  // Fill is offered only for a shape that closes: a line has no inside.
+  const fillTool = isClosedShape(shapeKind) ? (
+    <button
+      type="button"
+      className="canvas-tool-btn"
+      data-on={shapeFill}
+      aria-pressed={shapeFill}
+      aria-label="Fill"
+      title="Fill"
+      onClick={() => setShapeFill((on) => !on)}
+    >
+      <IconShape kind={shapeKind} filled />
+    </button>
+  ) : null;
+
+  /** What the selection can be told to do, while there is one. */
+  const selectionTools = selected ? (
+    <>
+      <button
+        type="button"
+        className="canvas-tool-btn"
+        aria-label="Duplicate"
+        title={keyboard ? `Duplicate, ${hotkeyTitle(DUPLICATE_KEY)}` : "Duplicate"}
+        disabled={selected.strokes.length + selected.texts.length === 0}
+        onClick={duplicateSelection}
+      >
+        <IconDuplicate />
+      </button>
+      <button
+        type="button"
+        className="canvas-tool-btn"
+        aria-label="Delete selection"
+        title={keyboard ? "Delete selection, Delete" : "Delete selection"}
+        onClick={deleteSelection}
+      >
+        <IconDelete tier="inline" />
+      </button>
+    </>
+  ) : null;
+
+  /** The tool's own choices, beside it on a desktop and on their own row on a phone. */
+  const separated = (parts: (React.ReactNode | null)[]) =>
+    parts
+      .filter((part) => part !== null && part !== false)
+      .map((part, i) => (
+        <span className="canvas-tool-group" key={i}>
+          {i > 0 && <span className="canvas-tool-sep" aria-hidden />}
+          {part}
+        </span>
+      ));
+  const optionTools =
+    tool === "draw"
+      ? separated([colorTool, widthTool])
+      : tool === "highlight"
+        ? separated([colorTool, widthTool])
+        : tool === "shape"
+          ? separated([shapeTool, fillTool, colorTool, widthTool])
+          : selected
+            ? separated([recolours ? colorTool : null, selectionTools])
+            : [];
 
   // Clear goes with the pen and the eraser, not the hand; Undo now takes it back.
   const clearTool =
-    tool !== "move" && folder.strokes.length > 0 ? (
+    (tool === "draw" || tool === "erase") && folder.strokes.length > 0 ? (
       <button
         type="button"
         className="canvas-tool-btn"
@@ -1502,6 +2243,23 @@ export function CanvasSheet({
       </button>
     ) : null;
 
+  /** Strokes as drawn this instant: a selection being carried is drawn where it is going. */
+  const carriedIds = carry !== STILL && selected ? new Set(selected.strokes) : null;
+  const shownStrokes = carriedIds ? allStrokes.map((s) => (carriedIds.has(s.id) ? carryStroke(s, carry) : s)) : allStrokes;
+  const strokeMark = (stroke: DrawingStroke) => (
+    <path
+      key={stroke.id}
+      className={stroke.highlight ? "canvas-highlight" : undefined}
+      d={strokePath(stroke, WORLD_ORIGIN)}
+      fill={stroke.fill ? stroke.color : "none"}
+      stroke={stroke.color}
+      strokeWidth={stroke.width}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  );
+  const shownBox = selectedBox(true);
+
   return (
     <section
       className="canvas-sheet"
@@ -1518,10 +2276,19 @@ export function CanvasSheet({
         // Escape closes the layer on top: a right-click menu before the canvas
         // (review UX-A-05). The app's own Escape listener closes the canvas
         // and stands down for a key already taken here.
-        if (e.key === "Escape" && (contextMenu || noteMenu) && !isTypingTarget(e.target)) {
+        if (e.key === "Escape" && (contextMenu || noteMenu || optionMenu || textMenu || pictureMenu) && !isTypingTarget(e.target)) {
           e.preventDefault();
           setContextMenu(null);
           setNoteMenu(null);
+          setOptionMenu(null);
+          setTextMenu(null);
+          setPictureMenu(null);
+          return;
+        }
+        // ...and a selection before the canvas: Escape lets go of it.
+        if (e.key === "Escape" && selection && !isTypingTarget(e.target)) {
+          e.preventDefault();
+          setSelection(null);
           return;
         }
         if (e.key !== "Tab" || isTypingTarget(e.target)) return;
@@ -1560,13 +2327,13 @@ export function CanvasSheet({
 
         {!phone && (
           <div className="canvas-tools" ref={tools}>
-            {mainTools}
-            {tool === "draw" && (
+            {toolButtons}
+            <span className="canvas-tool-sep" aria-hidden />
+            {actionButtons}
+            {optionTools.length > 0 && (
               <>
                 <span className="canvas-tool-sep" aria-hidden />
-                {colorTools}
-                <span className="canvas-tool-sep" aria-hidden />
-                {widthTools}
+                {optionTools}
               </>
             )}
             {clearTool && (
@@ -1583,16 +2350,30 @@ export function CanvasSheet({
             )}
           </div>
         )}
+        {/* The drawing leaves as a picture: shared on a phone, saved on a desktop. */}
+        <button
+          type="button"
+          className="iconbtn canvas-save"
+          aria-label="Save as picture"
+          title="Save as picture"
+          disabled={!hasContent}
+          onClick={() => void savePictureOfCanvas()}
+        >
+          <IconDownload tier="nav" />
+        </button>
       </header>
       <div
         ref={canvasRef}
         className="canvas-surface"
         data-tool={tool}
+        onPointerDownCapture={startMiddlePan}
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handleCanvasPointerMove}
         onPointerUp={handleCanvasPointerUp}
         onPointerCancel={handleCanvasPointerUp}
         onContextMenu={handleContextMenu}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
         {/* The scaling wrapper: a transform repaints the world at `zoom`
             without ever changing its own layout size, so something has to
@@ -1608,34 +2389,90 @@ export function CanvasSheet({
             className="canvas-world"
             style={{ width: WORLD_SIZE, height: WORLD_SIZE, transform: `scale(${zoom})`, transformOrigin: "0 0" }}
           >
+            {/* Under the strokes, so what is drawn over a picture is seen on it. */}
+            {pictures.map(({ att, x, y }) => {
+              const width = imageWidths[att.id] ?? IMG_DEFAULT_W;
+              const at =
+                carry !== STILL && selected?.images.includes(att.id)
+                  ? carryPicture({ x, y, width }, carry, IMG_MIN_W)
+                  : { x, y, width };
+              return (
+              <CanvasPicture
+                key={att.id}
+                att={att}
+                x={at.x}
+                y={at.y}
+                width={at.width}
+                canvasId={folder.id}
+                origin={WORLD_ORIGIN}
+                zoomRef={zoomRef}
+                movable={tool === "move"}
+                onMove={moveImage}
+                onResize={onResizeImage}
+                onMenu={handlePictureMenu}
+              />
+              );
+            })}
             <svg
               className="canvas-svg"
               width={WORLD_SIZE}
               height={WORLD_SIZE}
               aria-hidden
             >
-              {allStrokes.map((stroke) => (
-                <path
-                  key={stroke.id}
-                  d={strokePath(stroke.points, WORLD_ORIGIN)}
-                  fill="none"
-                  stroke={stroke.color}
-                  strokeWidth={stroke.width}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              ))}
+              {/* Highlights first, so a highlighter marks under the ink rather than over it. */}
+              {shownStrokes.filter((s) => s.highlight).map(strokeMark)}
+              {shownStrokes.filter((s) => !s.highlight).map(strokeMark)}
+              {region &&
+                ("loop" in region ? (
+                  <polyline
+                    className="canvas-region"
+                    points={region.loop.map(([x, y]) => `${WORLD_ORIGIN + x},${WORLD_ORIGIN + y}`).join(" ")}
+                  />
+                ) : (
+                  <rect
+                    className="canvas-region"
+                    x={WORLD_ORIGIN + region.box.x}
+                    y={WORLD_ORIGIN + region.box.y}
+                    width={region.box.w}
+                    height={region.box.h}
+                  />
+                ))}
             </svg>
             {(folder.text_elements ?? []).map((t) => (
               <CanvasTextLabel
                 key={t.id}
-                text={t}
+                text={
+                  carry !== STILL && selected?.texts.includes(t.id)
+                    ? carryText(t, carry, selecting.current?.texts.find((p) => p.id === t.id)?.box.w ?? t.width ?? TEXT_W)
+                    : t
+                }
                 canvasId={folder.id}
+                origin={WORLD_ORIGIN}
+                tool={tool}
                 zoomRef={zoomRef}
                 onEditText={onEditText}
-                onRemoveText={onRemoveText}
+                onRemoveText={removeLabel}
+                onMenu={handleTextMenu}
+                editNow={editTextId === t.id}
+                onEditStarted={doneEditRequest}
               />
             ))}
+            {draftText && (
+              <CanvasTextLabel
+                key={draftText.id}
+                text={draftText}
+                canvasId={folder.id}
+                origin={WORLD_ORIGIN}
+                tool={tool}
+                zoomRef={zoomRef}
+                onEditText={onEditText}
+                onRemoveText={removeLabel}
+                onMenu={handleTextMenu}
+                draft
+                onCreateText={onAddText}
+                onFinishDraft={finishDraft}
+              />
+            )}
             {children.map(({ note, item }) => (
               <NoteCapsule
                 key={note.id}
@@ -1655,33 +2492,147 @@ export function CanvasSheet({
                 onResizeImage={onResizeImage}
               />
             ))}
+            {tool === "select" && shownBox && !region && (
+              // A hairline round what is held, and one square at its corner to stretch it
+              // by, both drawn at screen size whatever the zoom (`--canvas-unzoom`).
+              <div
+                className="canvas-selection"
+                aria-hidden
+                style={
+                  {
+                    left: WORLD_ORIGIN + shownBox.x,
+                    top: WORLD_ORIGIN + shownBox.y,
+                    width: shownBox.w,
+                    height: shownBox.h,
+                    "--canvas-unzoom": 1 / zoom,
+                  } as CSSProperties
+                }
+              >
+                <span className="canvas-selection-handle" />
+              </div>
+            )}
           </div>
         </div>
       </div>
       {/* A sketch nobody has marked yet: one quiet line, gone with the first stroke. */}
-      {tool === "draw" && children.length === 0 && allStrokes.length === 0 && (folder.text_elements ?? []).length === 0 && (
+      {tool === "draw" && children.length === 0 && allStrokes.length === 0 && (folder.text_elements ?? []).length === 0 && pictures.length === 0 && (
         <p className="canvas-hint">{keyboard ? "Draw here" : "Draw with your finger"}</p>
+      )}
+      {tool === "text" && !draftText && (folder.text_elements ?? []).length === 0 && (
+        <p className="canvas-hint">{keyboard ? "Click to write" : "Tap to write"}</p>
+      )}
+      {tool === "select" && !selected && !region && hasContent && !notice && (
+        <p className="canvas-hint">{keyboard ? "Drag a box round what to move" : "Draw a loop round what to move"}</p>
+      )}
+      {notice && (
+        <p className="canvas-hint" role="status">
+          {notice}
+        </p>
+      )}
+      {onAddImages && (
+        <input
+          ref={pickerRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          aria-hidden
+          tabIndex={-1}
+          onChange={handlePicked}
+        />
       )}
       {phone && (
         // The foot of the screen, where the thumb rests (the open note keeps its
         // marks there too). The surface above it ends where this begins, so no
         // touch meant for the drawing ever lands on a control.
         <footer className="canvas-dock" aria-label="Drawing tools">
+          <div className="canvas-dock-row">{toolButtons}</div>
           <div className="canvas-dock-row">
-            {mainTools}
+            {actionButtons}
             <span className="canvas-dock-end">
               {clearTool}
               {zoomTool}
             </span>
           </div>
-          {tool === "draw" && (
-            <div className="canvas-dock-row">
-              {colorTools}
-              <span className="canvas-tool-sep" aria-hidden />
-              {widthTools}
-            </div>
-          )}
+          {optionTools.length > 0 && <div className="canvas-dock-row">{optionTools}</div>}
         </footer>
+      )}
+      {optionMenu && (
+        <>
+          <div className="ctx-dismiss" onClick={() => setOptionMenu(null)} />
+          <CtxMenu
+            x={optionMenu.x}
+            y={optionMenu.y}
+            above={optionMenu.above}
+            className="canvas-option-menu"
+            label={optionMenu.kind === "color" ? colourWord : optionMenu.kind === "shape" ? "Shape" : "Line thickness"}
+          >
+            {optionMenu.kind === "shape" ? (
+              SHAPES.map((candidate) => (
+                <button
+                  key={candidate.kind}
+                  type="button"
+                  role="menuitemradio"
+                  className="ctx-item"
+                  data-on={shapeKind === candidate.kind}
+                  aria-checked={shapeKind === candidate.kind}
+                  onClick={() => {
+                    setShapeKind(candidate.kind);
+                    setOptionMenu(null);
+                  }}
+                >
+                  <IconShape kind={candidate.kind} />
+                  {candidate.label}
+                </button>
+              ))
+            ) : optionMenu.kind === "color" ? (
+              <div className="canvas-palette">
+                {CANVAS_COLOURS.map((candidate) => (
+                  <button
+                    key={candidate.key}
+                    type="button"
+                    role="menuitemradio"
+                    className="canvas-color-btn canvas-palette-item"
+                    data-on={shownColour.value === candidate.value}
+                    aria-checked={shownColour.value === candidate.value}
+                    aria-label={candidate.label}
+                    title={candidate.label}
+                    style={{ "--pen": candidate.value } as CSSProperties}
+                    onClick={() => {
+                      // With strokes selected the colour is theirs; the pen keeps its own.
+                      if (recolours) recolourSelection(candidate.value);
+                      else setColor(candidate.value);
+                      setOptionMenu(null);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              (tool === "highlight" ? HIGHLIGHT_WIDTHS : CANVAS_WIDTHS).map((candidate) => (
+                <button
+                  key={candidate}
+                  type="button"
+                  role="menuitemradio"
+                  className="ctx-item canvas-width-option"
+                  data-on={shownWidth === candidate}
+                  aria-checked={shownWidth === candidate}
+                  onClick={() => {
+                    if (tool === "highlight") setHighlightWidth(candidate);
+                    else setWidth(candidate);
+                    setOptionMenu(null);
+                  }}
+                >
+                  <span
+                    className="canvas-width-rule"
+                    style={{ height: tool === "highlight" ? candidate / 3 : candidate }}
+                    aria-hidden
+                  />
+                  {candidate} px
+                </button>
+              ))
+            )}
+          </CtxMenu>
+        </>
       )}
       {contextMenu && (
         <>
@@ -1694,6 +2645,21 @@ export function CanvasSheet({
               <IconText />
               Add text
             </button>
+            {onAddImages && (
+              <button
+                type="button"
+                role="menuitem"
+                className="ctx-item"
+                onClick={() => {
+                  const at: [number, number] = [contextMenu.worldX, contextMenu.worldY];
+                  setContextMenu(null);
+                  pickPictures(at);
+                }}
+              >
+                <IconPicture />
+                Add picture
+              </button>
+            )}
             <button
               type="button"
               role="menuitemradio"
@@ -1720,6 +2686,17 @@ export function CanvasSheet({
               type="button"
               role="menuitemradio"
               className="ctx-item"
+              data-on={tool === "text"}
+              aria-checked={tool === "text"}
+              onClick={() => handleSetTool("text")}
+            >
+              <IconText />
+              Text
+            </button>
+            <button
+              type="button"
+              role="menuitemradio"
+              className="ctx-item"
               data-on={tool === "erase"}
               aria-checked={tool === "erase"}
               onClick={() => handleSetTool("erase")}
@@ -1727,6 +2704,55 @@ export function CanvasSheet({
               <IconEraser />
               Eraser
             </button>
+            {(
+              [
+                ["select", "Select", <IconLasso key="i" />],
+                ["highlight", "Highlighter", <IconHighlighter key="i" />],
+                ["shape", "Shapes", <IconShapes key="i" />],
+              ] as const
+            ).map(([name, label, icon]) => (
+              <button
+                key={name}
+                type="button"
+                role="menuitemradio"
+                className="ctx-item"
+                data-on={tool === name}
+                aria-checked={tool === name}
+                onClick={() => handleSetTool(name)}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+            {hasContent && (
+              <>
+                <span className="ctx-sep" aria-hidden />
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="ctx-item"
+                  onClick={() => {
+                    setContextMenu(null);
+                    fitAll();
+                  }}
+                >
+                  <IconFit />
+                  Show everything
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="ctx-item"
+                  onClick={() => {
+                    setContextMenu(null);
+                    void savePictureOfCanvas();
+                  }}
+                >
+                  <IconDownload />
+                  Save as picture
+                </button>
+              </>
+            )}
             {/* The way out of an idea nobody meant to make. Last in the menu
                 and separated from the tools above it, because it is the only
                 row here that changes anything but the pointer. It asks first
@@ -1821,6 +2847,80 @@ export function CanvasSheet({
             </button>
           </CtxMenu>
         </>
+      )}
+
+      {textMenu && (
+        <>
+          <div className="ctx-dismiss" onClick={() => setTextMenu(null)} />
+          <CtxMenu x={textMenu.x} y={textMenu.y} label="Text menu">
+            <button
+              type="button"
+              role="menuitem"
+              className="ctx-item"
+              onClick={() => {
+                setEditTextId(textMenu.text.id);
+                setTextMenu(null);
+              }}
+            >
+              <IconText />
+              Edit text
+            </button>
+            {/* Undo sets it back, so it does not ask. */}
+            <button
+              type="button"
+              role="menuitem"
+              className="ctx-item"
+              onClick={() => {
+                const text = textMenu.text;
+                setTextMenu(null);
+                removeLabel(folder.id, text.id);
+              }}
+            >
+              <IconDelete tier="inline" />
+              Delete text
+            </button>
+          </CtxMenu>
+        </>
+      )}
+
+      {pictureMenu && (
+        <>
+          <div className="ctx-dismiss" onClick={() => setPictureMenu(null)} />
+          <CtxMenu x={pictureMenu.x} y={pictureMenu.y} label="Picture menu">
+            <button
+              type="button"
+              role="menuitem"
+              className="ctx-item"
+              onClick={() => {
+                const att = pictureMenu.att;
+                setPictureMenu(null);
+                setRemoving([att]);
+              }}
+            >
+              <IconDelete tier="inline" />
+              Remove picture
+            </button>
+          </CtxMenu>
+        </>
+      )}
+
+      {removing && onRemoveImage && (
+        <Dialog
+          title={removing.length === 1 ? "Remove picture?" : `Remove ${removing.length} pictures?`}
+          message={
+            removing.length === 1
+              ? `Remove ${removing[0].name} from this idea? The file is deleted, and anything drawn over it stays.`
+              : `Remove ${removing.length} pictures from this idea? Their files are deleted, and anything drawn over them stays.`
+          }
+          confirmLabel={removing.length === 1 ? "Remove picture" : "Remove pictures"}
+          destructive
+          onConfirm={() => {
+            const going = removing;
+            setRemoving(null);
+            for (const att of going) onRemoveImage(folder.id, att.id);
+          }}
+          onCancel={() => setRemoving(null)}
+        />
       )}
     </section>
   );

@@ -27,7 +27,7 @@ import {
   type SiteMedia,
 } from "../_shared/media.ts";
 import { allowedOrigins } from "../_shared/origins.ts";
-import { publicUrl as checkedUrl } from "../_shared/netguard.ts";
+import { judgeUrl, publicUrl as checkedUrl } from "../_shared/netguard.ts";
 import { readCapped, readHtml, readMeta } from "../_shared/pageMeta.ts";
 import { PREVIEW_BURST, PREVIEW_REFILL_MS, TokenBucket } from "../_shared/rateLimit.ts";
 
@@ -121,6 +121,14 @@ function json(body: unknown, status: number, req: Request) {
 function publicUrl(raw: unknown): Promise<URL | null> {
   return checkedUrl(raw, (hostname, type) => Deno.resolveDns(hostname, type));
 }
+
+/** `publicUrl`, keeping a failed lookup apart from a refusal (`judgeUrl`). */
+function judgedUrl(raw: unknown): Promise<URL | null | "lookup-failed"> {
+  return judgeUrl(raw, (hostname, type) => Deno.resolveDns(hostname, type));
+}
+
+/** A name that could not be looked up this time: 502, which the app asks again after. */
+const LOOKUP_FAILED = { error: "The address could not be looked up" };
 
 /**
  * Per user, per isolate — see `_shared/rateLimit.ts` for how soft that is.
@@ -428,7 +436,11 @@ Deno.serve(async (req: Request) => {
   } catch {
     return json({ error: "Invalid JSON body" }, 400, req);
   }
-  const url = await publicUrl(body.url);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return json({ error: "Invalid JSON body" }, 400, req);
+  }
+  const url = await judgedUrl(body.url);
+  if (url === "lookup-failed") return json(LOOKUP_FAILED, 502, req);
   if (!url) return json({ error: "Only public http(s) URLs are supported" }, 400, req);
 
   // Sites we can say more about than their HTML does. Only for a full unfurl,
@@ -460,7 +472,8 @@ Deno.serve(async (req: Request) => {
       // Resolve immediately before every request as well as when the URL is
       // first accepted. This closes the common redirect/rebinding window where
       // a hostname changes from a public address to an internal one.
-      const checked = await publicUrl(current.toString());
+      const checked = await judgedUrl(current.toString());
+      if (checked === "lookup-failed") return json(LOOKUP_FAILED, 502, req);
       if (!checked) return json({ error: "The request target is not public" }, 400, req);
       current = checked;
       const response = await fetch(current, {
@@ -476,7 +489,8 @@ Deno.serve(async (req: Request) => {
       if (verdict === "redirect") {
         if (redirects === MAX_REDIRECTS) return json({ error: "Too many redirects" }, 502, req);
         const location = response.headers.get("location");
-        const next = location ? await publicUrl(new URL(location, current).toString()) : null;
+        const next = location ? await judgedUrl(new URL(location, current).toString()) : null;
+        if (next === "lookup-failed") return json(LOOKUP_FAILED, 502, req);
         if (!next) return json({ error: "The redirect target is not public" }, 400, req);
         current = next;
         continue;
@@ -542,7 +556,7 @@ Deno.serve(async (req: Request) => {
       // megabyte. The refusal answered 413 for any page that *announced* more,
       // and the client takes 413 as a verdict about the page and never asks
       // again — so every long article was stamped "no preview" for good.
-      if (!type.includes("text/html") && !type.includes("application/xhtml+xml")) {
+      if (!isHtmlType(type)) {
         return json({ error: "The URL did not return a web page" }, 415, req);
       }
       const html = await readHtml(response, MAX_HTML);
@@ -579,3 +593,9 @@ Deno.serve(async (req: Request) => {
     clearTimeout(timeout);
   }
 });
+
+/** A page with no Content-Type is read as HTML, as a browser would sniff it; case never matters. */
+function isHtmlType(type: string): boolean {
+  const t = type.toLowerCase();
+  return t === "" || t.includes("text/html") || t.includes("application/xhtml+xml");
+}

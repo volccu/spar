@@ -424,6 +424,30 @@ rule strength, until 2026-10-23: the owner asked for it gone, and it is plain `-
 Sixteen is the whole set and there is no seventeenth, for the same reason the type scale has six
 sizes: a seventeenth is a design failure, not a token shortage.
 
+### And a stroke the user drew
+
+*(2026-10-28, the owner asked for the brand colours as pens.)* The second argument the paragraph
+above asks for, made once: **a canvas stroke may wear one of the same sixteen tints**, at mark
+strength (`--board-<hue>`), beside the three tonal pens (Ink, Muted, Faint). The reason is the
+board's own: a stroke is **the user's content, not the app's chrome**, and on a drawing hue tells
+one mark from another faster than a weight can. The terms hold it to that:
+
+- **The same sixteen, never a seventeenth**, and so on the ramp the device chose: a stroke stores
+  the token (`var(--board-ember)`), never a value, and the light ramp's re-solved tints apply to it
+  (`lib/canvasPalette.ts` builds the list from `BOARD_COLORS`; there is one palette, not two).
+- **It reaches the page through `--pen`**: on the pen-colour button and the picker's swatches, which
+  are samples of what will be drawn, and as the stroke's own SVG `stroke`. The button around the
+  swatch, its pressed state and the picker's "this one" mark stay tone and rule — the outline on the
+  chosen swatch is the selection, the hue is only what it is.
+- **Nothing the app draws takes it**: not a label's text, not a picture's frame, not the idea card's
+  ghost lines. The idea card's miniature draws each stroke in its own colour, because the miniature
+  is the canvas at card size.
+- **A shape may be filled with its own pen** *(2026-10-28, owner chose fill over outline-only)*: a
+  closed shape the user drew (rectangle, ellipse) may take its stroke's colour as its SVG `fill`,
+  and nothing else ever does. **A highlighter stroke is its pen seen through**
+  (`--highlight-opacity`, one value per ramp) — the same sixteen, not a new colour. The Select
+  tool's loop and box are the app's marks and stay `--muted` hairlines: a selection is never tinted.
+
 ### Its mark, too
 
 The same panel gives a folder a **mark** from the icon set (§7) — the folder is the default and
@@ -585,6 +609,10 @@ Both are needed. The tonal lift alone is too quiet inside a paragraph; an underl
 like every other underlined thing in the app. Together, an address is the brightest thing in the
 note — which is exactly what it is. **Hovered, it inverts** to `--signal-ink` on `--signal`,
 reusing the app's existing word for "this one" rather than inventing a second.
+
+**A file marker is drawn as a link** (`.att-ref`; owner, 2026-10-26): `[image 2]` in an open
+note leads to one of the note's own files, so it wears exactly the link's two signals, and inverts
+the same way under a mouse or a press. It is the only other thing the signal may mark.
 
 `:focus-visible` is `2px solid var(--signal)` at 2px offset. That is the one non-link use, and it
 is permitted because it is the browser's accessibility contract, not the app's vocabulary.
@@ -1078,12 +1106,15 @@ paper at 0.62.
 
 ### The Sorter
 
-One note, and the folders under the thumb. Three bands, top to bottom: where you are in the pile,
-the note, and where it can go. On a touch screen the note takes whatever height is left, which is
-what keeps the destinations on the floor, under the thumb, without a measured number anywhere. A wide
-window worked with a mouse stands them right under the note instead, the pile in the middle of the
-screen (2026-10-24, review PL-06): the note keeps one height, ten lines, so the destinations never
-move between notes, and a long note scrolls inside it.
+One note, and the places it can go (layout A, 2026-10-24, the owner's pick of four mockups). On a
+phone, three bands, top to bottom: where you are in the pile, the note with its own four controls
+under it, and the places on the floor — a grid two to a row, then **Leave · Archive · Delete**. The
+note takes whatever height is left, so the places stay under the thumb without a measured number. A
+wide window (chosen in JS, like the shelf) stands the note and the places **side by side**: the note
+in its reading column on the left with **Back** and **Leave** under it, the places one row each down a
+column on the right, Archive and Delete side by side at its foot. Nothing moves between notes.
+The pile is drawn beside the count: a hairline cell a note (answered `--muted`, in hand `--ink`),
+one line filling past forty.
 
 - The note is set exactly as it is read anywhere else — body face, `--t-read`, `--lh-read` — in
   the open note's own centred column (`calc(33 * var(--t-read))`), and scrolls if it is long. A note
@@ -1099,9 +1130,11 @@ move between notes, and a long note scrolls inside it.
 - **Destinations are targets before they are words:** 44px, the name in the display face because a
   folder is a named place, the count in the machine face because it is data. They are separated by
   1px of `--rule-soft` showing through, the same hairline grid the cards use.
-- **Keep, Important, To-do and Back sit in the head band's second row, under the creature and the count**, Keep a `--muted` word. They are not places, so they
-  are not among the destinations: a non-place at the foot is where a thumb aiming for it lands in
-  the bin. Nothing at the foot should be easier to hit than a folder, and nothing sits past Delete.
+- **Open, Important, To-do and Remind stand under the note's words, each a mark and its word** in
+  the reading face. They change the note and are not places, so they are not among the places. On
+  a phone **Leave** is the first of the three answers on the floor, Archive between it and Delete,
+  and nothing sits past Delete; Back is a mark in the head band. On a wide window Back and Leave
+  stand under the note, Leave the one with an edge.
 - **Every full-screen page and mode keeps its exit mark where the header's cog stands:** 14 from the
   top, 6 from the right, a thumb's square (`--exit-top`, `--exit-right`; review 2026-10-24, UI-02),
   and its head band keeps `--exit-clear` free beside it. About, Settings, the imports, Tidy up, Tick

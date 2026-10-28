@@ -55,7 +55,7 @@ function renderFolder(overrides: Partial<React.ComponentProps<typeof CanvasSheet
       onDragNoteTo={() => {}}
       onOpenNote={() => {}}
       onAddStroke={() => {}}
-      onClearStrokes={() => {}} onRemoveStroke={() => {}} onRestoreStrokes={() => {}}
+      onClearStrokes={() => {}} onRemoveStroke={() => {}} onChangeCanvas={() => {}}
       {...overrides}
     />,
   );
@@ -106,7 +106,7 @@ describe("CanvasSheet", () => {
         onDragNoteTo={() => {}}
         onOpenNote={() => {}}
         onAddStroke={() => {}}
-        onClearStrokes={() => {}} onRemoveStroke={() => {}} onRestoreStrokes={() => {}}
+        onClearStrokes={() => {}} onRemoveStroke={() => {}} onChangeCanvas={() => {}}
       />,
     );
 
@@ -121,13 +121,13 @@ describe("CanvasSheet", () => {
     expect(screen.getByLabelText("Draw")).toBeTruthy();
   });
 
-  it("reveals drawing controls when draw tool is selected", () => {
+  it("reveals one colour and one thickness control when draw tool is selected", () => {
     renderFolder();
-    expect(screen.queryByLabelText("Ink")).toBeNull();
+    expect(screen.queryByLabelText("Pen colour: Ink")).toBeNull();
 
     fireEvent.click(screen.getByLabelText("Draw"));
-    expect(screen.getByLabelText("Ink")).toBeTruthy();
-    expect(screen.getByLabelText("Stroke width 4")).toBeTruthy();
+    expect(screen.getByLabelText("Pen colour: Ink")).toBeTruthy();
+    expect(screen.getByLabelText("Line thickness: 4")).toBeTruthy();
   });
 
   /**
@@ -139,21 +139,43 @@ describe("CanvasSheet", () => {
    * the button can be a thumb's worth tall with the 22px sample drawn inside
    * it (`styles.test.ts` holds the height).
    */
-  it("says which pen is in hand, and carries its tone as --pen", () => {
+  it("offers the three neutrals and all sixteen brand colours through one picker", () => {
     renderFolder();
     fireEvent.click(screen.getByLabelText("Draw"));
-
-    const ink = screen.getByLabelText("Ink");
-    const muted = screen.getByLabelText("Muted");
-    expect(ink.getAttribute("aria-pressed")).toBe("true");
-    expect(muted.getAttribute("aria-pressed")).toBe("false");
-    expect(ink.getAttribute("style")).toContain("--pen");
+    const trigger = screen.getByLabelText("Pen colour: Ink");
+    expect(trigger.getAttribute("style")).toContain("--pen");
     // The fill belongs to the swatch the stylesheet draws, never to the button.
-    expect(ink.style.background).toBe("");
+    expect(trigger.style.background).toBe("");
 
-    fireEvent.click(muted);
-    expect(screen.getByLabelText("Muted").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByLabelText("Ink").getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(trigger);
+    const menu = screen.getByRole("menu", { name: "Pen colour" });
+    const choices = within(menu).getAllByRole("menuitemradio");
+    expect(choices).toHaveLength(19);
+    expect(within(menu).getByRole("menuitemradio", { name: "Ink", checked: true })).toBeTruthy();
+    expect(within(menu).getByRole("menuitemradio", { name: "Muted", checked: false })).toBeTruthy();
+
+    fireEvent.click(within(menu).getByRole("menuitemradio", { name: "Rust" }));
+    expect(screen.queryByRole("menu", { name: "Pen colour" })).toBeNull();
+    const rust = screen.getByLabelText("Pen colour: Rust");
+    expect(rust.getAttribute("style")).toContain("var(--board-ember)");
+    expect(rust.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("stores the chosen brand token on the next stroke", () => {
+    const onAddStroke = vi.fn();
+    renderFolder({ initialTool: "draw", onAddStroke });
+    fireEvent.click(screen.getByLabelText("Pen colour: Ink"));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Rust" }));
+
+    const canvas = document.querySelector<HTMLElement>(".canvas-surface")!;
+    canvas.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 }) as DOMRect;
+    fireEvent.pointerDown(canvas, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 60, clientY: 60 });
+    fireEvent.pointerMove(canvas, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerUp(canvas, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 100, clientY: 100 });
+
+    expect(onAddStroke).toHaveBeenCalledTimes(1);
+    expect(onAddStroke.mock.calls[0][1].color).toBe("var(--board-ember)");
   });
 
   it("shows clear drawings only when strokes exist", () => {
@@ -185,7 +207,7 @@ describe("CanvasSheet", () => {
     // The menu closes behind the choice, and the toolbar agrees with it.
     expect(document.querySelector(".ctx-menu")).toBeNull();
     expect(document.querySelector<HTMLElement>(".canvas-surface")!.dataset.tool).toBe("draw");
-    expect(screen.getByLabelText("Ink")).toBeTruthy();
+    expect(screen.getByLabelText("Pen colour: Ink")).toBeTruthy();
   });
 
   /* --- naming the place ---------------------------------------------------- */
@@ -531,7 +553,7 @@ describe("a note on the canvas reads as its card does", () => {
         onDragNoteTo={() => {}}
         onOpenNote={() => {}}
         onAddStroke={() => {}}
-        onClearStrokes={() => {}} onRemoveStroke={() => {}} onRestoreStrokes={() => {}}
+        onClearStrokes={() => {}} onRemoveStroke={() => {}} onChangeCanvas={() => {}}
       />,
     );
     return document.querySelector<HTMLElement>(".spatial-note .card-body")!;

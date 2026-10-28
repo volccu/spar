@@ -4,7 +4,8 @@
  * invented sample notes and nothing else.
  *
  *   npm run shots                          build the demo, shoot everything into docs/media/
- *   npm run shots -- --only capture,tidy   just those (hero, canvas, capture, tidy, keep, merge)
+ *   npm run shots -- --only capture,tidy   just those (hero, canvas, capture, tidy, keep, merge;
+ *                                          hero makes hero.png and hero-light.png)
  *   npm run shots -- --out <folder>        somewhere else than docs/media/
  *   npm run shots -- --frames <folder>     also keep every recorded frame there, to look at
  *
@@ -18,7 +19,9 @@
  *      into a temporary folder, and refuses a build that carries a seed chunk;
  *   3. serves it on 127.0.0.1 and drives headless Chrome in the
  *      `zenika/alpine-chrome:with-puppeteer` image, on the host's network so
- *      it reaches loopback (no port is published). Every scene starts in a
+ *      it reaches loopback (no port is published) — so it needs Docker on
+ *      Linux: Docker Desktop's host network does not reach the host's
+ *      loopback, and the run stops at ERR_CONNECTION_REFUSED. Every scene starts in a
  *      fresh browser profile, where the empty Inbox offers "Try it with sample
  *      notes" — the one way notes get in here, apart from the Keep scene, which
  *      imports a synthetic Takeout built from `tests/fixtures/keep/takeout-sample/`;
@@ -143,6 +146,11 @@ async function hostRole() {
     }
 
     // What the browser must find, and nothing more.
+    // The sample set reaches the robot's custom element (through
+    // mascotMoments), which extends HTMLElement at load; Node has none, and
+    // nothing here draws, so an empty stand-in is enough.
+    globalThis.HTMLElement ??= class {};
+    globalThis.customElements ??= { define() {}, get() {} };
     const { tsImport } = await import("tsx/esm/api");
     const { buildSampleSet } = await tsImport("../web/src/demo/sampleNotes.ts", import.meta.url);
     const sample = buildSampleSet(new Date());
@@ -378,13 +386,20 @@ async function browserRole() {
   const CLIP = { width: 1000, height: 625, deviceScaleFactor: 1 };
 
   /** A new profile — empty IndexedDB, no service worker — on the demo. */
-  const fresh = async (viewport, { pointer = false } = {}) => {
+  const fresh = async (viewport, { pointer = false, theme = null } = {}) => {
     const context = await browser.createBrowserContext();
     const page = await context.newPage();
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.setViewport(viewport);
+    // The image's Chromium predates Promise.try, which the PDF reader calls;
+    // every browser the app supports has it.
+    await page.evaluateOnNewDocument(() => {
+      Promise.try ??= (fn, ...args) => new Promise((resolve) => resolve(fn(...args)));
+    });
     if (!viewport.isMobile) await page.evaluateOnNewDocument(answerAsDesktop);
     if (pointer) await page.evaluateOnNewDocument(drawPointer);
+    // The light ramp is a device setting (lib/settings.ts); dark needs nothing.
+    if (theme) await page.evaluateOnNewDocument((t) => localStorage.setItem("spar.theme", t), theme);
     await page.goto(BASE, { waitUntil: "load" });
     return { context, page };
   };
@@ -432,12 +447,18 @@ async function browserRole() {
     if (checkBoards) {
       const tabs = await page.evaluate(() => [...document.querySelectorAll(".board-tab")].map((t) => t.textContent.replace(/\d+$/, "").trim()));
       for (const name of EXPECT.boards) must(tabs.includes(name), `the sample board ${name} is not on the shelf`);
-      const automatic = ["Inbox", "Archive", "Todos", "Links", "Files", "All", ""];
+      const automatic = ["Inbox", "Archive", "Inspiration", "Todos", "Links", "Files", "All", "Trash", ""];
       const extra = tabs.filter((t) => !EXPECT.boards.includes(t) && !automatic.includes(t));
       must(extra.length === 0, `boards that are not the sample set's: ${extra.join(", ")}`);
     }
     // The load's own undo offer, gone, so it is in no picture.
-    await page.waitForFunction(() => !document.querySelector(".undo"), { timeout: 30_000 });
+    await page.waitForFunction(() => !document.querySelector(".undo") && !document.querySelector(".speech"), { timeout: 30_000 });
+    // Then the demo's one tip ("Hold a note to pick it"), said just after the
+    // offer and kept for KEEP_MS (30 s): waited out, so it is in no picture either.
+    const tip = await page
+      .waitForFunction(() => document.querySelector(".speech")?.textContent.includes("Hold a note"), { timeout: 3_000 })
+      .then(() => true, () => false);
+    if (tip) await page.waitForFunction(() => !document.querySelector(".speech"), { timeout: 45_000 });
     await sleep(400);
   };
 
@@ -521,25 +542,28 @@ async function browserRole() {
   };
 
   const scenes = {
-    /** Desktop and phone side by side, in one picture. */
+    /** Desktop and phone side by side, in one picture, in each theme. */
     async hero() {
-      const desk = await fresh(DESKTOP);
-      await loadSamples(desk.page);
-      await desk.page.mouse.move(DESKTOP.width - 2, DESKTOP.height - 2);
-      await sleep(300);
-      const desktopShot = await desk.page.screenshot({ type: "png" });
-      await desk.context.close();
+      for (const theme of ["dark", "light"]) {
+        const desk = await fresh(DESKTOP, { theme });
+        await loadSamples(desk.page);
+        await desk.page.mouse.move(DESKTOP.width - 2, DESKTOP.height - 2);
+        await sleep(300);
+        const desktopShot = await desk.page.screenshot({ type: "png" });
+        await desk.context.close();
 
-      const phone = await fresh(PHONE);
-      await loadSamples(phone.page, { checkBoards: false });
-      const phoneShot = await phone.page.screenshot({ type: "png" });
-      await phone.context.close();
+        const phone = await fresh(PHONE, { theme });
+        await loadSamples(phone.page, { checkBoards: false });
+        const phoneShot = await phone.page.screenshot({ type: "png" });
+        await phone.context.close();
 
-      const stage = await fresh({ width: 1920, height: 979, deviceScaleFactor: 1 });
-      await stage.page.setContent(heroPage(desktopShot.toString("base64"), phoneShot.toString("base64")), { waitUntil: "load" });
-      await stage.page.screenshot({ path: `${OUT}/hero.png`, type: "png" });
-      await stage.context.close();
-      step("hero.png: the Inbox on a desktop and a phone");
+        const name = theme === "dark" ? "hero.png" : "hero-light.png";
+        const stage = await fresh({ width: 1920, height: 979, deviceScaleFactor: 1 });
+        await stage.page.setContent(heroPage(desktopShot.toString("base64"), phoneShot.toString("base64"), theme), { waitUntil: "load" });
+        await stage.page.screenshot({ path: `${OUT}/${name}`, type: "png" });
+        await stage.context.close();
+        step(`${name}: the Inbox on a desktop and a phone`);
+      }
     },
 
     /** The trip's idea, opened: its notes laid out on the canvas. */
@@ -562,8 +586,24 @@ async function browserRole() {
       };
       await drag([150, 380], [1040, 250]); // Sintra, off to the right
       await drag([700, 140], [520, 470]); // eating, below the stay
-      await page.click('button.canvas-tool-btn[aria-label="Draw"]');
-      await sleep(300);
+      // Where the box, the words and the highlight go, on that layout.
+      const SHAPE_FROM = [34, 90];
+      const SHAPE_TO = [598, 348];
+      const TEXT_AT = [918, 478];
+      const HIGHLIGHT = [[922, 497], [1100, 497]];
+      /** A tool from the bar; and one of a choice menu's items, opened from its button. */
+      const tool = async (name) => {
+        await page.click(`button.canvas-tool-btn[aria-label="${name}"]`);
+        await sleep(300);
+      };
+      const choose = async (opener, item) => {
+        await page.click(opener);
+        await sleep(300);
+        await page.click(item);
+        await sleep(300);
+      };
+      await tool("Draw");
+      await choose('button[aria-label^="Pen colour"]', '.canvas-palette-item[aria-label="Clay"]');
       const stroke = async (points) => {
         await page.mouse.move(...points[0]);
         await page.mouse.down();
@@ -579,19 +619,31 @@ async function browserRole() {
       }
       await stroke(curve);
       await stroke([[880, 236], [902, 250], [884, 268]]);
-      await page.click('button.canvas-tool-btn[aria-label="Move"]');
+      // A box round the two that go together, with the shape tool, in a second pen.
+      await tool("Shapes");
+      await choose('button[aria-label^="Shape:"]', "::-p-text(Rectangle)");
+      await choose('button[aria-label^="Pen colour"]', '.canvas-palette-item[aria-label="Sage"]');
+      await page.mouse.move(...SHAPE_FROM);
+      await page.mouse.down();
+      await page.mouse.move(...SHAPE_TO, { steps: 20 });
+      await page.mouse.up();
       await sleep(300);
-      await page.mouse.click(918, 478, { button: "right" });
+      // Words on the canvas itself, then the highlighter across them.
+      await tool("Move");
+      await page.mouse.click(...TEXT_AT, { button: "right" });
       await sleep(400);
       await page.click("::-p-text(Add text)");
       await sleep(500);
-      const placeholder = await page.waitForSelector("::-p-text(Double-click to edit)", { timeout: 5_000 });
-      const spot = await placeholder.boundingBox();
-      await page.mouse.click(spot.x + spot.width / 2, spot.y + spot.height / 2, { count: 2 });
-      await sleep(400);
       await page.keyboard.type("Only if the weather holds", { delay: 20 });
       await sleep(300);
+      await page.keyboard.down("Control");
       await page.keyboard.press("Enter");
+      await page.keyboard.up("Control");
+      await sleep(600);
+      await tool("Highlighter");
+      await choose('button[aria-label^="Pen colour"]', '.canvas-palette-item[aria-label="Ochre"]');
+      await stroke(HIGHLIGHT);
+      await tool("Move");
       await sleep(1200);
       await page.mouse.move(DESKTOP.width - 2, DESKTOP.height - 2);
       await page.screenshot({ path: `${OUT}/canvas.png`, type: "png" });
@@ -624,11 +676,11 @@ async function browserRole() {
       // Where each note in the recorded pile goes; everything else is
       // archived before the recording starts, so the pile is a short one.
       const fates = [
-        ["Pay the electricity bill", { board: "Home" }],
-        ["Harbour from the evening ferry", { verb: "Archive" }],
-        ["Try the bakery on the corner", { verb: "Delete" }],
-        ["Miso butter mushrooms", { board: "Kitchen" }],
-        ["Renew the library card", { board: "Reading" }],
+        ["electricity bill due fri", { board: "Home" }],
+        ["film maria mentioned", { verb: "Archive" }],
+        ["bakery on the corner", { verb: "Delete" }],
+        ["miso butter mushrooms", { board: "Kitchen" }],
+        ["printer ink 305XL", { board: "Work" }],
       ];
       const fateOf = async () => {
         const text = await page.$eval(".sorter-note", (el) => el.textContent);
@@ -651,7 +703,7 @@ async function browserRole() {
       await page.waitForFunction(() => !document.querySelector(".sorter"), { timeout: 10_000 });
       await sleep(600);
       must((await page.$$(".card")).length === fates.length, "the pile is not the five notes the recording expects");
-      await page.waitForFunction(() => !document.querySelector(".undo"), { timeout: 30_000 });
+      await page.waitForFunction(() => !document.querySelector(".undo") && !document.querySelector(".speech"), { timeout: 30_000 });
 
       await page.mouse.move(700, 250);
       await record(page, "tidy", async () => {
@@ -666,8 +718,15 @@ async function browserRole() {
           const fate = await fateOf();
           must(fate, "a note in the pile nobody planned for");
           if (fate.board) {
-            await clickOn(page, await sorterButton(page, "Move to a board…"));
-            await sleep(600);
+            // A few folders are buttons of their own; more sit behind one row.
+            const direct = await page.evaluate(
+              (n) => [...document.querySelectorAll(".sorter-dest-name")].some((el) => el.textContent === n),
+              fate.board,
+            );
+            if (!direct) {
+              await clickOn(page, await sorterButton(page, "Move to a board…"));
+              await sleep(600);
+            }
             await clickOn(page, await sorterButton(page, fate.board));
           } else {
             await clickOn(page, await sorterButton(page, fate.verb));
@@ -713,7 +772,7 @@ async function browserRole() {
         await clickOn(page, importButton);
         await page.waitForSelector("::-p-text(Undo this import)", { timeout: 30_000 });
         await sleep(2400);
-        await clickOn(page, ".keep-actions ::-p-text(Done)");
+        await clickOn(page, ".keep-actions ::-p-text(Show my notes)");
         await page.waitForSelector(".card", { timeout: 10_000 });
         await sleep(3000);
       });
@@ -729,9 +788,15 @@ async function browserRole() {
       await page.mouse.move(700, 300);
       await record(page, "merge", async () => {
         await sleep(900);
-        await clickOn(page, await card(page, "Pay the electricity bill"), { button: "right" });
+        await clickOn(page, await card(page, "electricity bill due fri"), { button: "right" });
         await sleep(600);
-        await clickOn(page, await card(page, "Call the dentist"));
+        // The right-click opened the selection panel at the pointer; it goes,
+        // the selection stays, and Ctrl+click adds the second note.
+        await page.keyboard.press("Escape");
+        await sleep(500);
+        await page.keyboard.down("Control");
+        await clickOn(page, await card(page, "call dentist"));
+        await page.keyboard.up("Control");
         await sleep(700);
         await clickOn(page, "button.capture-menu");
         await sleep(900);
@@ -749,11 +814,11 @@ async function browserRole() {
         await clickOn(page, idea);
         await page.waitForSelector('button[aria-label="Close idea"]', { timeout: 10_000 });
         await sleep(1200);
-        await page.mouse.move(560, 360, { steps: 18 });
+        await page.mouse.move(760, 110, { steps: 18 });
         await sleep(200);
-        await page.mouse.click(560, 360, { button: "right" });
+        await page.mouse.click(760, 110, { button: "right" });
         await sleep(1000);
-        await clickOn(page, "::-p-text(Un-merge)");
+        await clickOn(page, "::-p-text(Separate)");
         await page.waitForFunction(() => !document.querySelector('button[aria-label="Close idea"]'), { timeout: 10_000 });
         await sleep(2800);
       });
@@ -860,11 +925,13 @@ function answerAsDesktop() {
 }
 
 /** The hero: the desktop and the phone on the app's own ground, each inside a hairline. */
-function heroPage(desktop, phone) {
+/** The stage both shots stand on: the ramp's own paper and rule, per theme. */
+function heroPage(desktop, phone, theme = "dark") {
+  const [paper, rule] = theme === "light" ? ["#f3efe7", "#cfc6bd"] : ["#0c0a08", "#423830"];
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-    html, body { margin: 0; background: #0c0a08; }
+    html, body { margin: 0; background: ${paper}; }
     .stage { width: 1920px; height: 979px; display: flex; align-items: center; justify-content: center; gap: 40px; }
-    img { display: block; border: 1px solid #423830; }
+    img { display: block; border: 1px solid ${rule}; }
     .desktop { width: 1400px; height: 875px; }
     .phone { width: 404px; height: 875px; }
   </style></head><body><div class="stage">

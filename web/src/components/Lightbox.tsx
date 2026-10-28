@@ -802,7 +802,17 @@ interface Props {
    * any more, so this is where a picture is removed; the wall hands nothing.
    */
   onRemove?: () => void;
+  /**
+   * What the walk holds besides this one, so the bar can keep a place for a
+   * control the next stop will have (the wall mixes links and files). Left out,
+   * a walk holds files only, as a note's own do.
+   */
+  walkHolds?: { links: boolean; files: boolean };
 }
+
+/** A control kept in its place for the walk, not drawn for this stop: it holds
+ *  the bar still and is nothing to a pointer, a key or a reader. */
+const SPARE = { "data-spare": "true", "aria-hidden": true, tabIndex: -1 } as const;
 
 export function Lightbox({
   att,
@@ -820,6 +830,7 @@ export function Lightbox({
   isCover = false,
   alt,
   onRemove,
+  walkHolds,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const shotControl = useRef<ShotControl | null>(null);
@@ -995,6 +1006,12 @@ export function Lightbox({
   const canCopy = canCopyPicture();
   const shares = canShare();
   const picture = Boolean(link ? !link.video : att && !document_ && !isVideo(att));
+  // Walking from one stop to the next must not slide the controls along the
+  // bar under the finger (ui-sweep 2026-10-28): every control some stop in the
+  // walk can have keeps its place on all of them, drawn only where it applies.
+  const walks = count > 1;
+  const holdsLinks = walks && (walkHolds?.links ?? false);
+  const holdsFiles = walks && (walkHolds?.files ?? true);
 
   async function onCopyPicture(e: React.MouseEvent) {
     e.stopPropagation();
@@ -1154,7 +1171,7 @@ export function Lightbox({
           </span>
         )}
         <span className="spacer" />
-        {link && (
+        {link ? (
           <a
             className="iconbtn"
             href={link.href}
@@ -1166,6 +1183,12 @@ export function Lightbox({
           >
             <IconOpenSite />
           </a>
+        ) : (
+          holdsLinks && (
+            <span className="iconbtn" {...SPARE}>
+              <IconOpenSite />
+            </span>
+          )
         )}
         {onOpenNote && (
           <button
@@ -1181,10 +1204,12 @@ export function Lightbox({
             <IconOpenNote />
           </button>
         )}
-        {picture && (
+        {(picture || walks) && (
           <button
             type="button"
             className="iconbtn"
+            {...(picture ? {} : SPARE)}
+            disabled={!picture}
             aria-label="Turn a quarter"
             title="Rotate (R)"
             onClick={(e) => {
@@ -1195,10 +1220,12 @@ export function Lightbox({
             <IconRotate />
           </button>
         )}
-        {picture && canCopy && (
+        {(picture || walks) && canCopy && (
           <button
             type="button"
             className="iconbtn"
+            {...(picture ? {} : SPARE)}
+            disabled={!picture}
             aria-label={copied ? "Copied" : "Copy picture"}
             title="Copy picture"
             onClick={(e) => void onCopyPicture(e)}
@@ -1206,10 +1233,12 @@ export function Lightbox({
             <IconCopy on={copied} />
           </button>
         )}
-        {shares && (picture || att) && (
+        {shares && (picture || att || walks) && (
           <button
             type="button"
             className="iconbtn"
+            {...(picture || att ? {} : SPARE)}
+            disabled={!(picture || att)}
             aria-label={`Share ${name}`}
             title="Share"
             onClick={(e) => void sharePicture(e)}
@@ -1217,10 +1246,12 @@ export function Lightbox({
             <IconShare tier="inline" />
           </button>
         )}
-        {onCover && !isCover && (
+        {onCover && (!isCover || walks) && (
           <button
             type="button"
             className="iconbtn"
+            {...(isCover ? SPARE : {})}
+            disabled={isCover}
             aria-label="Use as the card's picture"
             title="Use as cover"
             onClick={(e) => {
@@ -1231,23 +1262,26 @@ export function Lightbox({
             <IconCover />
           </button>
         )}
-        {att && (
+        {(att || holdsFiles) && (
           <button
             type="button"
             className="iconbtn"
-            aria-label={`Save ${att.name}`}
+            {...(att ? {} : SPARE)}
+            aria-label={`Save ${att?.name ?? ""}`}
             title="Save"
-            disabled={!downloadUrl && !att.path}
+            disabled={!att || (!downloadUrl && !att.path)}
             onClick={(e) => void save(e)}
           >
             <IconDownload />
           </button>
         )}
-        {att && onRemove && (
+        {(att || holdsFiles) && onRemove && (
           <button
             type="button"
             className="iconbtn"
-            aria-label={`Remove ${att.name}`}
+            {...(att ? {} : SPARE)}
+            disabled={!att}
+            aria-label={`Remove ${att?.name ?? ""}`}
             title="Remove from note"
             onClick={(e) => {
               e.stopPropagation();

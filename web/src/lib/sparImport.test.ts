@@ -96,7 +96,8 @@ function archive() {
       items: [{ note_id: "n-plain", x: 10, y: 20 }],
       strokes: [],
       image_widths: {},
-      text_elements: [{ id: "t-1", x: 1, y: 2, text: "a label" }],
+      text_elements: [{ id: "t-1", x: 1, y: 2, text: "a label", width: 320 }],
+      images: [{ attachment_id: "a-on-idea", x: 40, y: 50 }],
       created_at: T,
       updated_at: T,
     },
@@ -143,6 +144,9 @@ describe("a spår download, round trip", () => {
     );
     expect(data.folders).toEqual([folder]);
     expect(data.canvases.map((c) => c.id)).toEqual(["c-1"]);
+    // A label's width and a picture set on the canvas come back as they went.
+    expect(data.canvases[0].text_elements[0].width).toBe(320);
+    expect(data.canvases[0].images).toEqual([{ attachment_id: "a-on-idea", x: 40, y: 50 }]);
   });
 
   it("brings every note back under its own id, the original kept as written", async () => {
@@ -254,6 +258,32 @@ describe("a spår download, round trip", () => {
     expect(planSparImport(data, nothingHere).canvases.map((c) => c.id)).toEqual(["c-1"]);
     const mineToo: Canvas = { ...data.canvases[0], id: "c-mine" };
     expect(planSparImport(data, { ...nothingHere, canvases: [mineToo] }).canvases).toEqual([]);
+  });
+});
+
+describe("a canvas from the self-hosted server's download", () => {
+  it("finds its pictures inside items, as the server row keeps them", () => {
+    const read = readSparExport({
+      format: "spår export",
+      version: 1,
+      notes: [],
+      folders: [],
+      canvases: [
+        {
+          id: "c-1",
+          idea_id: "c-1",
+          items: [{ note_id: "n", x: 1, y: 2 }, { attachment_id: "p1", x: 3, y: 4 }],
+          strokes: [],
+          image_widths: {},
+          text_elements: [],
+          created_at: "2026-01-01T00:00:00.000Z",
+          updated_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    if (typeof read === "string") throw new Error(read);
+    expect(read.data.canvases[0].items).toEqual([{ note_id: "n", x: 1, y: 2 }]);
+    expect(read.data.canvases[0].images).toEqual([{ attachment_id: "p1", x: 3, y: 4 }]);
   });
 });
 

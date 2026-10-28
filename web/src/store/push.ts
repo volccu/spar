@@ -161,6 +161,55 @@ async function store(sub: PushSubscription): Promise<boolean> {
 }
 
 /**
+ * Whether the browser's subscription was made under a different signing key
+ * than this build carries. After the key pair is rotated the push service
+ * answers 401/403 to every send for it, which the sweep reads as passing, so
+ * the device went silent for good with nothing on either side saying so
+ * (bughunt 2026-10-24). A browser that does not say which key it used is
+ * taken at its word.
+ */
+function signedWithOtherKey(sub: PushSubscription): boolean {
+  const key = (sub as { options?: { applicationServerKey?: ArrayBuffer | null } }).options
+    ?.applicationServerKey;
+  const want = vapidPublicKey();
+  if (!key || !want) return false;
+  const have = new Uint8Array(key);
+  const ours = keyBytes(want);
+  return have.length !== ours.length || have.some((byte, i) => byte !== ours[i]);
+}
+
+/**
+ * The browser's subscription, unless it was made under a key this build no
+ * longer signs with — then it is let go, here and on the server, and
+ * `rotated` says a new one is owed.
+ */
+async function currentSubscription(
+  reg: ServiceWorkerRegistration,
+): Promise<{ sub: PushSubscription | null; rotated: boolean }> {
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub || !signedWithOtherKey(sub)) return { sub, rotated: false };
+  const endpoint = sub.endpoint;
+  await sub.unsubscribe().catch((error: unknown) =>
+    console.error("the browser kept a push subscription under an old key", error),
+  );
+  const backend = await getBackend();
+  if (backend) {
+    const { error } = await backend.deletePushSubscription(endpoint);
+    if (error) console.error("removing the old-key subscription failed:", error.message);
+  }
+  return { sub: null, rotated: true };
+}
+
+function subscribe(reg: ServiceWorkerRegistration): Promise<PushSubscription> {
+  return reg.pushManager.subscribe({
+    // Every push carries a payload here, and a payload cannot be sent to a
+    // subscription that didn't promise to be visible about it.
+    userVisibleOnly: true,
+    applicationServerKey: keyBytes(vapidPublicKey()),
+  });
+}
+
+/**
  * Ask, subscribe, register. Safe to call more than once — the browser returns
  * the subscription it already has rather than minting a second one, which is
  * what makes `endpoint` a usable primary key.
@@ -174,15 +223,8 @@ export async function enablePush(): Promise<PushState> {
   // `ready` rather than `getRegistration`, because the very first call can land
   // before the worker generated at build time has finished activating.
   const reg = await navigator.serviceWorker.ready;
-  const existing = await reg.pushManager.getSubscription();
-  const sub =
-    existing ??
-    (await reg.pushManager.subscribe({
-      // Every push carries a payload here, and a payload cannot be sent to a
-      // subscription that didn't promise to be visible about it.
-      userVisibleOnly: true,
-      applicationServerKey: keyBytes(vapidPublicKey()),
-    }));
+  const { sub: existing } = await currentSubscription(reg);
+  const sub = existing ?? (await subscribe(reg));
 
   // Whether the *server* knows is the whole test, and it is why this does not
   // simply return "on" once the browser has handed over a subscription.
@@ -235,8 +277,11 @@ export async function refreshPush(): Promise<void> {
   if (Notification.permission !== "granted") return;
   try {
     const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.getSubscription();
+    const { sub, rotated } = await currentSubscription(reg);
+    // Permission is already granted, so a subscription owed after a key
+    // rotation is made again without asking anything.
     if (sub) await store(sub);
+    else if (rotated) await store(await subscribe(reg));
   } catch {
     // A refresh is a courtesy. It must never be the reason the app fails to
     // start, so nothing here is allowed to escape.

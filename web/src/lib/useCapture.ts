@@ -5,6 +5,7 @@ import { mascotNotice } from "../components/mascot-element";
 import type { FileNotice } from "../store/useDialogs";
 import type { CaptureFields } from "../store/useNotes";
 import type { Board, Note, UserBoard } from "../types";
+import { refsInOrder } from "./attachRefs";
 import { canKeep, fileSize, filesSaid, hasContent, MAX_FILE_BYTES } from "./files";
 import { presetReminder } from "./reminders";
 import { receipt } from "./haptics";
@@ -29,7 +30,7 @@ interface Options {
   /** A typed capture. */
   create: (text: string, source?: string, fields?: CaptureFields) => Note | null;
   /** A capture that is files. */
-  createWithFiles: (files: File[], text?: string, fields?: CaptureFields) => Promise<Note | null>;
+  createWithFiles: (files: File[], text?: string, fields?: CaptureFields, refs?: readonly (number | undefined)[]) => Promise<Note | null>;
   /** The app's one notice dialog. */
   showFileNotice: (notice: FileNotice) => void;
   /** Mark a card to draw its border once. */
@@ -141,15 +142,19 @@ export function useCapture({
    * not**, because they go straight to `attachTo`, which has no check of its
    * own. One helper, so the next door added cannot forget either.
    */
-  const withinLimit = useCallback(
-    async (arrived: File[]): Promise<File[]> => {
+  const keptWithin = useCallback(
+    async (arrived: File[]): Promise<{ files: File[]; from: number[] }> => {
       // Made ready to keep first — an iPhone photo made a JPEG, a camera-sized
       // one brought to 2560px, the place it was taken removed, a pasted
       // picture named (`lib/photoPrep.ts`) — so a 30 MB photograph is
       // measured as the 1 MB it will be kept as, not refused for the size it
       // arrived at. A chunk of its own, fetched on the first attach.
       const { prepareFiles } = await import("./photoPrep");
-      const files = await prepareFiles(arrived.filter(hasContent));
+      // Each file remembers its place in what arrived (`from`), so a file
+      // refused here leaves its `[image 2]` marker pointing at nothing rather
+      // than handing its number to the next one (`lib/attachRefs.ts`).
+      const content = arrived.flatMap((f, i) => (hasContent(f) ? [i] : []));
+      const files = await prepareFiles(content.map((i) => arrived[i]));
       // A folder or an empty file is dropped without a word, as `useFileDrop`
       // always dropped it — there is nothing in it to explain the loss of.
       const tooBig = files.filter((f) => hasContent(f) && f.size > MAX_FILE_BYTES);
@@ -161,22 +166,26 @@ export function useCapture({
             tooBig.map((f) => `${f.name}: ${fileSize(f.size)}`).join("\n"),
         });
       }
-      return files.filter(canKeep);
+      const kept = files.flatMap((f, k) => (canKeep(f) ? [k] : []));
+      return { files: kept.map((k) => files[k]), from: kept.map((k) => content[k]) };
     },
     [showFileNotice],
   );
+  const withinLimit = useCallback(async (arrived: File[]) => (await keptWithin(arrived)).files, [keptWithin]);
 
   const takeReady = useCallback(
     async (files: File[], text: string, choice: CaptureChoice, fromShare: boolean) => {
-      const ok = await withinLimit(files);
+      const { files: ok, from } = await keptWithin(files);
       if (ok.length === 0) return false;
+      // The numbers the capture bar's markers were written with: by place.
+      const order = refsInOrder(files);
       // The same resolution a typed capture gets, including the folder it was
       // dropped on — a file is a note, so a file captured with the bar's marks
       // set carries them, and one dropped with nothing set is filed by where
       // you are standing exactly as before. Applied at creation rather than as
       // an update afterwards, for the same reason the typed path does it: one
       // write, one clock.
-      const made = await createWithFiles(ok, text, captureFields(choice));
+      const made = await createWithFiles(ok, text, captureFields(choice), from.map((i) => order[i]));
       if (made) {
         if (made.reminder_at) onReminderRef.current?.(made);
         setTraceId(made.id);
@@ -203,7 +212,7 @@ export function useCapture({
     },
     // `showFileNotice` is a state setter and so never changes; it is listed
     // because it now arrives through a hook, where the linter cannot see that.
-    [createWithFiles, withinLimit, captureFields, landed, setTraceId],
+    [createWithFiles, keptWithin, captureFields, landed, setTraceId],
   );
 
   /**
@@ -265,8 +274,10 @@ export function useCapture({
       showFileNotice({
         title: "Some shared files were not added",
         message:
-          `A share holds at most ${SHARE_MAX_FILES} files and ${fileSize(SHARE_MAX_BYTES)}, ` +
-          `and each file at most ${fileSize(MAX_FILE_BYTES)}.\n` +
+          (left.full
+            ? "This device ran out of room to hold them. Free some space and share them again.\n"
+            : `A share holds at most ${SHARE_MAX_FILES} files and ${fileSize(SHARE_MAX_BYTES)}, ` +
+              `and each file at most ${fileSize(MAX_FILE_BYTES)}.\n`) +
           left.names.map((f) => `${f.name}: ${fileSize(f.size)}`).join("\n") +
           (more > 0 ? `\n…and ${more} more` : ""),
       });
@@ -373,7 +384,7 @@ export function useCapture({
     [adding],
   );
 
-  return { withinLimit, takeFiles, dropping, capture, incoming, offer, heldLine: heldLine ?? addingLine };
+  return { withinLimit, keptWithin, takeFiles, dropping, capture, incoming, offer, heldLine: heldLine ?? addingLine };
 }
 
 /** `MAX_FILES` and `MAX_TOTAL_BYTES` in `public/share-sw.js`, said in the notice. */

@@ -462,10 +462,10 @@ The arrangement of an idea note, one row per idea (Supabase: `folders`, migratio
 | Field | Type | Notes |
 |---|---|---|
 | `id` | UUID | **The idea note's own id.** The note must exist and be the caller's. |
-| `items` | JSON array | `{note_id, x, y, width?}` — opaque to the server. |
+| `items` | JSON array | `{note_id, x, y, width?}` for a note, `{attachment_id, x, y}` for a picture placed on the canvas (a file of the idea note; since 2026-10-28) — opaque to the server. A client splits them on read (`canvasFromRow`); an older one finds no note by an `attachment_id` entry, skips it and writes it back untouched. |
 | `strokes` | JSON array | Pencil strokes — opaque. |
 | `image_widths` | JSON object | attachment id → pixels — opaque. |
-| `text_elements` | JSON array | Labels — opaque. |
+| `text_elements` | JSON array | Labels `{id, x, y, text, width?}` — opaque. |
 | `created_at`, `updated_at` | instants | Stored exactly as sent. |
 
 - Upload is an upsert on `id`; **every write replaces the whole row as sent**, whatever its stamp —

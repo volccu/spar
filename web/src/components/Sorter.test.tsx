@@ -805,9 +805,12 @@ describe("the Sorter", () => {
     // goes behind it (below, with a shelf of seven).
     expect(names).toEqual(["Inspiration", "New board…", "Archive", "Delete"]);
     expect(names).not.toContain("Leave");
-    expect(panel.querySelector(".sorter-head .sorter-skip")?.textContent).toBe("Leave");
-    // Important is up there too, for the same reason and one of its own: it
-    // is the only control here that leaves the card where it is.
+    // On a wide window Leave stands under the note, beside Back, never among
+    // the places (layout A, 2026-10-24).
+    expect(panel.querySelector(".sorter-nav .sorter-skip")?.textContent).toBe("Leave");
+    expect(panel.querySelector(".sorter-to .sorter-skip")).toBeNull();
+    // Important is under the note too, with the note's other controls: it is
+    // the only one here that leaves the card where it is.
     expect(within(panel).getByRole("button", { name: "Important" })).toBeTruthy();
   });
 
@@ -1090,12 +1093,13 @@ describe("the folders in the Sorter's foot", () => {
     expect(btn(/Folder 2/).style.getPropertyValue("--board-tint")).toBe("");
   });
 
-  it("counts two rows on a phone, and on a wide window as many as half its height holds", () => {
+  it("counts five rows on a phone, and on a wide window as many as half its height holds", () => {
     expect(fitsBeneath(0, true)).toBe(true);
-    expect(fitsBeneath(4, true)).toBe(true);
-    expect(fitsBeneath(5, true)).toBe(false);
+    // Two to a row, five rows: ten (layout A, 2026-10-24).
+    expect(fitsBeneath(10, true)).toBe(true);
+    expect(fitsBeneath(11, true)).toBe(false);
     // A phone's bound does not grow with the screen (review 2026-10-04, UX-A-02).
-    expect(fitsBeneath(5, true, 900)).toBe(false);
+    expect(fitsBeneath(11, true, 900)).toBe(false);
     // Unmeasured, a wide window is two rows of three, as it always was.
     expect(fitsBeneath(6, false)).toBe(true);
     expect(fitsBeneath(7, false)).toBe(false);
@@ -1708,11 +1712,12 @@ describe("the places a phone draws as buttons", () => {
     vi.stubGlobal("innerWidth", 390);
     try {
       const boards = [
-        ...shelf(7),
+        ...shelf(12),
         fixtureBoard({ id: "insp", name: "Inspiration", position: 99, kind: "inspiration" }),
       ];
-      const busy: Record<string, number> = { b2: 30, b4: 20, b5: 10, b7: 5 };
-      const { onFile } = renderSorter({ boards, countFor: (id) => busy[id] ?? 0 });
+      // Every folder holds notes but the first and the third.
+      const quiet = new Set(["b1", "b3"]);
+      const { onFile } = renderSorter({ boards, countFor: (id) => (quiet.has(id) ? 0 : 5) });
       const dialog = sorter()!;
       const names = Array.from(dialog.querySelectorAll(".sorter-dest-name")).map(
         (el) => el.textContent,
@@ -1721,9 +1726,17 @@ describe("the places a phone draws as buttons", () => {
         "Folder 2",
         "Folder 4",
         "Folder 5",
+        "Folder 6",
         "Folder 7",
+        "Folder 8",
+        "Folder 9",
+        "Folder 10",
+        "Folder 11",
+        "Folder 12",
         "Inspiration",
         "Move to a board…",
+        // A phone's floor: Leave, Archive, Delete (layout A, 2026-10-24).
+        "Leave",
         "Archive",
         "Delete",
       ]);
@@ -1735,7 +1748,7 @@ describe("the places a phone draws as buttons", () => {
       const rest = Array.from(dialog.querySelectorAll(".sorter-dest-name")).map(
         (el) => el.textContent,
       );
-      expect(rest).toEqual(["Cancel", "Folder 1", "Folder 3", "Folder 6", "New board…"]);
+      expect(rest).toEqual(["Cancel", "Folder 1", "Folder 3", "New board…"]);
     } finally {
       vi.unstubAllGlobals();
     }

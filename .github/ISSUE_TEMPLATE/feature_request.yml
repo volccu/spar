@@ -1,0 +1,24 @@
+name: An idea
+description: Something spår could do, or do better.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        spår is small on purpose. SPEC.md explains what it will not do (labels, AI, colours for
+        notes) and why, so a quick look there first saves us both time.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What gets in your way
+      description: The moment you wished spår worked differently. A real example helps most.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: textarea
+    id: elsewhere
+    attributes:
+      label: Seen it done well somewhere else?

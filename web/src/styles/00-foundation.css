@@ -331,6 +331,9 @@
      while the canvas is being dragged, and it could not do it. Still the
      quietest rule in the app, and still well below --rule-soft. */
   --rule-faint: #241e17;
+  /* A highlighter stroke is its pen colour seen through (DESIGN.md §2b): enough to mark a
+     word, never enough to hide it. A touch stronger on the dark ground, where tints sink. */
+  --highlight-opacity: 0.42;
   /* One step off the paper, and only ever one step.
      ------------------------------------------------------------------------
      The chrome used to say "this one is on" by inverting to full ink, the same
@@ -869,6 +872,7 @@
   --rule: #cfc6bd;
   --rule-soft: #e1d9d1;
   --rule-faint: #e9e3db;
+  --highlight-opacity: 0.36;
   --raised: #e6dfd7;
   --lens-ground: #eee9e2;
   --invert: #3f3931;

@@ -198,15 +198,14 @@ function endList(value: string, start: number, caret: number): Edit {
 const BOXED_RE = /^[ \t]*(?:[-*–][ \t]+)?(?:\[[ xX]\]|☐|☑)/;
 /** The marker a box takes over from: a dash, a bullet or a number. */
 const MARKER_RE = /^([ \t]*)(?:[-*–]|\d{1,3}[.)])[ \t]+/;
-/** The longest first line `asChecklist` reads as a name rather than an item. */
+/** The longest first line `listTitle` reads as a name rather than an item. */
 const NAME_MAX = 30;
 
 /**
  * The title a list's first line carries, or null: short, no list marker, not a
  * box, not a `#` line, and either ended with a colon (dropped) or set off by a
- * blank line without ending a sentence. `asChecklist` writes it as a name and
- * the card's checklist face (`deriveFace`) draws it over the boxes, so a list
- * typed by hand and one the To-do mark made read alike.
+ * blank line without ending a sentence. The card's checklist face
+ * (`deriveFace`) draws it over the boxes of a list typed by hand.
  */
 export function listTitle(lines: string[]): string | null {
   const first = (lines[0] ?? "").trim();
@@ -220,56 +219,4 @@ export function listTitle(lines: string[]): string | null {
     !MARKER_RE.test(lines[0]) &&
     (colon || ((lines[1] ?? "").trim() === "" && !/[.!?]$/.test(first)));
   return titled ? name : null;
-}
-
-/**
- * A capture of several lines, made into a list to tick — **only because the
- * user pressed To-do on it** (review 2026-10-01, UX-05).
- *
- * This is the one place outside typing where the app writes a marker into
- * somebody's words, and the licence is the press: "typing help never rewrites
- * text the user is not typing" is a rule about help nobody asked for, and the
- * To-do mark is the asking. A Keep user writes three lines and taps To-do
- * expecting a list; without this they got a note with nothing to tick, which
- * the Ticker does not even offer.
- *
- * Deliberately narrow. One line is a to-do, not a list, and is left alone. A
- * note that already holds a box was made into a list by its writer and is
- * left exactly as written — its heading line is theirs. A `# ` name on the
- * first line stays the name. Blank lines stay blank; indentation stays where
- * it was; a dash or a number in front of a line gives way to the box, as a
- * typed `[] ` already takes over from a dash.
- *
- * One more reading, for a heading typed above the items (dogfooding
- * 2026-10-18), and only when the writer signalled it: text alone cannot tell
- * "Shopping" from "Milk", so a plain first line is an item like every other.
- * The first line becomes the note's name, written as `# Shopping` (the app's
- * own name rule, `lib/name.ts`), when it is short, has no list marker, is not
- * already a `#` line and has at least one item under it, and either (a) ends
- * with a colon ("Shopping:", the colon dropped) or (b) has a blank line right
- * under it. In (b) a first line that ends a sentence is not a name. Only the
- * rest is boxed.
- *
- * A single line is boxed only with `oneLine`, which is the capture bar on
- * Todos (review 2026-10-24, UX-16): a to-do written there starts with its
- * box. It is never read as a name.
- */
-export function asChecklist(text: string, oneLine = false): string {
-  const lines = text.split("\n");
-  const filled = lines.filter((l) => l.trim() !== "").length;
-  if (filled < 2 && !(oneLine && filled === 1)) return text;
-  if (lines.some((l) => BOXED_RE.test(l))) return text;
-  const name = filled < 2 ? null : listTitle(lines);
-  const names = name !== null;
-  return lines
-    .map((line, i) => {
-      if (line.trim() === "") return line;
-      if (i === 0 && /^#[ \t]/.test(line)) return line;
-      if (i === 0 && names) return `# ${name}`;
-      const marker = line.match(MARKER_RE);
-      if (marker) return `${marker[1]}[ ] ${line.slice(marker[0].length)}`;
-      const indent = line.match(/^[ \t]*/)![0];
-      return `${indent}[ ] ${line.slice(indent.length)}`;
-    })
-    .join("\n");
 }

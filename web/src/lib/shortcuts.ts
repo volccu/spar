@@ -3,7 +3,9 @@ import {
   BOLD_KEY,
   FLAG_KEY,
   MOVE_KEY,
+  REDO_KEY,
   CAPTURE_KEY,
+  DUPLICATE_KEY,
   HELP_KEY,
   hotkeyLabel,
   hotkeyTitle,
@@ -131,7 +133,14 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
   },
   {
     where: "An idea, drawn on",
-    shortcuts: [{ keys: [mod(UNDO_KEY)], does: "Take back the last stroke, rub-out or Clear" }],
+    shortcuts: [
+      { keys: [mod(UNDO_KEY)], does: "Take back the last thing drawn, moved or rubbed out" },
+      { keys: [shiftMod(UNDO_KEY), mod(REDO_KEY)], does: "Do it again" },
+      { keys: [mod(DUPLICATE_KEY)], does: "Copy what is selected" },
+      { keys: [key("Delete")], does: "Delete what is selected" },
+      { keys: [key("Escape")], does: "Let go of what is selected" },
+      { keys: [key("Shift")], does: "While dragging a shape: a square, a circle, a straight line" },
+    ],
   },
   {
     where: "A picture, opened",

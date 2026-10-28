@@ -734,6 +734,23 @@ spar-mascot,
   max-height: calc(var(--visible-h, 100dvh) - var(--panel-top, 0px));
 }
 
+/* A Move chooser hung from the top keeps the height it opened at
+   (`BoardChooser`), and its field keeps to the foot of it while the list
+   narrows above. */
+.selpanel-chooser.selpanel-under {
+  /* Never past the glass: a window made shorter after opening still wins. */
+  min-height: min(var(--held-h, 0px), calc(var(--visible-h, 100dvh) - var(--panel-top, 0px)));
+}
+
+.selpanel-chooser.selpanel-under > .selpanel-new,
+.selpanel-chooser.selpanel-under > .selpanel-row {
+  margin-top: auto;
+}
+
+.selpanel-chooser.selpanel-under > .selpanel-new + .selpanel-row {
+  margin-top: 0;
+}
+
 /* Hung under a mark inside the open note (the reminder panel, review
    UI-A-03): it takes `.selpanel-over`'s step above the sheet, and lets go of
    that class's floor the way `.selpanel-under` lets go of the bar's. */
@@ -881,6 +898,12 @@ spar-mascot,
   padding: 0 18px 12px;
   color: var(--muted);
   font-size: var(--t-data);
+}
+
+/* The Move chooser keeps its hint's two lines while it is empty
+   (`BoardChooser`): at 30ch, "Enter to move to Kitchen" already takes both. */
+.selpanel-chooser > .selpanel-hint {
+  min-height: calc(2lh + 22px);
 }
 
 /* The Move chooser's folders: every one, in shelf order, scrolling inside

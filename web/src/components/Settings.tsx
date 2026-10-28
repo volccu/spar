@@ -547,6 +547,13 @@ export function Settings({
                     control: <SettingSegments name="Weather from the robot" setting="weather" choices={ON_OFF} />,
                   },
                 ]),
+            // The pen on a canvas (`lib/shapeSnap.ts`): Undo always gives the rough line back.
+            {
+              id: "tidyShapes",
+              label: "Tidy shapes when drawing",
+              advice: "Hold the pen still at the end of a rough line, circle or box on an idea to make it clean, and Undo gives back what you drew.",
+              control: <SettingSegments name="Tidy shapes when drawing" setting="tidyShapes" choices={ON_OFF} />,
+            },
             // Offered only where it can be seen: an installed app in a browser
             // that badges (`lib/appBadge.ts`).
             ...(badgeable

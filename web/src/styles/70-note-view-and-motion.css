@@ -181,9 +181,7 @@
   .topbar-settings:focus-visible,
   .board-more:hover,
   .search-scope:hover,
-  .search-scope:focus-visible,
-  .count-end:hover,
-  .count-end:focus-visible {
+  .search-scope:focus-visible {
     color: var(--ink);
   }
 

@@ -246,7 +246,7 @@ const STRONG = [
   // a pasted page began its panel one line in.
   /^\s*<!DOCTYPE\b/i,
   // A CSS rule opening: a selector and a brace, nothing else on the line.
-  /^\s*[.#]?[\w-]+[\w\s.,#:>[\]="'-]*\{\s*$/,
+  /^\s*[.#]?[\w-][\w\s.,#:>[\]="'-]*\{\s*$/,
   // A JSON key.
   /^\s*"[\w$-]+"\s*:/,
 ];

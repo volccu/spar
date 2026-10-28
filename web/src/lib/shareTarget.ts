@@ -37,7 +37,7 @@ export interface SharedCapture {
    * or the total one share may carry (audit SEC-1). Named so the app can say
    * which; `count` may be larger than `names`, which the worker caps.
    */
-  left?: { names: { name: string; size: number }[]; count: number };
+  left?: { names: { name: string; size: number }[]; count: number; full?: true };
   /**
    * Empties the inbox — called **once the note exists**, and never before.
    *
@@ -61,6 +61,8 @@ interface SharedWords {
   url?: unknown;
   left?: unknown;
   leftCount?: unknown;
+  /** The device ran out of room partway through parking the files. */
+  leftFull?: unknown;
 }
 
 /** The worker's `left` list, read as warily as everything else it parked. */
@@ -74,7 +76,8 @@ export function readLeft(words: SharedWords | null): SharedCapture["left"] {
     }));
   const said = typeof words?.leftCount === "number" ? words.leftCount : 0;
   const count = Math.max(names.length, Number.isFinite(said) ? Math.floor(said) : 0);
-  return count > 0 ? { names, count } : undefined;
+  if (count === 0) return undefined;
+  return words?.leftFull === true ? { names, count, full: true } : { names, count };
 }
 
 /**

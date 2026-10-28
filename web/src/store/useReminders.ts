@@ -1,3 +1,4 @@
+import { serverNow } from "./serverClock";
 import { useCallback, useEffect, useState, type RefObject } from "react";
 import type { Note, ReminderRepeat } from "../types";
 import {
@@ -74,7 +75,7 @@ export function useReminders({
     let live = true;
     void refreshPush().then(() => pushState()).then((state) => {
       if (live) setPushStatus(state);
-    });
+    }).catch(() => {});
 
     const fromNotification = (id: string | null | undefined) => {
       if (!id) return;
@@ -233,7 +234,9 @@ export function useReminders({
    */
   const disableRing = useCallback(() => {
     setRingingOff(true);
-    void disablePush().then(setPushStatus);
+    void disablePush().then(setPushStatus).catch(() => {
+      void pushState().then(setPushStatus).catch(() => {});
+    });
   }, []);
 
   /**
@@ -303,7 +306,11 @@ export function useReminders({
   const rings = syncConfigured && !deviceOnly;
   const clearSpent = useCallback((justMoved?: ReadonlySet<string>) => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-    const now = Date.now();
+    // The server's clock, as the trash sweep uses: a device clock running fast
+    // would clear a reminder that has not rung, and the clear syncs with a
+    // fresh stamp so the server sweep never rings it. No reading yet, no clear.
+    const now = serverNow();
+    if (now === null) return;
     for (const note of notesRef.current) {
       if (justMoved?.has(note.id) || !spentReminder(note, now)) continue;
       // A rule this build cannot read goes with the time, as Clear does.

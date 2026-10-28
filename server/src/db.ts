@@ -141,6 +141,19 @@ export const MIGRATIONS: string[] = [
   );
   create index prefs_history_owner on prefs_history(owner_id, replaced_at);
   `,
+  // 3 — each device that took a reminder's occurrence (bughunt 2026-10-24):
+  // the spår server's copy of Supabase's `reminder_device_deliveries`
+  // (migration 0031). The sweep tries again only the devices not in here.
+  `
+  create table reminder_device_deliveries (
+    note_id     text not null references notes(id) on delete cascade,
+    endpoint    text not null,
+    owner_id    text not null references users(id) on delete cascade,
+    reminder_at integer not null,
+    fired_at    integer not null,
+    primary key (note_id, endpoint)
+  );
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -163,3 +163,30 @@ describe("where a push may be sent", () => {
     expect(result).toMatchObject({ ok: false, gone: true });
   });
 });
+
+describe("a lookup that fails, as opposed to a name that does not exist", () => {
+  const notFound = () => Object.assign(new Error("no record found"), { name: "NotFound" });
+  it("is told apart, so the caller can ask again instead of refusing for good", async () => {
+    const { judgeUrl } = await import("../supabase/functions/_shared/netguard");
+    const timedOut: Resolver = async () => {
+      throw Object.assign(new Error("timed out"), { name: "TimedOut" });
+    };
+    expect(await judgeUrl("https://flaky.example/", timedOut)).toBe("lookup-failed");
+    expect(await publicUrl("https://flaky.example/", timedOut)).toBeNull();
+  });
+  it("still refuses a name with no records at all", async () => {
+    const { judgeUrl } = await import("../supabase/functions/_shared/netguard");
+    const none: Resolver = async () => {
+      throw notFound();
+    };
+    expect(await judgeUrl("https://nowhere.example/", none)).toBeNull();
+  });
+  it("still refuses a private answer even when the other family failed", async () => {
+    const { judgeUrl } = await import("../supabase/functions/_shared/netguard");
+    const mixed: Resolver = async (_host, type) => {
+      if (type === "A") return ["10.0.0.1"];
+      throw new Error("SERVFAIL");
+    };
+    expect(await judgeUrl("https://inside.example/", mixed)).toBeNull();
+  });
+});

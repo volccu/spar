@@ -128,6 +128,32 @@ describe("the reminder sweep", () => {
     expect(Date.parse(row.updated_at)).toBe(Date.parse(String(n.updated_at)));
   });
 
+  it("tries again only the device whose push service failed, and then closes the occurrence", async () => {
+    let laptopUp = false;
+    const service = pushService((url) => (url.endsWith("/laptop") && !laptopUp ? 503 : 201));
+    s = await startServer({}, { pushTransport: service.transport });
+    const a = new Client(s.url);
+    await a.signUp();
+    await subscribe(a, await browser(), "https://push.example.test/phone");
+    await subscribe(a, await browser(), "https://push.example.test/laptop");
+    await a.request("POST", "/api/notes", { rows: [note({ reminder_at: new Date(Date.now() - 60_000).toISOString() })] });
+
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      expect(await s.app.push.sweep()).toEqual({ due: 1, sent: 1, retired: 0 });
+    } finally {
+      console.error = quiet;
+    }
+    // Still owed to the laptop, and only to the laptop.
+    laptopUp = true;
+    service.sent.length = 0;
+    expect(await s.app.push.sweep()).toEqual({ due: 1, sent: 1, retired: 0 });
+    expect(service.sent.map((x) => x.url)).toEqual(["https://push.example.test/laptop"]);
+    // Every device has it now.
+    expect(await s.app.push.sweep()).toEqual({ due: 0, sent: 0, retired: 0 });
+  });
+
   it("offers no Later or Done on a repeating reminder", async () => {
     const service = pushService(() => 201);
     s = await startServer({}, { pushTransport: service.transport });

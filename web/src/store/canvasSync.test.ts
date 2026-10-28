@@ -91,8 +91,11 @@ vi.mock("./db", () => ({
     }
   },
   getMeta: async () => storedCursor,
-  putCanvasesLocalOnly: async (folders: Canvas[]) => {
-    writtenLocally.push(...folders);
+  putCanvasesFromServer: async (folders: Canvas[]) => {
+    // Faithful to the real one: nothing queued here is overwritten.
+    const stored = folders.filter((f) => !outbox.has(f.id));
+    writtenLocally.push(...stored);
+    return stored;
   },
   setMeta: async (_key: string, value: unknown) => {
     storedCursors.push(value);
@@ -177,6 +180,19 @@ describe("pushing an arrangement", () => {
     expect(outbox.get("idea")).toBe("2026-08-12T09:00:02.000Z");
   });
 
+  it("sends pictures placed on the canvas inside items, beside the notes", async () => {
+    outbox = new Map([["idea", ARRANGED]]);
+    const { syncCanvasesOnce } = await import("./canvasSync");
+
+    await syncCanvasesOnce([folder({ images: [{ attachment_id: "p1", x: 5, y: 6 }] })]);
+
+    expect(pushedRows[0].items).toEqual([
+      { note_id: "a", x: 0, y: 0 },
+      { attachment_id: "p1", x: 5, y: 6 },
+    ]);
+    expect("images" in pushedRows[0]).toBe(false);
+  });
+
   /** The client never names an owner, so it can never name the wrong one. */
   it("leaves owner_id to the server", async () => {
     outbox = new Map([["idea", ARRANGED]]);
@@ -239,6 +255,16 @@ describe("pulling an arrangement", () => {
   });
 
   /** A row written before labels existed must read as "no labels", not null. */
+  it("reads pictures back out of items, and leaves the notes' list holding only notes", async () => {
+    remoteRows = [{ ...remoteRow, items: [...remoteRow.items, { attachment_id: "p1", x: 5, y: 6 }, null] }];
+    const { syncCanvasesOnce } = await import("./canvasSync");
+
+    const { pulled } = await syncCanvasesOnce([]);
+
+    expect(pulled[0].items).toEqual([{ note_id: "a", x: 900, y: 400 }]);
+    expect(pulled[0].images).toEqual([{ attachment_id: "p1", x: 5, y: 6 }]);
+  });
+
   it("reads a row without text elements as an empty canvas", async () => {
     const { text_elements: _omitted, ...withoutLabels } = remoteRow;
     remoteRows = [withoutLabels];

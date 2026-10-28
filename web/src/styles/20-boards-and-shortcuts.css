@@ -382,6 +382,13 @@
   display: none;
 }
 
+/* Until the folders are read off the device the strip keeps its place and
+   draws nothing, so the app's own boards never slide sideways when the
+   folders arrive ahead of them (ui-sweep 2026-10-28). */
+.boards[data-waiting="true"] {
+  visibility: hidden;
+}
+
 /* Boards are named places, so they are set in the display face. Marcellus is
    an inscriptional Roman — it is built for spaced capitals and looks its best
    here, at the one spot in the app that names things. */

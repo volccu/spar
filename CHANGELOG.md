@@ -7,6 +7,47 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-28
+
+### Added
+
+- **The canvas draws properly now.** One pen-colour picker (the three greys and the sixteen folder
+  tints) and one thickness picker; a highlighter; shapes (rectangle, ellipse, line, arrow, with an
+  optional fill); a rough box or ring held still is tidied into a clean one, and one undo gives the
+  rough line back (Settings can turn it off); a Text tool; Select, a loop for a finger and a box for
+  a mouse, to move, resize, recolour, copy or delete; Undo and Redo for the sitting; Show everything;
+  a middle-button pan; Save as picture, as a PNG. Pictures can be pasted, dropped or picked straight
+  onto an idea.
+- A file added in the middle of writing leaves an `[image 2]` marker in the text that opens it.
+- The robot says "N selected · Cancel" while notes are picked.
+- Tidy up on a wide window puts the note and the places side by side; a phone's floor ends Leave ·
+  Archive · Delete.
+- The public page: a full feature list in the README, a code of conduct, issue and pull request
+  templates, and fresh pictures (with a light-theme hero).
+
+### Fixed
+
+- The To-do mark no longer turns a note into tick boxes.
+- A slow file upload no longer holds note sync behind it.
+- Two link previews answered at once no longer wipe each other.
+- A push subscription made under an old signing key is replaced on open instead of going silent.
+- Shared photos that a full device could not hold are named instead of dropped silently.
+- Undoing Added to idea, Took out and Dissolve puts back only what is still as they left it.
+- Nothing on screen jumps any more when the shelf loads, a one-line note is tapped, the first box is
+  ticked on a phone, pictures are stepped through, or the Move chooser narrows its list.
+
+## [1.0.1] - 2026-10-24
+
+### Fixed
+
+- Review fixes from the day of the first release: the Keep import's summary names what went to
+  Todos and Links and opens there, the search scope chip reads as it looks, and stale words in the
+  About page and the docs were made true.
+
+## [1.0.0] - 2026-10-24
+
+The first public release.
+
 ### Added
 
 - The source is published under the GNU Affero General Public License v3.0.
@@ -20,7 +61,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the Archive, pinned ones are marked important, Keep's trash stays behind. Each label can become a
   new board, go into an existing one or stay in the Inbox, and labels that did not become a note's
   board are kept on its last line. Photographs, drawings and recordings come in as files under the
-  25 MB limit, and anything left behind is named. A second import skips what is already here, and
+  50 MB limit, and anything left behind is named. A second import skips what is already here, and
   the whole import has one undo that moves it to the trash. Offered from the menu and on the empty
   Inbox of a new archive.
 - A build made with `VITE_RUNTIME_CONFIG=1` reads its backend from `/config.json` on the server it
@@ -97,3 +138,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   granted explicitly; a note emptied on one device is stored empty instead of reverting to its
   first capture on the others; re-sending a note can no longer move its `updated_at` backwards; and
   a Google Keep id is unique per account rather than across all of them.
+
+[Unreleased]: https://github.com/volccu/spar/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/volccu/spar/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/volccu/spar/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/volccu/spar/releases/tag/v1.0.0

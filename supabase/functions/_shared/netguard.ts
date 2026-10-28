@@ -203,6 +203,18 @@ export type Resolver = (hostname: string, type: "A" | "AAAA") => Promise<string[
  * the address it checked — see the head of this file.
  */
 export async function publicUrl(raw: unknown, resolve: Resolver): Promise<URL | null> {
+  const judged = await judgeUrl(raw, resolve);
+  return judged instanceof URL ? judged : null;
+}
+
+/**
+ * `publicUrl`, telling a refusal apart from a lookup that merely failed. A
+ * resolver timing out or answering SERVFAIL says nothing about the page, and
+ * answered as a refusal (400) it stamped the link "no preview" for good on the
+ * client, which takes 400 as a verdict. `"lookup-failed"` is for the caller to
+ * answer with a status the client asks again after.
+ */
+export async function judgeUrl(raw: unknown, resolve: Resolver): Promise<URL | null | "lookup-failed"> {
   const url = publicUrlShape(raw);
   if (!url) return null;
   const host = url.hostname.toLowerCase().replace(/\.+$/, "");
@@ -210,16 +222,21 @@ export async function publicUrl(raw: unknown, resolve: Resolver): Promise<URL | 
   if (v4(host)) return url;
 
   let resolved = false;
+  let failed = false;
   for (const type of ["A", "AAAA"] as const) {
     let addresses: string[];
     try {
       addresses = await resolve(host, type);
-    } catch {
-      // A host may legitimately have only one record family.
+    } catch (error) {
+      // A host may legitimately have only one record family: Deno answers
+      // `NotFound` for a name or family with no records. Anything else is the
+      // lookup itself failing.
+      if ((error as { name?: string } | null)?.name !== "NotFound") failed = true;
       continue;
     }
     if (addresses.length > 0) resolved = true;
     if (addresses.some((address) => isPrivateAddress(address))) return null;
   }
-  return resolved ? url : null;
+  if (resolved) return url;
+  return failed ? "lookup-failed" : null;
 }

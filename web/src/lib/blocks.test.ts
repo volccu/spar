@@ -527,3 +527,11 @@ describe("headings", () => {
     expect(found).toBe(4);
   });
 });
+
+describe("one very long unbroken token", () => {
+  it("is parsed in linear time, not frozen on a backtracking pattern", () => {
+    const started = Date.now();
+    parseBlocks("a".repeat(60_000));
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});

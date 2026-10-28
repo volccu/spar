@@ -33,7 +33,7 @@ const SPACING_LITERALS: Record<string, number> = {
   "80-empty-mascot-selection.css": 27,
   "82-dialogs-and-undo.css": 19,
   "84-sync-signin-phone-shelf.css": 21,
-  "88-sorter.css": 19,
+  "88-sorter.css": 17,
   "90-about-and-settings.css": 9,
   "95-keep-import.css": 29,
   "99-hover-tip.css": 0,

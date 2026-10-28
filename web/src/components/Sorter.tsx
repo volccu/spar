@@ -36,6 +36,7 @@ import {
   IconReminder,
   IconRestore,
   IconStepBack,
+  IconStepOn,
   IconTodo,
 } from "./Icons";
 
@@ -109,16 +110,15 @@ function stands(entry: Entry, live: Note | undefined): boolean {
 /**
  * How many places the foot draws directly, before it falls back to a Move row.
  *
- * **Two rows of buttons under the thumb, and no more** (review 2026-10-01,
- * PL-02). A phone draws two to a row, so four; a wide window draws three, so
- * six. That is the owner's own bound on how much of the screen the folders may
- * take — the 2026-09-26 change put every folder behind a Move row because a
- * dozen of them took half a phone, and it made *every* filed note two taps to
- * save the few people who have a dozen. A shelf that fits is drawn as buttons;
- * only one that does not goes behind the row — except on a phone, which keeps
- * its busiest four as buttons (`splitPlaces`, review 2026-10-13, UX-02).
+ * A phone draws two to a row, five rows of them, so ten — the owner's own pick
+ * of a Tidy up whose folders fill the lower half (2026-10-24, layout A; it was
+ * two rows, review 2026-10-01, PL-02). A wide window lists them down a column
+ * of their own beside the note (`directWide`). A shelf that fits is drawn as
+ * buttons; only one that does not goes behind the row — except on a phone,
+ * which keeps its busiest ten as buttons (`splitPlaces`, review 2026-10-13,
+ * UX-02).
  */
-const DIRECT_PHONE = 4;
+const DIRECT_PHONE = 10;
 const DIRECT_WIDE = 6;
 
 /** Whether `places` destinations (the Inbox row and the folders) fit in two
@@ -173,6 +173,9 @@ export function splitPlaces(
     rest: run.filter((p) => !keep.has(p) && !isInspiration(p)),
   };
 }
+
+/** Past this many notes the pile is drawn as one line filling, not a cell each. */
+const PROGRESS_CELLS = 40;
 
 /** How long a tap after an answer is ignored, so a double tap answers one note. */
 const HOLD_MS = 250;
@@ -1054,10 +1057,124 @@ export function Sorter({
     </button>
   );
 
+  /** Back one note. On a phone a mark in the head band; on a wide window a
+   *  word beside Leave, under the note, where the mouse already is. Disabled,
+   *  not removed, at the start of the pile, so nothing beside it moves. */
+  const backButton = (
+    <button
+      type="button"
+      className={phone ? "sorter-done" : "sorter-done sorter-done-word"}
+      aria-label="Back one note"
+      title={phone ? "Back one note" : undefined}
+      disabled={at === 0}
+      onClick={back}
+    >
+      <IconStepBack />
+      {!phone && <span className="sorter-word">Back</span>}
+      {!phone && keyboard && <KeyCaps label="←" />}
+    </button>
+  );
+
+  /** Leave: the note stays where it is and the next one comes. On a phone it
+   *  is the first of the three answers on the floor, as far from Delete as the
+   *  row allows; on a wide window it stands beside Back under the note. */
+  const leaveButton = phone ? (
+    <button type="button" className="sorter-dest sorter-leave" onClick={leave} onKeyDown={noRepeat}>
+      <IconStepOn />
+      <span className="sorter-dest-name">Leave</span>
+    </button>
+  ) : (
+    <button type="button" className="sorter-skip mono" onClick={leave}>
+      Leave
+      {keyboard && <KeyCaps label="→" />}
+    </button>
+  );
+
+  /** What can be said about the note without sending it anywhere: open it,
+   *  flag it, make it a to-do, remind me. Under the note's words, each with
+   *  its word, because they are about the note (layout A, 2026-10-24). */
+  const tools = (
+    <div className="sorter-tools">
+      {/* Not an answer: the whole note, to fix and come back to this same
+          card. The words' own tap still edits in place. */}
+      {onOpen && (
+        <button type="button" className="sorter-tool" aria-label="Open note" onClick={openWhole}>
+          <IconOpenNote />
+          <span className="sorter-word">Open</span>
+        </button>
+      )}
+      {/* One name, on or off — `aria-pressed` carries which (review
+          2026-10-04, CD-02). It leaves the card where it is. */}
+      <button
+        type="button"
+        className="sorter-tool"
+        aria-label="Important"
+        aria-pressed={Boolean(note?.priority)}
+        onClick={mark}
+      >
+        <IconPriority on={Boolean(note?.priority)} tier="inline" />
+        <span className="sorter-word">Important</span>
+      </button>
+      {/* Drawn from `isTodoNote`, the one definition the shelf and the open
+          note's mark read too. */}
+      <button
+        type="button"
+        className="sorter-tool"
+        aria-label="To-do"
+        aria-pressed={note ? isTodoNote(note) : false}
+        onClick={markTodo}
+      >
+        <IconTodo on={note ? isTodoNote(note) : false} />
+        <span className="sorter-word">To-do</span>
+      </button>
+      {/* Remind me later: an answer that does not file — the four presets of
+          the open note, then the next note. */}
+      <button
+        type="button"
+        className="sorter-tool"
+        aria-label="Remind me later"
+        aria-haspopup="menu"
+        aria-expanded={reminding}
+        onClick={() => setRemindingAt(reminding ? null : at)}
+      >
+        <IconReminder on={Boolean(note?.reminder_at)} tier="inline" />
+        <span className="sorter-word">Remind</span>
+      </button>
+    </div>
+  );
+
+  const count = (
+    <span className="sorter-at mono">
+      {ended ? "Done" : `${Math.min(at + 1, pile.length)} of ${pile.length}`}
+    </span>
+  );
+
+  /** How far through the pile, drawn: a cell a note while they fit, else one
+   *  line filling. A picture of the count beside it, so hidden from a reader. */
+  const progress = !ended && pile.length > 1 && (
+    <span className="sorter-progress" aria-hidden>
+      {pile.length <= PROGRESS_CELLS ? (
+        pile.map((_, i) => (
+          <span
+            key={i}
+            className="sorter-progress-cell"
+            data-at={i < at ? "done" : i === at ? "here" : undefined}
+          />
+        ))
+      ) : (
+        <span
+          className="sorter-progress-fill"
+          style={{ inlineSize: `${((at + 1) / pile.length) * 100}%` }}
+        />
+      )}
+    </span>
+  );
+
   return (
     <div
       ref={layerRef}
-      className="sorter"
+      // A wide window stands the note and the places side by side (layout A).
+      className={phone ? "sorter" : "sorter sorter-side"}
       role="dialog"
       aria-modal="true"
       aria-label={`Tidy up ${where}`}
@@ -1072,98 +1189,28 @@ export function Sorter({
       onTouchEnd={editing ? undefined : onTouchEnd}
       onTouchCancel={editing ? undefined : onTouchCancel}
     >
-      {/* Where you are, and everything that is **not** a destination: Back,
-          Important, Leave, and the way out. They are up here, away from the
-          hand, for one reason — at the foot every row is a place a note can
-          go, and a row that is not one is how a thumb aiming for it lands in
-          the bin instead (2026-09-04 audit, F13). The phone's short path to
-          Leave is the swipe, not this button. */}
+      {/* Where you are, and the way out. The controls that are not a place
+          a note can go are not with the places: on a wide window they stand
+          under the note, on a phone the note's own four stand under it and
+          Leave is the first of the three answers on the floor (layout A,
+          2026-10-24; they were the head band's second row). */}
       <div className="sorter-head">
         {/* The creature stands here as it does in the header, its bubble beside
-            it, and the count at the far end of the same row. */}
+            it, and on a wide window the count at the far end of the same row. */}
         <div className="sorter-head-row">
           {creature}
-          <span className="sorter-at mono">
-            {ended ? "Done" : `${Math.min(at + 1, pile.length)} of ${pile.length}`}
-          </span>
+          {!phone && count}
+          {!phone && progress}
+          {phone && !ended && backButton}
         </div>
-        {/* One group, so on a phone too narrow for the count and every control
-            in one row it is the controls that drop under the count, together,
-            the cross still last at the right edge — never the count squeezed
-            to a word a line, never the cross pushed off the screen (audit
-            2026-10-24, UX-002). */}
-        <div className="sorter-tools">
-          {!ended && (
-            <>
-              <button
-                type="button"
-                className="sorter-done"
-                aria-label="Back one note"
-                title="Back one note"
-                disabled={at === 0}
-                onClick={back}
-              >
-                <IconStepBack />
-              </button>
-              {/* Not an answer either: the whole note, to fix and come back to
-                  this same card. The words' own tap still edits in place. */}
-              {onOpen && (
-                <button
-                  type="button"
-                  className="sorter-done"
-                  aria-label="Open note"
-                  title="Open note"
-                  onClick={openWhole}
-                >
-                  <IconOpenNote />
-                </button>
-              )}
-              {/* The one control here that leaves the card where it is. */}
-              <button
-                type="button"
-                className="sorter-done"
-                // One name, on or off — `aria-pressed` carries which. A lit
-                // flag named "Not important" told a listener the reverse
-                // (review 2026-10-04, CD-02).
-                aria-label="Important"
-                title="Important"
-                aria-pressed={Boolean(note?.priority)}
-                onClick={mark}
-              >
-                <IconPriority on={Boolean(note?.priority)} tier="inline" />
-              </button>
-              {/* The same kind of control: says something about the note, moves
-                  nothing. Drawn from `isTodoNote`, the one definition the shelf
-                  and the open note's mark read too. */}
-              <button
-                type="button"
-                className="sorter-done"
-                aria-label="To-do"
-                title="To-do"
-                aria-pressed={note ? isTodoNote(note) : false}
-                onClick={markTodo}
-              >
-                <IconTodo on={note ? isTodoNote(note) : false} />
-              </button>
-              {/* Remind me later: an answer that does not file — the four presets
-                  of the open note, then the next note. */}
-              <button
-                type="button"
-                className="sorter-done"
-                aria-label="Remind me later"
-                title="Remind me later"
-                aria-haspopup="menu"
-                aria-expanded={reminding}
-                onClick={() => setRemindingAt(reminding ? null : at)}
-              >
-                <IconReminder on={Boolean(note?.reminder_at)} tier="inline" />
-              </button>
-              <button type="button" className="sorter-skip mono" onClick={leave}>
-                Leave
-              </button>
-            </>
-          )}
-        </div>
+        {/* A phone gives the creature's words the count's room: the count and
+            the pile drawn stand on a row of their own under it. */}
+        {phone && (
+          <div className="sorter-pile-row">
+            {count}
+            {progress}
+          </div>
+        )}
         {/* The way out stands where every full-screen exit does, the header
             cog's spot (`.sorter-exit`, review 2026-10-24, UI-02). */}
         <button
@@ -1208,146 +1255,163 @@ export function Sorter({
           />
         </div>
       ) : (
-        <>
-        {/* The note, as much of it as there is room for. This screen is for
-            deciding where something goes; a tap on the words opens them for
-            editing in place (review 2026-10-04, FX-B-03), and everything else
-            about the note is one tap away on the board as it always was.
+        <div className="sorter-body">
+          <div className="sorter-main">
+            {/* The note, as much of it as there is room for. This screen is for
+                deciding where something goes; a tap on the words opens them for
+                editing in place (review 2026-10-04, FX-B-03), and everything else
+                about the note is one tap away on the board as it always was.
 
-            The card is the thing the finger carries: the wrapper follows a
-            swipe, and the two words are drawn in its corners for as long as it
-            is held, coming up as it goes (`useModeLayer`, UX-08). They are
-            decoration for the hand — the buttons say the same things — so
-            they are hidden from a reader. */}
-        <div className="sorter-card" ref={faceRef}>
-          <span className="sorter-cue sorter-cue-keep" data-cue aria-hidden>
-            Leave
-          </span>
-          <span className="sorter-cue sorter-cue-away" data-cue aria-hidden>
-            Delete
-          </span>
-          <div className="sorter-note">
-            {/* The open note's own reading column, centred, so a long line is not
-                1400px of text on a desktop (review 2026-10-01, UI-14). */}
-            <div className="sorter-read">
-              {/* What this note was already answered with, while that answer
-                  holds — Back is how a reader reaches it, and the screen has to
-                  say what Leave will now undo. */}
-              {decided && <p className="sorter-was mono">{verdictWords(decided, note!, boards)}</p>}
-              {thumb && <img className="sorter-shot" src={thumb} alt="" />}
-              {!editing && shown.links.length > 0 && (
-                <ul className="sorter-links">
-                  {shown.links.map((row, i) => (
-                    <li key={`${i}-${row.link.href}`} className="sorter-link">
-                      <span className="sorter-link-name">{row.name}</span>
-                      {row.site && <span className="sorter-link-site mono">{row.site}</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {editing ? (
-                <textarea
-                  ref={(el) => {
-                    const s = session.current;
-                    if (el && s && s.caret !== -1) {
-                      // Once, on arrival: focus, the caret where the tap was
-                      // (the end when it could not be measured), the height.
-                      const at = s.caret ?? el.value.length;
-                      s.caret = -1;
-                      el.focus({ preventScroll: true });
-                      el.setSelectionRange(at, at);
-                      fitTextarea(el);
-                    }
-                  }}
-                  className="sorter-text sorter-edit"
-                  aria-label="Note text"
-                  value={fieldValue(draft)}
-                  onChange={(e) => {
-                    const value = e.currentTarget.value;
-                    setDraft(value);
-                    fitTextarea(e.currentTarget);
-                    const s = session.current;
-                    if (!s) return;
-                    s.last = value;
-                    onEditBody?.(s.note, value);
-                  }}
-                  onBlur={() => finishEditing(false)}
-                />
-              ) : (
-                shown.words && (
-                  <p
-                    className="sorter-text"
-                    data-editable={onEditBody ? "" : undefined}
-                    onClick={startEditing}
-                  >
-                    {readAs(shown.words)}
-                  </p>
-                )
-              )}
+                The card is the thing the finger carries: the wrapper follows a
+                swipe, and the two words are drawn in its corners for as long as it
+                is held, coming up as it goes (`useModeLayer`, UX-08). They are
+                decoration for the hand — the buttons say the same things — so
+                they are hidden from a reader. */}
+            <div className="sorter-card" ref={faceRef}>
+              <span className="sorter-cue sorter-cue-keep" data-cue aria-hidden>
+                Leave
+              </span>
+              <span className="sorter-cue sorter-cue-away" data-cue aria-hidden>
+                Delete
+              </span>
+              <div className="sorter-note">
+                {/* The open note's own reading column, centred, so a long line is not
+                    1400px of text on a desktop (review 2026-10-01, UI-14). */}
+                <div className="sorter-read">
+                  {/* What this note was already answered with, while that answer
+                      holds — Back is how a reader reaches it, and the screen has to
+                      say what Leave will now undo. */}
+                  {decided && <p className="sorter-was mono">{verdictWords(decided, note!, boards)}</p>}
+                  {thumb && <img className="sorter-shot" src={thumb} alt="" />}
+                  {!editing && shown.links.length > 0 && (
+                    <ul className="sorter-links">
+                      {shown.links.map((row, i) => (
+                        <li key={`${i}-${row.link.href}`} className="sorter-link">
+                          <span className="sorter-link-name">{row.name}</span>
+                          {row.site && <span className="sorter-link-site mono">{row.site}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {editing ? (
+                    <textarea
+                      ref={(el) => {
+                        const s = session.current;
+                        if (el && s && s.caret !== -1) {
+                          // Once, on arrival: focus, the caret where the tap was
+                          // (the end when it could not be measured), the height.
+                          const at = s.caret ?? el.value.length;
+                          s.caret = -1;
+                          el.focus({ preventScroll: true });
+                          el.setSelectionRange(at, at);
+                          fitTextarea(el);
+                        }
+                      }}
+                      className="sorter-text sorter-edit"
+                      // One row, not the textarea's default two: a one-line note
+                      // stays one line when tapped (see the open note's editor).
+                      rows={1}
+                      aria-label="Note text"
+                      value={fieldValue(draft)}
+                      onChange={(e) => {
+                        const value = e.currentTarget.value;
+                        setDraft(value);
+                        fitTextarea(e.currentTarget);
+                        const s = session.current;
+                        if (!s) return;
+                        s.last = value;
+                        onEditBody?.(s.note, value);
+                      }}
+                      onBlur={() => finishEditing(false)}
+                    />
+                  ) : (
+                    shown.words && (
+                      <p
+                        className="sorter-text"
+                        data-editable={onEditBody ? "" : undefined}
+                        onClick={startEditing}
+                      >
+                        {readAs(shown.words)}
+                      </p>
+                    )
+                  )}
+                </div>
+              </div>
             </div>
+            <PileEdge after={pile.length - at - 1} />
+            {tools}
+            {!phone && (
+              <div className="sorter-nav">
+                {backButton}
+                {leaveButton}
+              </div>
+            )}
           </div>
-        </div>
-        <PileEdge after={pile.length - at - 1} />
 
-        {/* The destinations, under the thumb. A shelf that fits (`fitsBeneath`:
-            two rows) is drawn **as buttons**, so filing is one tap again — the
-            Inbox first when this is a folder's pile, the folders in the shelf's
-            own order (see `file` for why they never move), then a new board,
-            then Archive and Delete last, the one nobody should reach by
-            accident, with nothing past it a thumb might be aiming for instead
-            (Leave is in the head). Links, which only some notes can go to, stands
-            in a row of its own at the very top of the foot: the foot is anchored
-            to the floor, so a row that comes and goes up there moves nothing a
-            thumb is aimed at. A shelf too big for that goes behind one Move row
-            and comes up in the same band only when asked for; the band scrolls
-            rather than eating the note. */}
-        {choosing ? (
-          <div className="sorter-to sorter-to-boards" role="group" aria-label="Move to a board">
-            <button
-              type="button"
-              className="sorter-dest sorter-dest-wide"
-              onClick={closeChoosing}
-            >
-              <IconClear />
-              <span className="sorter-dest-name">Cancel</span>
-            </button>
-            {/* Links first, where the chooser elsewhere puts it: the one place
-                here that is not a folder of the user's. */}
-            {folded && note && canKeepOnLinks(note) && (
-              <button type="button" className="sorter-dest" onClick={fileLinks}>
-                <IconLink tier="inline" />
-                <span className="sorter-dest-name">Links</span>
-              </button>
-            )}
-            {rest.map((place, i) => placeRow(place, drawn.length + i))}
-            {newBoardRow(false)}
-          </div>
-        ) : (
-          <div className={folded ? "sorter-to" : "sorter-to sorter-to-direct"}>
-            {!folded && note && canKeepOnLinks(note) && (
-              <button type="button" className="sorter-dest sorter-dest-wide" onClick={fileLinks}>
-                <IconLink tier="inline" />
-                <span className="sorter-dest-name">Links</span>
-              </button>
-            )}
-            {drawn.map(placeRow)}
-            {rest.length === 0 ? (
-              newBoardRow(true)
-            ) : (
-              <button
-                type="button"
-                className="sorter-dest sorter-dest-wide"
-                onClick={() => setChoosingAt(at)}
-              >
-                <IconFolder />
-                <span className="sorter-dest-name">Move to a board…</span>
-              </button>
-            )}
-            {archiveRow}
-            {deleteRow}
-          </div>
-        )}
-        </>
+          {/* The places. A shelf that fits (`fitsBeneath`) is drawn **as
+              buttons**, so filing is one tap — the Inbox first when this is a
+              folder's pile, the folders in the shelf's own order (see `file`
+              for why they never move), then a new board; Archive and Delete
+              stand apart at the end, Delete last, the one nobody should reach
+              by accident. Links, which only some notes can go to, is a wide row
+              at the top. A shelf too big goes behind one Move row and comes up
+              in the same band only when asked for; the list scrolls rather than
+              eating the note. On a wide window this is a column beside the
+              note; on a phone a grid on the floor. */}
+          {choosing ? (
+            <div className="sorter-to sorter-to-boards" role="group" aria-label="Move to a board">
+              <div className="sorter-to-list">
+                <button
+                  type="button"
+                  className="sorter-dest sorter-dest-wide"
+                  onClick={closeChoosing}
+                >
+                  <IconClear />
+                  <span className="sorter-dest-name">Cancel</span>
+                </button>
+                {/* Links first, where the chooser elsewhere puts it: the one
+                    place here that is not a folder of the user's. */}
+                {folded && note && canKeepOnLinks(note) && (
+                  <button type="button" className="sorter-dest" onClick={fileLinks}>
+                    <IconLink tier="inline" />
+                    <span className="sorter-dest-name">Links</span>
+                  </button>
+                )}
+                {rest.map((place, i) => placeRow(place, drawn.length + i))}
+                {newBoardRow(false)}
+              </div>
+            </div>
+          ) : (
+            <div className={folded ? "sorter-to" : "sorter-to sorter-to-direct"}>
+              <div className="sorter-to-list">
+                {!folded && note && canKeepOnLinks(note) && (
+                  <button type="button" className="sorter-dest sorter-dest-wide" onClick={fileLinks}>
+                    <IconLink tier="inline" />
+                    <span className="sorter-dest-name">Links</span>
+                  </button>
+                )}
+                {drawn.map(placeRow)}
+                {rest.length === 0 ? (
+                  newBoardRow(true)
+                ) : (
+                  <button
+                    type="button"
+                    className="sorter-dest sorter-dest-wide"
+                    onClick={() => setChoosingAt(at)}
+                  >
+                    <IconFolder />
+                    <span className="sorter-dest-name">Move to a board…</span>
+                  </button>
+                )}
+              </div>
+              <div className="sorter-to-end">
+                {phone && leaveButton}
+                {archiveRow}
+                {deleteRow}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* The clock's four presets, the open note's own in its order, each saying

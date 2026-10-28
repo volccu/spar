@@ -295,6 +295,26 @@ export async function putCanvasLocalOnly(folder: Canvas): Promise<void> {
   await (await db()).put("folders", folder);
 }
 
+/**
+ * Pulled canvases, stored only where nothing is queued for them — asked in the
+ * same transaction as the write, as `putNotesFromServer` does for notes. Read
+ * apart, a drag made between the outbox read and the write was overwritten by
+ * the other device's arrangement and then uploaded as if it were this one's
+ * (bughunt 2026-10-24). Answers the ones it stored.
+ */
+export async function putCanvasesFromServer(folders: Canvas[]): Promise<Canvas[]> {
+  if (folders.length === 0) return [];
+  const tx = (await db()).transaction(["folders", "folderDirty"], "readwrite");
+  const stored: Canvas[] = [];
+  for (const folder of folders) {
+    if ((await tx.objectStore("folderDirty").get(folder.id)) !== undefined) continue;
+    await tx.objectStore("folders").put(folder);
+    stored.push(folder);
+  }
+  await tx.done;
+  return stored;
+}
+
 export async function putCanvasesLocalOnly(folders: Canvas[]): Promise<void> {
   if (folders.length === 0) return;
   const tx = (await db()).transaction("folders", "readwrite");

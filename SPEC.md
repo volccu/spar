@@ -350,8 +350,9 @@ continues any of the three, counting the number up as it goes, and Enter on an e
 list. Nothing fires unless the caret is sitting exactly on the trigger, so pasting and re-editing
 never rewrite text under the user — which is also why inserting into the middle of a numbered list
 does **not** renumber the items below it. Those lines are text the user is not typing on, and this
-app does not reach for them. The one exception is asked for: the capture bar's To-do mark, pressed
-on a note of two or more lines, saves each line as a tick box.
+app does not reach for them. The capture bar's To-do mark is no exception: it marks the note as a
+to-do and saves the words as written, so a short to-do stays a compact slip on Todos (owner,
+2026-10-26; it used to box each line).
 
 **No hue inside a note, and the one emphasis is a link** (`DESIGN.md` §3 and §2b). The app has no
 colour anywhere except a folder's own mark on the shelf (§12d), and never
@@ -362,7 +363,9 @@ signals, because either alone is too quiet. Everything else meaning "on", "selec
 inverts or raises. Note type is a mono label, not a colour, because four hues across a 241-card
 grid reads as confetti — and that is still true of anything drawn on a card. The board tints are
 the opposite case and are why they were allowed: eight hues across a *shelf* of eight names is
-eight things told apart at a glance, on a row that exists to be scanned rather than read.
+eight things told apart at a glance, on a row that exists to be scanned rather than read. A canvas
+pen may wear the same sixteen (2026-10-28, owner asked): a stroke is the user's drawing, not the
+app's state, and hue is how one mark on a drawing is told from another (DESIGN.md §2b).
 
 **Sync is drawn, not spelled.** Two nodes — this device and the other one. At rest they sit exactly
 on top of each other, because that is what synced means: two copies of the same thing in the same
@@ -543,10 +546,12 @@ where a person reads it.
   mode from (Search and Reminders are there too), and the mode grows out of the menu row that was
   tapped.
 - One note at a time, read at reading size in the open note's centred column. Below it the
-  destinations, wrapped in rows under the thumb and **one tap each**: every folder **in the shelf's
-  own order**, **New folder…**, **Archive**, and **Delete** last; **Leave**, **Important**, **To-do** and
-  **Remind** are in the head, beside the count of where you are in the pile, along with **Back**. When the folders
-  would take more than two rows (four on a phone; on a wide window as many as half its height holds, at least six) they go behind one **Move to
+  destinations, **one tap each**: every folder **in the shelf's own order**, **New folder…**,
+  **Archive**, and **Delete** last. **Open**, **Important**, **To-do** and **Remind** stand under the
+  note's words. On a phone the places are a grid on the floor with **Leave · Archive · Delete** under
+  it and **Back** in the head; on a wide window the places are a column beside the note and **Back**
+  and **Leave** stand under the note (layout A, 2026-10-24, the owner's pick). When the folders
+  would not fit (ten on a phone; on a wide window as many as half its height holds, at least six) they go behind one **Move to
   a board…** row instead. **Inside a folder's own Tidy up the Inbox is a destination, first in the
   list, and that folder is left out.** On a keyboard the numbers **1–9** pick the place in that
   position and **E** archives, as on the board (A still does; 2026-10-10, owner approved, audit UX-9); Delete alone has no key (2026-10-05, owner approved, review
@@ -566,8 +571,8 @@ where a person reads it.
   writes `status: "trashed"`, which is a month in the trash with an undo offer on the way, and a
   right swipe writes nothing.
 - **Stepping back is a button, not the other swipe.** Both swipes are spent, and a decision you
-  can make by flinging your thumb is one you can make by accident, so **Back** stands in the head
-  band. On a keyboard the right arrow leaves and the left arrow goes back; **binning has no key**,
+  can make by flinging your thumb is one you can make by accident, so **Back** is a button: in the
+  head band on a phone, under the note on a wide window. On a keyboard the right arrow leaves and the left arrow goes back; **binning has no key**,
   because there is no undoing the twentieth press of one you were holding.
 - **A tap on the note's words edits them in place.** The open note's own tap-to-edit: the field
   takes the paragraph's place on the same line grid, the caret where the finger landed, and typing
@@ -579,9 +584,9 @@ where a person reads it.
   pile, and the destinations need that band of screen more. It returns the moment it closes. The
   undo mark stands at the top of the note instead, where it covers nothing.
 - **Important** marks the note and leaves it showing — the one control here that does not spend
-  the decision the screen is asking for. It is in the head band for that reason and for one more:
-  at the foot every row is a **place**, and a row that is not one is how a thumb aiming for it
-  lands in the bin instead, which is why Leave is up there too. (It was **Keep** until
+  the decision the screen is asking for. It stands under the note with the note's other controls,
+  apart from the places. Leave, the one answer here that is not a place, stands on a phone's floor
+  as the first of three, as far from Delete as the row allows. (It was **Keep** until
   2026-10-05, owner approved, review CD-07: Keep is Google Keep's name and nothing else here.)
 - **Remind** (the clock) offers the open note's four reminder presets; a pick sets the reminder,
   offers it back on the undo mark, and moves on. The note is not filed — it stays where it was and
@@ -785,6 +790,18 @@ and is undone in one step.
 become a new note in the same folder and leave this note's `body` (never `raw_content`), with only
 the whitespace at the cut tidied. One undo puts both halves back — the words into the note, the new
 note into the trash — and only together.
+
+**Drawing on an idea** (a sketch is an idea born empty). The canvas has a pen, a highlighter, a
+Shapes tool (rectangle, ellipse, line, arrow; a closed one may be filled), Text, pictures, a
+whole-stroke eraser and a Select tool — a loop for a finger, a box for a mouse — that moves,
+stretches, recolours, copies and deletes what it holds. The pen tidies a rough line, ring or box
+held still for half a second, and one Undo gives the rough line back (a Settings switch turns it
+off). Undo and Redo are the sitting's own, item by item, never stored. **Show everything** fits
+the whole drawing in view and **Save as picture** makes a PNG of it. A shape is stored as a stroke
+whose points are its outline (`shape`, `fill`, `highlight` on the stroke, no migration), so a
+device that has not updated still draws it. *(2026-10-28, owner asked, after a look at FigJam,
+Miro, Excalidraw, tldraw and GoodNotes; their team features — stickies, connectors, frames — were
+left out on purpose.)*
 
 ## 8. AI assist — tried, removed
 

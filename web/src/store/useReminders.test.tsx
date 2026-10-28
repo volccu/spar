@@ -13,6 +13,10 @@ vi.mock("./push", () => ({
   ringingOff: () => false,
   setRingingOff: vi.fn(),
 }));
+const clock = vi.hoisted(() => ({ skew: 0, read: true }));
+vi.mock("./serverClock", () => ({
+  serverNow: () => (clock.read ? Date.now() + clock.skew : null),
+}));
 const answers = vi.hoisted(() => ({ waiting: [] as { note_id: string }[] }));
 vi.mock("../lib/reminderActions", () => ({
   // A stand-in snooze: any answer moves the reminder an hour on from now.
@@ -129,5 +133,79 @@ describe("turning this device on for reminders", () => {
     });
     expect(quiet).toHaveBeenCalled();
     quiet.mockRestore();
+  });
+});
+
+describe("a device clock running fast", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    clock.skew = 0;
+    clock.read = true;
+  });
+
+  it("does not clear a reminder the server's clock says has not rung yet", async () => {
+    // Device is an hour fast: by its clock this reminder is long spent, by the server's it is not.
+    clock.skew = -3_600_000 - SPENT_AFTER_MS;
+    const update = vi.fn();
+    renderHook(() =>
+      useReminders({
+        update,
+        notesRef: { current: [base({ id: "later", reminder_at: at(NOW - SPENT_AFTER_MS - 1) })] },
+        loading: false,
+        syncConfigured: true,
+        deviceOnly: false,
+        pulledOnce: true,
+        onOpen: () => {},
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("waits for a server reading rather than guess with its own clock", async () => {
+    clock.read = false;
+    const update = vi.fn();
+    renderHook(() =>
+      useReminders({
+        update,
+        notesRef: { current: [base({ id: "rang", reminder_at: at(NOW - SPENT_AFTER_MS - 1) })] },
+        loading: false,
+        syncConfigured: true,
+        deviceOnly: false,
+        pulledOnce: true,
+        onOpen: () => {},
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(update).not.toHaveBeenCalled();
+  });
+});
+
+describe("push start-up failing", () => {
+  afterEach(cleanup);
+
+  it("refreshing the device's ringing rejecting is not an unhandled rejection", async () => {
+    const { refreshPush } = await import("./push");
+    vi.mocked(refreshPush).mockRejectedValueOnce(new Error("no service worker"));
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    renderHook(() =>
+      useReminders({
+        update: vi.fn(),
+        notesRef: { current: [] },
+        loading: false,
+        syncConfigured: true,
+        deviceOnly: false,
+        pulledOnce: true,
+      } as Parameters<typeof useReminders>[0]),
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
   });
 });

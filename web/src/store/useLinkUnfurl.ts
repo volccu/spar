@@ -228,13 +228,20 @@ export function useLinkUnfurl({
         (note.link_previews ?? []).find((preview) => preview.href === local.href);
       // Replaces this link's entry and nothing else: every other entry is
       // spread through untouched, fields this build has never heard of included.
-      const write = (note: Note, entry: LinkPreviewData) =>
-        update(noteId, {
-          link_previews: [
-            ...(note.link_previews ?? []).filter((preview) => preview.href !== local.href),
-            entry,
-          ],
-        });
+      // Built on the latest copy this hook has written, not the render's: two
+      // links in one note answered before the screen redrew each rebuilt the
+      // list from the same stale copy, and the second wiped the first's
+      // preview (bughunt 2026-10-24). The ref is brought up to date with the
+      // write here and replaced by the real notes on the next render.
+      const write = (note: Note, entry: LinkPreviewData) => {
+        const latest = notesRef.current.find((n) => n.id === noteId) ?? note;
+        const link_previews = [
+          ...(latest.link_previews ?? []).filter((preview) => preview.href !== local.href),
+          entry,
+        ];
+        notesRef.current = notesRef.current.map((n) => (n.id === noteId ? { ...n, link_previews } : n));
+        update(noteId, { link_previews });
+      };
 
       const before = stillLinked();
       if (!before) return;

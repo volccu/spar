@@ -143,3 +143,30 @@ describe("a delete for good the store refuses", () => {
     expect(hook.result.current.storageError).toMatch(/still in the trash/);
   });
 });
+
+/**
+ * A note whose write failed sits in the localStorage stash; destroying it must
+ * take the stash copy with it, or the next open puts the note back.
+ */
+describe("a note destroyed while its write was failing", () => {
+  it("is not left in the stash to come back", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const hook = renderHook(() => useNotes());
+    await vi.waitFor(() => expect(hook.result.current.loading).toBe(false), { timeout: 15_000 });
+    let id = "";
+    failNext.count = 100;
+    act(() => {
+      id = hook.result.current.create("Doomed")!.id;
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(readUnsaved().some((n) => n.id === id)).toBe(true);
+    act(() => hook.result.current.setStatus(id, "trashed"));
+    failNext.count = 0;
+    await act(async () => {
+      await hook.result.current.destroy([id]);
+    });
+    expect(readUnsaved().some((n) => n.id === id)).toBe(false);
+  });
+});

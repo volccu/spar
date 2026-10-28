@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CanvasText, DrawingStroke, Note, Canvas } from "../types";
+import type { CanvasImage, CanvasText, DrawingStroke, Note, Canvas } from "../types";
 import type { CanvasItem } from "../types";
 import {
+  addCanvasImages,
   addCanvasText,
   addCanvasItem,
   addStroke,
   buildCanvas,
+  moveCanvasImage,
   moveCanvasItem,
+  removeCanvasImage,
   removeCanvasText,
   removeCanvasItem,
   removeStroke,
   resizeCanvasItem,
-  restoreStrokes,
   setCanvasImageWidth,
   updateCanvasText,
 } from "../lib/canvas";
@@ -220,12 +222,6 @@ export function useCanvases() {
     [mutate],
   );
 
-  const restoreStrokesToFolder = useCallback(
-    (canvasId: string, entries: { stroke: DrawingStroke; index: number }[]) =>
-      mutate(canvasId, (folder) => restoreStrokes(folder, entries)),
-    [mutate],
-  );
-
   const resizeItem = useCallback(
     (canvasId: string, noteId: string, width: number) =>
       mutate(canvasId, (folder) => resizeCanvasItem(folder, noteId, width)),
@@ -235,6 +231,30 @@ export function useCanvases() {
   const setImageWidth = useCallback(
     (canvasId: string, attachmentId: string, width: number) =>
       mutate(canvasId, (folder) => setCanvasImageWidth(folder, attachmentId, width)),
+    [mutate],
+  );
+
+  /** The canvas as it stands this instant, ahead of the render that will show it. */
+  const canvasNow = useCallback(
+    (canvasId: string) => canvasesRef.current.find((folder) => folder.id === canvasId),
+    [],
+  );
+
+  const addImages = useCallback(
+    (canvasId: string, images: CanvasImage[]) =>
+      mutate(canvasId, (folder) => addCanvasImages(folder, images)),
+    [mutate],
+  );
+
+  const moveImage = useCallback(
+    (canvasId: string, attachmentId: string, x: number, y: number) =>
+      mutate(canvasId, (folder) => moveCanvasImage(folder, attachmentId, x, y)),
+    [mutate],
+  );
+
+  const removeImage = useCallback(
+    (canvasId: string, attachmentId: string) =>
+      mutate(canvasId, (folder) => removeCanvasImage(folder, attachmentId)),
     [mutate],
   );
 
@@ -248,7 +268,7 @@ export function useCanvases() {
     (
       canvasId: string,
       textId: string,
-      changes: Partial<Pick<CanvasText, "text" | "x" | "y">>,
+      changes: Partial<Pick<CanvasText, "text" | "x" | "y" | "width">>,
     ) => mutate(canvasId, (folder) => updateCanvasText(folder, textId, changes)),
     [mutate],
   );
@@ -271,11 +291,16 @@ export function useCanvases() {
     itemAt,
     removeItem,
     restoreItem,
+    /** Any change to one canvas, as one queued write: a canvas's Undo, Redo and Select. */
+    changeCanvas: mutate,
     addStroke: addStrokeToFolder,
     removeStroke: removeStrokeFromFolder,
-    restoreStrokes: restoreStrokesToFolder,
     resizeItem,
     setImageWidth,
+    canvasNow,
+    addImages,
+    moveImage,
+    removeImage,
     addText,
     editText,
     removeText,

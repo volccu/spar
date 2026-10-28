@@ -434,6 +434,41 @@
   text-decoration: none;
 }
 
+/* A marker for one of the note's files, "[image 2]" (lib/attachRefs.ts): a
+   button, because it opens something here rather than going anywhere, drawn
+   exactly as a link is and as the characters it is — nothing of a button's
+   own box, so the line does not move between reading and writing. */
+.reader .att-ref {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  color: var(--signal);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: var(--cursor-pointer);
+}
+
+.reader .att-ref:active {
+  background: var(--signal);
+  color: var(--signal-ink);
+  text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .reader .att-ref:hover {
+    background: var(--signal);
+    color: var(--signal-ink);
+    text-decoration: none;
+  }
+}
+
 /* --- what the user marked: one line grid -----------------------------------
    Four marks, and every one of them is still characters in the note: "**",
    "*", "`" and "#". They are kept in the string, so the rendered note still

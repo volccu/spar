@@ -53,6 +53,26 @@ describe("useLinkUnfurl", () => {
     hasClient = true;
   });
 
+  it("keeps both answers when two links in one note land before the screen redraws", async () => {
+    invoke.mockImplementation(async (_name: string, { body }: { body: { url: string } }) => ({
+      data: { url: body.url, title: body.url, description: null, image: null },
+      error: null,
+    }));
+    // An update that never redraws: both answers land against the same render.
+    const update = vi.fn();
+    const linked = note({ body: "https://example.com/a and https://example.com/b" });
+
+    renderHook(() => useLinkUnfurl({ notes: [linked], signedIn: true, update }));
+    for (let i = 0; i < 4; i++) await settle();
+
+    expect(update).toHaveBeenCalledTimes(2);
+    const last = update.mock.calls[1][1] as Partial<Note>;
+    expect(last.link_previews?.map((p) => p.href).sort()).toEqual([
+      "https://example.com/a",
+      "https://example.com/b",
+    ]);
+  });
+
   it("asks once per link and writes the answer into the note", async () => {
     invoke.mockResolvedValue({
       data: { url: "https://example.com/a", title: "Example", description: "A page", image: null },

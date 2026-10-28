@@ -1,20 +1,40 @@
 <p align="center">
-  <img src="web/public/icon.svg" width="96" height="96" alt="The spår mascot: a small square machine with a face, drawn in warm greys">
+  <a href="https://spar.willemaki.com">
+    <img src="web/public/icon.svg" width="96" height="96" alt="The spår mascot: a small square machine with a face, drawn in warm greys">
+  </a>
 </p>
 
 <h1 align="center">spår</h1>
 
 <p align="center">
-  A local-first Google Keep replacement: capture without choosing anything, tidy the pile to zero later.
+  A local-first Google Keep replacement.<br>
+  Write it down now, with nothing to choose. Tidy the pile to zero later.
 </p>
 
 <p align="center">
   <a href="https://spar.willemaki.com"><b>Try the demo</b></a> ·
-  <a href="#run-it-with-docker"><b>Run with Docker</b></a> ·
-  <a href="#coming-from-google-keep"><b>Import from Keep</b></a>
+  <a href="#features"><b>Features</b></a> ·
+  <a href="#run-it-with-docker"><b>Quick start</b></a> ·
+  <a href="#coming-from-google-keep"><b>Import from Keep</b></a> ·
+  <a href="docs/self-hosting.md"><b>Self-hosting</b></a>
 </p>
 
-![spår on a desktop and on a phone: the Inbox, a flush grid of short notes on a dark ground](docs/media/hero.png)
+<p align="center">
+  <a href="LICENSE"><img alt="Licence: AGPL-3.0" src="https://img.shields.io/badge/licence-AGPL--3.0-948b7d?style=flat-square&labelColor=29221a"></a>
+  <a href="https://github.com/volccu/spar/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/volccu/spar?style=flat-square&label=release&labelColor=29221a&color=948b7d"></a>
+  <a href="https://spar.willemaki.com"><img alt="Demo: in your browser" src="https://img.shields.io/badge/demo-in%20your%20browser-948b7d?style=flat-square&labelColor=29221a"></a>
+  <img alt="Works offline" src="https://img.shields.io/badge/works-offline-948b7d?style=flat-square&labelColor=29221a">
+  <img alt="No AI" src="https://img.shields.io/badge/AI-none-948b7d?style=flat-square&labelColor=29221a">
+</p>
+
+<p align="center">
+  <a href="https://spar.willemaki.com">
+    <picture>
+      <source media="(prefers-color-scheme: light)" srcset="docs/media/hero-light.png">
+      <img src="docs/media/hero.png" alt="spår on a desktop and on a phone: the Inbox, a flush grid of short notes on a dark ground">
+    </picture>
+  </a>
+</p>
 
 spår (Swedish for *trace*) is a notes app for one person. It keeps Keep's model — short notes,
 lists, links and pictures on cards — and replaces the interface: nothing to decide when you write
@@ -22,7 +42,8 @@ something down, and a quick way to put it all away afterwards. It runs in the br
 as an app. It works with no server at all; add one when you want your notes on more than one device.
 
 - **Capture asks for nothing.** One field at the bottom of the screen. Type, press Enter, and the
-  note is on the board. No title, no folder, no label to pick first.
+  note is on the board. No title, no folder, no label to pick first. Four optional marks wait
+  beside Save for when you do want one.
 - **Tidy the pile to zero.** Everything you write lands in the Inbox. When you have a minute,
   *Tidy up* shows one note at a time with your folders as buttons, and the Inbox counts down to zero.
 - **Reminders that repeat, free.** Once, or every day, week or month, set on the note itself and
@@ -45,15 +66,16 @@ as an app. It works with no server at all; add one when you want your notes on m
 
 ![Choosing a Google Takeout zip on the import screen, sending two labels to the Inbox, importing, and landing on the Inbox with the new notes](docs/media/keep.gif)
 
-**Merge, and un-merge.** Two notes become one idea with a canvas. Taking the merge back puts both where they were.
+**Merge, and separate.** Two notes become one idea with a canvas. Separate puts both back where they were.
 
-![Selecting two notes, merging them into an idea, opening the idea's canvas and choosing Un-merge; the two notes return to the Inbox](docs/media/merge.gif)
+![Selecting two notes, merging them into an idea, opening the idea's canvas and choosing Separate; the two notes return to the Inbox](docs/media/merge.gif)
 
-**The canvas.** An idea's notes laid out by hand, with lines and words drawn between them.
+**The canvas.** An idea's notes laid out by hand, then drawn on: a box from the shape tool, a pen arrow, and a line of text with a highlight across it.
 
-![The Lisbon in May idea: four notes arranged on a grid canvas, an arrow drawn from one to another, and a line of text written beside them](docs/media/canvas.png)
+![The Lisbon in May idea: four notes arranged on a grid canvas, two of them boxed together in sage green, a clay-coloured arrow drawn to a third, and a line of text with an ochre highlight across it](docs/media/canvas.png)
 
-Everything in these pictures is the demo's invented sample notes. `npm run shots` makes them again.
+Everything in these pictures is the demo's invented sample notes, and you can try it all in the
+[demo](https://spar.willemaki.com). `npm run shots` makes the pictures again.
 
 ## Run it with Docker
 
@@ -79,6 +101,271 @@ into the app) and Web Push (reminders) only over HTTPS or on `localhost`, so to 
 phone, put an HTTPS reverse proxy such as Caddy in front of it. [`docs/self-hosting.md`](docs/self-hosting.md)
 covers that, the first account, sign-up settings, backups and upgrades.
 
+## Features
+
+Everything spår does today, grouped by what you would be doing. Open a group to see all of it.
+A few things need the installed app, and say so. The demo does everything except what needs a
+server: sync, reminders that ring, and link previews.
+
+<details>
+<summary><b>Capture</b>: one field, Enter, done</summary>
+
+- One growing text field at the bottom of every screen. No title box, no folder or label to pick.
+- On a keyboard, Enter saves and Shift+Enter starts a new line. On a phone, Save is the button.
+- Four optional marks beside Save: Important, To-do, a folder, a reminder. All start off, and ignoring them is the fast path.
+- Written while you stand in a folder, a note is filed there; on Todos, it is a to-do. Anywhere else it lands in the Inbox.
+- Attach any file from the bar, drop it on the window, or paste it with Ctrl+V.
+- Start a sketch from the bar's add menu.
+- Typing an address you saved before says so on the spot: "Saved 3 days ago · Open".
+- When a note lands somewhere off screen, the robot says where, with a Go to jump there.
+- Three bits of typing help and no more: `- ` becomes a dash, `[] ` becomes a tick box, Enter continues a list.
+- What you first wrote is kept forever, whatever you edit later.
+
+</details>
+
+<details>
+<summary><b>The open note</b>: read first, edit on touch</summary>
+
+- A note opens for reading, and a touch puts you in the words. Every web address in it is a live link.
+- Formatting is plain text that stays visible: `# ` heading, `**bold**`, `*italic*`, backticks for code. A `# ` first line names the note.
+- An Insert menu adds a code block, today's date, a tick box or an attachment.
+- Code blocks show in a fixed-width face with a Copy button.
+- Tick boxes tick with a tap. List items drag by a grip in the margin, and numbered lists renumber.
+- **Untick all** and **Clear done** appear while anything is ticked.
+- Pick some words and make them a new note. One undo puts both halves back.
+- Copy, Share (where the device has a share sheet) and Read aloud in your device's own voice.
+- A right-click opens the note's own menu at the pointer.
+- A note opens at the first search hit, and a long note at the place you left it.
+- Edited on two devices at once? A notice offers to keep yours, show the newer one, or copy yours aside.
+
+</details>
+
+<details>
+<summary><b>Boards and folders</b>: an Inbox to empty, folders like real folders</summary>
+
+- The app opens on the **Inbox**: everything not yet filed. Its count is the one meant to reach zero.
+- Folders are real places. A note is in at most one, like a file.
+- Make, rename and delete folders. Deleting one archives its notes, so nothing is lost.
+- Give a folder its own mark (about 1,850 icons, found by name) and one of sixteen muted tints. That is the only colour in the app.
+- A folder can keep the screen awake while its notes are open, for a recipe or a packing list.
+- **Todos**, **Links**, **Files** and **All** gather notes from every folder without moving them.
+- A note that is nothing but links waits on Links, out of the Inbox, until you file or flag it.
+- On a desktop every board sits in one strip, one click away. On a phone they are a drawer from the edge, and you swipe sideways between boards.
+- Hold a board and carry it to reorder the shelf. Hide any built-in board but the Inbox in Settings.
+- On a phone the board row can stand at the bottom, near your thumb.
+- Each board remembers where you scrolled. Picking the board you are on goes back to the top.
+- Pick several notes (long press, right-click, Ctrl or Shift+click, or Space) to copy, flag, merge, delete, archive or move them.
+- Carry a held note onto a board to move it there, onto Archive or Trash to put it away, or onto another note to merge the two.
+- Cards sit in a flush grid, each drawn for what it holds: text, a checklist with its done count, a link with its picture, a photo, a PDF's first page.
+- Important notes rise to the top of their board, marked with a flag.
+- Move has a type-to-find field, and makes a new folder from whatever you type.
+- On first open with a big pile already there, one question: tidy it now, or leave it. Neither answer moves a note.
+
+</details>
+
+<details>
+<summary><b>Tidy up</b>: one note at a time, your folders as buttons</summary>
+
+- One note at a time, with every folder as a one-tap button, plus New folder, Archive and Delete.
+- Offered from the menu on every board with notes ("Tidy up 34 notes").
+- Swipe right to leave a note where it is, left to delete it. The note follows your finger.
+- Keys 1–9 pick a folder, E archives, and the arrows leave a note or go back.
+- Beside the note: Open, Important, To-do and Remind. Tap the words to fix a typo in place.
+- Back, then Leave, undoes an earlier answer. The end is a plain report, and offers the run's deletes back in one go.
+
+</details>
+
+<details>
+<summary><b>Todos and Tick off</b>: lists you actually finish</summary>
+
+- A to-do is any note you mark as one, or any note made of two or more tick boxes.
+- Short to-dos show as compact slips, so more fit on the screen.
+- **Tick off** shows one list at a time with every box a big button.
+- Ticked items sink below the open ones. **Untick all** resets a weekly shopping list, and **Archive** finishes one.
+- The screen stays awake while you tick.
+
+</details>
+
+<details>
+<summary><b>Merge and ideas</b>: related notes become one card</summary>
+
+- Merge two or more notes into an **idea**: one card holding them all, with a canvas to lay them out on.
+- The originals are archived, never deleted. **Separate** puts them all back where they were.
+- Merge more notes into an idea later, or take one out on its own.
+- **Dissolve** sends an idea to the Trash and leaves its notes alone.
+
+</details>
+
+<details>
+<summary><b>Sketch canvas</b>: arrange, draw and write on an idea</summary>
+
+- Drag an idea's notes and pictures wherever you want them.
+- Pen, highlighter, shapes (rectangle, ellipse, line, arrow, with optional fill), text and an eraser.
+- Pens in the app's three greys and the sixteen folder tints, in three widths. Hold Shift for a square, a circle or a straight line.
+- Draw a rough box or ring and hold still, and the pen tidies it. One undo gives the rough line back.
+- Select with a loop (finger) or a box (mouse) to move, resize, recolour, copy or delete.
+- Paste, drop or add pictures onto the canvas.
+- Undo and redo, zoom, "show everything", and a middle-button pan with a mouse.
+- **Save as picture** makes a PNG of the whole canvas.
+- Start a blank sketch from the capture bar. An empty one you back out of tidies itself away.
+
+</details>
+
+<details>
+<summary><b>Inspiration</b>: a wall of pictures to look at again</summary>
+
+- A built-in board drawn as a wall of pictures and links to pictures, each at its own shape.
+- It opens into a full-screen viewer you swipe through. Videos from YouTube and Vimeo play in place.
+- File into it like any folder, write while you stand on it, or take the one-tap offer when you share a picture into spår.
+- A folder you already have called "inspo" or "inspiration" becomes the wall, notes and all.
+
+</details>
+
+<details>
+<summary><b>Links</b>: saved pages with their pictures</summary>
+
+- Link previews show the page's title and picture, fetched by your own server, never by your browser. They can be switched off.
+- The Links board shows each page's picture: rows on a phone, tiles on a desktop.
+- Hide a preview with its ✕, and undo brings it back. The address in your text is never touched.
+- Pages that have disappeared are marked **gone**. Saved links are re-checked monthly, a few at a time.
+- A bookmarklet in Settings saves the page you are reading from your browser.
+
+</details>
+
+<details>
+<summary><b>Files, pictures and PDFs</b>: any file, up to 50 MB</summary>
+
+- Attach any file up to 50 MB.
+- A photo's or video's location data is removed on the way in. iPhone HEIC photos become JPEG, and very large photos are scaled to 2560 px.
+- Cards show a thumbnail, and a PDF shows its first page.
+- A full-screen picture viewer zooms, rotates, copies, sets a cover, downloads, removes, and walks through a note's files.
+- PDFs are drawn inside the app. Audio and video files play.
+- Removing a file always asks first. A file that exists only on this device is never cleared from its cache.
+
+</details>
+
+<details>
+<summary><b>Search</b>: instant, over everything you kept</summary>
+
+- Searches as you type, on the device, over every note including the Archive. The Trash stays out.
+- Every word must match, and endings like plurals do not matter. "Quoted words" must appear together.
+- Hits are highlighted, and a result opens at the first one.
+- Finds words inside PDFs and inside pictures (screenshots, photos of signs), read on your device and never sent anywhere.
+- One chip narrows a search to a folder, the Archive, Links or Inspiration.
+- A search that finds nothing offers your recent searches, a near spelling, or the note's place in the Trash.
+
+</details>
+
+<details>
+<summary><b>Reminders</b>: free, and they repeat</summary>
+
+- Set from the capture bar or the open note: in 1 hour, tonight, tomorrow, next week, or any time you pick.
+- Repeat every day, week or month.
+- Rung by Web Push from your own server. Notification permission is asked only when you set one.
+- A one-off reminder's notification has **Later** (an hour on) and **Done**.
+- A Reminders list in the menu shows everything coming up, soonest first.
+- The robot gives you a heads-up five minutes before.
+- A device that cannot ring says so on the note, instead of failing quietly.
+
+</details>
+
+<details>
+<summary><b>Sync and offline</b>: your device first, the server second</summary>
+
+- Opens from your device and works with no network. Every change is saved on the device first, in under 50 ms.
+- Changes queue while offline and go up when the network returns, retried until the server has them.
+- Changes made on your other devices arrive live.
+- Two ways to sync: the spår server (one container) or your own Supabase project. Or none at all, on one device.
+- "Use on this device only" is always offered, and notes made that way survive a later sign-in.
+- Different accounts never mix on one device.
+- The robot says sync trouble in words, and storage problems get a banner.
+- New versions are offered, never forced on you.
+
+</details>
+
+<details>
+<summary><b>Trash, archive and undo</b>: nothing is lost by accident</summary>
+
+- Delete moves a note to the Trash for 30 days. **Put back** restores it.
+- Only emptying the Trash by hand (which asks first) or the 30-day sweep removes a note for good.
+- Archive keeps a note out of the way, and it stays searchable.
+- Undo works for archive, delete, move, merge, split, import and more, with Ctrl+Z or the robot's Undo.
+- The original words of every note are kept, and are in every download.
+
+</details>
+
+<details>
+<summary><b>Import and export</b>: come in from Keep, leave whenever you like</summary>
+
+- Import from Google Keep: the Takeout zip or folder, read in your browser and never uploaded to be read.
+- It brings titles, checklists, links, pinned and archived notes, labels (as folders, or wherever you choose) and attachments, with Keep's own dates.
+- Importing the same Takeout twice skips what is already here, and one undo takes a whole import back.
+- **Download everything** saves a zip: each note a text file in a folder per place, its files beside it, and one JSON file of it all.
+- A spår download can be imported back in, safely, as many times as you like.
+- Closing your account deletes everything the server holds for it.
+
+</details>
+
+<details>
+<summary><b>Install and share</b>: an app on your phone and desktop</summary>
+
+- Installs as an app from the browser, on Android, desktop and iPhone.
+- In Android's share sheet: share a page, some text or several photos into spår, and they become one note. *(installed app)*
+- Long-press the icon, or right-click it on the taskbar, for **New note**. *(installed app)*
+- An optional Inbox count on the app icon, where the system supports it.
+- On iPhone and iPad it works in Safari, and reminders ring once it is on the Home Screen.
+
+</details>
+
+<details>
+<summary><b>Settings and look</b>: dark by default, light if you like</summary>
+
+- Theme: dark (the default), light, or follow the device.
+- Motion follows your system, or asks for less on this device only.
+- A short buzz on save and tick, where the phone supports it, which can be switched off.
+- Switches for link previews, the robot's weather, tidy shapes and the app-icon count.
+- Settings are searchable, and open with Ctrl+,.
+- Settings shows how fast spår is on your device: capture, open, typing and search times.
+
+</details>
+
+<details>
+<summary><b>Keyboard</b>: every common action has a key</summary>
+
+- Ctrl+K search, Ctrl+E write, Ctrl+A select all, Ctrl+Z undo, Ctrl+, settings, Esc closes, and `?` lists every key.
+- On cards: arrows walk the grid, Enter opens, E archives, M moves, F flags, Delete deletes, Space picks.
+- In a note: Ctrl+B, Ctrl+I, and Ctrl+Enter to close.
+- Tidy up takes 1–9 and E. The picture viewer takes arrows, zoom keys and R to rotate. The canvas takes undo, redo, duplicate and delete.
+- On a touch screen, the About page lists the gestures instead.
+
+</details>
+
+<details>
+<summary><b>The robot</b>: a small machine that is also the sync light</summary>
+
+- It lives in the header and shows how sync stands. It sleeps late at night.
+- It speaks in one small bubble: undo offers, where a note landed, how many you picked, a reminder coming up.
+- Poke it for the weather (asked only after a tap, place rounded, can be switched off) or how sync stands. Double-tap it to sync now.
+- It nods when you save, hops when a Tidy up is done, and holds up a sign at 100, 500 and every 1,000 notes.
+- Drop a card on it to archive the card.
+
+</details>
+
+<details>
+<summary><b>Privacy and self-hosting</b>: yours, on your terms</summary>
+
+- No AI anywhere. No analytics, no error reporting, no calls home. The fonts are served with the app.
+- On one device, nothing leaves it. With a server, the server is yours.
+- Link previews and their pictures come through your server, so the sites you save never see your browser.
+- Three ways to run it: one Docker container (the app plus a SQLite sync server), your own Supabase project, or one device only.
+- Sign-up can be closed, by invite, or open, with an admin command line for users and invite codes.
+- A public demo runs on invented sample notes, with no server at all.
+
+</details>
+
+**Not in spår**, on purpose or not yet: native apps and home-screen widgets, sharing a note with
+someone else, end-to-end encryption, labels, and colours for notes.
+
 ## Coming from Google Keep
 
 In Keep's Takeout (takeout.google.com, choose Keep), Google sends you a zip. In spår, open the menu,
@@ -99,55 +386,6 @@ browser; nothing is uploaded to be read.
   to the trash.
 
 Then *Tidy up* takes it from there.
-
-## Features
-
-**Writing and finding**
-
-- A capture bar at the bottom of every screen. On a keyboard Enter saves and Shift+Enter starts a
-  new line. Four optional marks beside Save (important, to-do, folder, reminder) all start off.
-- Installed on Android, spår is in the share sheet: a page, some text or several photos shared from
-  another app become one note. A long press on the icon offers *New note*.
-- Notes are cards in a flush grid, each drawn for what it holds: text, a checklist, a saved link
-  with its preview, a photograph, a PDF.
-- Search as you type, over every note including the Archive, and over the words inside attached PDFs
-  and pictures (read on your device).
-- The grid can be walked from the keyboard; the keys are listed in Settings and on the About page.
-
-**Organising, when you want to**
-
-- Folders. A note is in at most one, like a file. A folder you make can have its own mark and one of
-  sixteen muted tints; that is the only colour in the app.
-- Inspiration is a folder of its own, drawn as a wall of pictures and links to look at again.
-- Todos, Links, Files and All gather notes from every folder without moving them.
-- *Tidy up* works through a pile one note at a time, on the Inbox or any folder. The *Ticker* does the same for the
-  lists on Todos, with every box a button; *Untick all* resets a weekly shopping list.
-- Select several notes (long press, or right-click) to move, archive, delete or merge them.
-- Merging makes an **idea**: one card for related notes, with a canvas to arrange them on, draw on
-  and write on. *Un-merge* puts the notes back. Selected words in a note can be split off into a new
-  note.
-
-**Keeping**
-
-- The words you first wrote are kept forever, whatever you edit later, and are in every download.
-- Delete moves a note to the Trash for 30 days. Archiving, deleting, filing, merging and importing
-  can each be undone.
-- Reminders: once, or repeating daily, weekly or monthly. A one-off reminder's notification has
-  *Later* and *Done* on it.
-- *Download everything* (in Settings) saves a zip that needs nothing from spår to read: each
-  note a text file, in a folder per place, with its files beside it, and everything again as one
-  JSON file.
-
-**Sync, if you want it**
-
-- With the spår server (the container above) or with a Supabase project of your own: sign in, and
-  notes, folders, files and reminders sync between devices, with changes arriving live.
-- The device is the source of truth. The app opens from local storage and writes there first;
-  sync runs afterwards. Conflicts resolve last-write-wins per field, with no CRDTs, which is enough
-  for one person on a few devices.
-
-**Not in spår**, on purpose or not yet: native apps and home-screen widgets, sharing a note with
-someone else, end-to-end encryption, labels, and colours for notes.
 
 ## Principles
 
