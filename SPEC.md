@@ -36,7 +36,8 @@ competitor is "took the note and never found it again", and that one is an inter
    priority, to-do, board, reminder — and offering is the whole distinction: every one starts off,
    Save works without touching any of them, and typing-then-Enter costs exactly what it always did.
    Each mark is the same one the open note uses for the same thing; the reminder's clock offers the
-   open note's four presets, applied at Save, and Save is when the device is asked to ring.
+   open note's own reminder panel (four presets, Pick a date, repeat), applied at Save, and Save is
+   when the device is asked to ring.
    (Reminder: 2026-10-05, owner approved, review FX-B-06.)
    The bar may also **tell** — never ask — in one line on its top edge: that an address being
    written is already saved ("Saved 3 days ago · Open"); and, only when a capture lands where the

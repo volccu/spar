@@ -46,6 +46,11 @@ describe("reading a page's bytes", () => {
 });
 
 describe("reading a page", () => {
+  it("does not decode a numeric `&` twice", () => {
+    expect(decode("&#38;lt;b&#38;gt;")).toBe("&lt;b&gt;");
+    expect(decode("&#x26;amp;")).toBe("&amp;");
+  });
+
   it("decodes entities, `&amp;` last, and trims", () => {
     expect(decode("  Fish &amp; chips  ")).toBe("Fish & chips");
     expect(decode("a title that says &amp;lt;")).toBe("a title that says &lt;");
@@ -85,5 +90,21 @@ describe("reading a page", () => {
       <meta property="og:image:url" content="  ">
       <meta property="og:image" content="/og.png">`;
     expect(readMeta(html).candidates).toEqual(["/og.png", "https://x/secure.png", "/tw.png", "/tw-src.png", "/micro.png", "/link.png"]);
+  });
+
+  it("keeps a tag whose quoted value contains a `>`", () => {
+    const html = `<meta property="og:description" content="a > b">
+      <meta name="description" content="plain">
+      <meta property="og:image" content="https://x/i.png?a=1>2">`;
+    const meta = readMeta(html);
+    expect(meta.description).toBe("a > b");
+    expect(meta.candidates[0]).toBe("https://x/i.png?a=1>2");
+  });
+});
+
+describe("readMeta attribute names", () => {
+  it("does not read data-content as content", () => {
+    const html = `<meta data-content="z" property="og:title" content="T">`;
+    expect(readMeta(html).title).toBe("T");
   });
 });

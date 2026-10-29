@@ -977,9 +977,9 @@ p.selpanel-hint {
   max-width: 30ch;
 }
 
-/* The reminder panel's Custom row, lined up with the rows above it: its label
-   starts in their label column, a mark's width and the rows' gap in from the
-   edge (review UI-A-07). */
+/* The reminder panel's Time and Repeat rows, lined up with the rows above
+   them: the label starts in their label column, a mark's width and the rows'
+   gap in from the edge (review UI-A-07). */
 .selpanel-row-label {
   flex: 0 0 auto;
   margin-left: calc(var(--icon-inline) + 10px);

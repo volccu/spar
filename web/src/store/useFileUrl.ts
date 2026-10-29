@@ -45,11 +45,11 @@ export function useFileUrl(att: Attachment | null, reach: FileReach): FileUrl {
   const path = att?.path ?? null;
 
   useEffect(() => {
+    setUrl(null);
+    setMissing(false);
     if (!att) return;
     let dead = false;
     let made: string | null = null;
-    setUrl(null);
-    setMissing(false);
 
     const want: Promise<Blob | string | null | undefined> =
       reach === "any"

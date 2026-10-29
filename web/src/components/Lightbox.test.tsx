@@ -170,6 +170,23 @@ describe("getting closer to a picture", () => {
     expect(frame.getAttribute("data-zoomed")).toBe("true");
   });
 
+  it("keeps panning with the one finger left after a pinch", () => {
+    const { shot, frame } = open();
+    Object.defineProperty(frame, "clientWidth", { configurable: true, value: 100 });
+    Object.defineProperty(frame, "clientHeight", { configurable: true, value: 100 });
+    Object.defineProperty(shot, "offsetWidth", { configurable: true, value: 100 });
+    Object.defineProperty(shot, "offsetHeight", { configurable: true, value: 100 });
+    fireEvent.pointerDown(frame, { pointerId: 1, clientX: 0, clientY: 0, pointerType: "touch" });
+    fireEvent.pointerDown(frame, { pointerId: 2, clientX: 100, clientY: 0, pointerType: "touch" });
+    fireEvent.pointerMove(frame, { pointerId: 2, clientX: 300, clientY: 0, pointerType: "touch" });
+    fireEvent.pointerUp(frame, { pointerId: 2, clientX: 300, clientY: 0, pointerType: "touch" });
+    expect(shot.style.transform).toContain("scale(3)");
+    const before = shot.style.transform;
+
+    fireEvent.pointerMove(frame, { pointerId: 1, clientX: 20, clientY: 0, pointerType: "touch" });
+    expect(shot.style.transform).not.toBe(before);
+  });
+
   it("never goes below the fit, however far the fingers close", () => {
     const { shot, frame } = open();
     pinchTo(frame, 200, 10);

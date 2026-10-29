@@ -63,7 +63,9 @@ export function useCanvases() {
       if (failedWrites.current.get(canvas.id) === attempt) failedWrites.current.delete(canvas.id);
       if (failedWrites.current.size === 0) setStorageError(null);
     } catch {
-      failedWrites.current.set(canvas.id, attempt);
+      // A newer write took this canvas's place (and may already have been
+      // saved), so this older refusal must not bring its stale copy back.
+      if (failedWrites.current.get(canvas.id) !== attempt) return;
       setStorageError("This arrangement is visible, but it is not saved on this device yet.");
     }
   }, []);

@@ -285,3 +285,11 @@ describe("cutSelection", () => {
     expect(r.rest).toBe("# Plan\n\n1. first\n\n  **bold** stays");
   });
 });
+
+describe("a caret at the very start of an empty first line", () => {
+  it("marks, boxes and fences that line, not the one below", () => {
+    expect(markLine("\nabc", 0, "# ").value).toBe("# \nabc");
+    expect(boxSelectedLines("\nabc", 0, 0).value.endsWith("\nabc")).toBe(true);
+    expect(fenceSelectedLines("\nabc", 0, 0).value).toBe("```\n\n```\nabc");
+  });
+});

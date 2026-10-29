@@ -863,6 +863,7 @@ function reviveFromTrash(
       result.revived += 1;
       if (status === "archived") result.archived += 1;
       if (board_id) result.filed += 1;
+      if (board_id && status === "archived") result.archivedFiled += 1;
       result.made.push({ id, status });
     }
   }

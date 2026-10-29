@@ -419,15 +419,45 @@ export function reminderWhen(iso: string, now = new Date()): string {
 }
 
 /**
- * The earliest value a `datetime-local` may offer, in the local wall-clock
- * form the field speaks (`2026-09-22T14:05`). A reminder in the past would be
- * "due" the moment it was set, which nobody sets on purpose.
+ * The days of one month as the date picker lays them out: always six weeks of
+ * seven, Monday first, `null` where a day belongs to the month either side. Six
+ * rows every month, so paging from a four-week February to a six-week August
+ * never changes the panel's height under the pointer.
  */
-export function localInputMin(now = new Date()): string {
-  const y = now.getFullYear();
-  const mo = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${d}T${hhmm(now)}`;
+export function monthDays(year: number, month: number): (Date | null)[] {
+  const first = new Date(year, month, 1);
+  const lead = (first.getDay() + 6) % 7;
+  const count = new Date(year, month + 1, 0).getDate();
+  return Array.from({ length: 42 }, (_, i) => {
+    const day = i - lead + 1;
+    return day >= 1 && day <= count ? new Date(year, month, day) : null;
+  });
+}
+
+/** Minutes past midnight as a clock writes them: 540 → "09:00". */
+export function clockWords(minutes: number): string {
+  const at = new Date(2000, 0, 1, Math.floor(minutes / 60), minutes % 60);
+  return hhmm(at);
+}
+
+/**
+ * A time of day typed into the picker, as minutes past midnight, or `null` for
+ * something that is not one. Forgiving the way a person types on a phone's
+ * number pad: "9" is 09:00, "930" and "9.30" are 09:30, "2115" is 21:15.
+ */
+export function parseClock(text: string): number | null {
+  // The minutes are always two digits, so "930" backtracks to 9 and 30.
+  const m = /^(\d{1,2})(?:[:.,\s]?(\d{2}))?$/.exec(text.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = m[2] === undefined ? 0 : Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+/** The instant a picked day and time of day make, in this device's clock. */
+export function atMinutes(day: Date, minutes: number): Date {
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), Math.floor(minutes / 60), minutes % 60);
 }
 
 /**

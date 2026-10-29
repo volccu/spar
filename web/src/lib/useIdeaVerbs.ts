@@ -309,7 +309,7 @@ export function useIdeaVerbs({
             if (back.has(b.id)) update(b.id, { status: b.status, merged_into: b.merged_into });
           }
           for (const item of added) if (back.has(item.note_id)) removeItem(folder.id, item.note_id);
-          putBackLeaves();
+          putBackLeaves(back);
         },
       });
     },

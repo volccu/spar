@@ -442,7 +442,7 @@ describe("the Sorter", () => {
 
   /**
    * Remind me later is an answer (review 2026-10-04, FX-B-01): the clock in the
-   * head offers the open note's four presets, a pick sets the reminder and
+   * head offers the open note's reminder panel, a pick sets the reminder and
    * moves on, the note stays in the Inbox, and the summary counts it.
    */
   it("sets a reminder from the head and moves on, counting it in the summary", async () => {
@@ -464,8 +464,9 @@ describe("the Sorter", () => {
 
     fireEvent.click(within(sorter()!).getByRole("button", { name: "Remind me later" }));
     const menu = screen.getByRole("menu", { name: "Reminder" });
-    // The open note's four presets, and nothing else.
-    expect(within(menu).getAllByRole("menuitem")).toHaveLength(4);
+    // The open note's four presets, Pick a date, and the repeat beside them.
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(5);
+    expect(within(menu).getByRole("group", { name: "Repeat" })).toBeTruthy();
     fireEvent.click(within(menu).getByRole("menuitem", { name: /in 1 hour/i }));
 
     // On to the next note, the presets shut, and nothing was filed.
@@ -1879,5 +1880,16 @@ describe("the ways out of the Sorter", () => {
       expect(hop).toHaveBeenCalledTimes(1);
       expect(hop).toHaveBeenCalledWith(expect.objectContaining({ left: 2 }));
     });
+  });
+});
+
+describe("the Important line of the Sorter's summary", () => {
+  it("does not count a note that arrived important and was switched off", () => {
+    renderSorter({ pile: [fixtureNote({ id: "p1", body: "first words", priority: true })] });
+    fireEvent.click(within(sorter()!).getByRole("button", { name: "Important" }));
+    fireEvent.click(within(sorter()!).getByRole("button", { name: /^Leave/ }));
+    expect(sorter()!.querySelector(".sorter-end")?.textContent ?? sorter()!.textContent).not.toMatch(
+      /Important/,
+    );
   });
 });

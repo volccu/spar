@@ -569,7 +569,14 @@ function ZoomShot({
     if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
       e.currentTarget.releasePointerCapture?.(e.pointerId);
     }
-    if (pointers.current.size < 2) pinch.current = null;
+    if (pointers.current.size < 2 && pinch.current) {
+      pinch.current = null;
+      // The finger left carries on as a pan from where it stands now.
+      const [left] = pointers.current.values();
+      if (left && view.current.scale > 1.01) {
+        pan.current = { x: left.x, y: left.y, fromX: view.current.x, fromY: view.current.y };
+      }
+    }
     if (pointers.current.size === 0) {
       const from = press.current;
       const walked = axis.current === "x" && from ? e.clientX - from.x : 0;

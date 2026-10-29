@@ -157,7 +157,11 @@ Deno.serve(async (req) => {
       },
       { onConflict: "note_id" },
     );
-    if (error) console.error("recording a delivery failed:", error.message);
+    if (error) {
+      // Not closed: the per-device rows are still the only record of who has it.
+      console.error("recording a delivery failed:", error.message);
+      return;
+    }
     // Closed: the per-device rows for it have done their job.
     if (perDevice) await db.from("reminder_device_deliveries").delete().eq("note_id", r.note_id);
   };

@@ -1,15 +1,13 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Note, ReminderRepeat } from "../types";
 import {
   nextOccurrenceIso,
   presetReminder,
   presetWhen,
-  localInputMin,
   reminderOverdue,
   reminderPresets,
   reminderWhen,
   repeatWords,
-  REMINDER_REPEATS,
   type ReminderPreset,
 } from "../lib/reminders";
 import { useFullDate, useTimeWords, useTimeUntilWords } from "../lib/clock";
@@ -18,7 +16,9 @@ import { DEMO } from "../lib/demo";
 import { hasKeyboard, isTypingTarget } from "../lib/hotkeys";
 import { hangUnder, keepInside, type UnderAnchor } from "../lib/pointerAnchor";
 import { Action } from "./shared/Action";
-import { IconCheck, IconClear, IconReminder, IconRepeat } from "./Icons";
+import { IconCheck, IconClear, IconDate, IconReminder, IconStepOn } from "./Icons";
+import { RepeatRow } from "./RepeatRow";
+import { loadReminderPick, ReminderPick } from "./reminderPickLazy";
 
 /**
  * Which preset a reminder already set at `at` is, if any — so a panel opened on
@@ -138,13 +138,16 @@ export function ReminderPanel({
    * (dogfooding 2026-10-18): its backdrop swallowed the next tap on Back,
    * two extra taps every time. A panel opened on a note that has a reminder
    * ticks the matching preset, spells the time out at the top and offers the
-   * repeat rows and Clear. A custom time stays open: it is typed in pieces.
+   * repeat row and Clear. A day picked on the picker shuts it the same way.
    */
-  const [picked, setPicked] = useState<ReminderPreset | "custom" | null>(() =>
-    presetFor(reminderAt),
+  const [picked] = useState<ReminderPreset | "custom" | null>(() =>
+    presetFor(reminderAt) ?? (reminderAt ? "custom" : null),
   );
-  // A custom time typed by hand that has already passed: refused, and said.
-  const [late, setLate] = useState(false);
+  // The picker stands in the panel's place while it is open.
+  const [picking, setPicking] = useState(false);
+  useEffect(() => {
+    void loadReminderPick();
+  }, []);
   const occurrence = reminderAt ? nextOccurrenceIso(note) : null;
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -176,13 +179,28 @@ export function ReminderPanel({
       <div
         ref={panelRef}
         className={
-          anchor ? "selpanel selpanel-under selpanel-over" : "selpanel selpanel-right selpanel-over"
+          anchor
+            ? "selpanel reminder-panel selpanel-under selpanel-over"
+            : "selpanel reminder-panel selpanel-right selpanel-over"
         }
         style={anchor ? hangUnder(anchor) : undefined}
         role="menu"
         aria-label="Reminder"
         tabIndex={-1}
       >
+        {picking ? (
+          <Suspense fallback={null}>
+            <ReminderPick
+              initial={occurrence}
+              onBack={() => setPicking(false)}
+              onSet={(at) => {
+                onSetReminder?.(note.id, at);
+                onClose();
+              }}
+            />
+          </Suspense>
+        ) : (
+        <>
         {/* The time that is set, as a clock reads it. The note's own row
             counts towards it in words ("reminds in 11 hours") and this is the
             one place the exact time is written, so a panel opened on a set
@@ -218,88 +236,27 @@ export function ReminderPanel({
             {picked === preset.key ? <IconCheck /> : <IconReminder tier="inline" />}
           </Action>
         ))}
-        {/* Said in the panel's own label voice and stood in the rows' label
-            column (review UI-A-07): a bare span here inherited the browser's
-            16px Baskerville and sat a mark's width left of every other label.
-            The field is set like every field you type into — the reading face
-            at reading size — not 10.5px tracked capitals a thumb has to hit. */}
-        <div className="selpanel-row selpanel-row-custom">
-          <span className="selpanel-row-label mono">Custom</span>
-          <input
-            type="datetime-local"
-            className="field-words"
-            aria-label="Custom reminder time"
-            // The picker offers nothing earlier than now. There is
-            // deliberately no starting value: the field sets the reminder
-            // the moment it holds a whole time, so a prefilled one would
-            // save on the first segment changed. The panel stays open
-            // after it, because the time is typed in pieces.
-            min={localInputMin()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              const value = e.currentTarget.value;
-              if (!value) {
-                setLate(false);
-                return;
-              }
-              const at = new Date(value);
-              if (Number.isNaN(at.getTime())) return;
-              // A `datetime-local` reports a value as soon as it *looks*
-              // complete, and a year typed digit by digit passes through
-              // `0002-…` on its way to 2026 — so the first keystroke set a
-              // reminder for the year 2 and shut the panel on the reader.
-              // Any year outside a range a person could mean is a year
-              // still being typed.
-              const year = at.getFullYear();
-              if (year < 1970 || year > 2200) return;
-              // `min` only shapes the picker; a time typed by hand can
-              // still be in the past. It is refused the same way — the
-              // panel stays open and the field shows itself invalid —
-              // rather than set as a reminder that is already overdue.
-              // The minute's grace is the field's own resolution. No style
-              // marks a field invalid, so the refusal is said in a line.
-              if (at.getTime() < Date.now() - 60_000) {
-                setLate(true);
-                return;
-              }
-              setLate(false);
-              onSetReminder?.(note.id, at.toISOString());
-              setPicked("custom");
-            }}
-          />
-        </div>
-        {late && (
-          <p className="selpanel-hint advice" role="status">
-            That time has passed. Pick a later one.
-          </p>
-        )}
+        {/* Any other day and time: the panel turns into the picker
+            (`ReminderPick`), and back. Ticked while the time set is one no
+            preset names. */}
+        <Action
+          role="menuitemradio"
+          checked={picked === "custom"}
+          keepFocus
+          label="Pick a date"
+          suffix={<span className="selpanel-n"><IconStepOn /></span>}
+          onClick={() => setPicking(true)}
+        >
+          {picked === "custom" ? <IconCheck /> : <IconDate />}
+        </Action>
         {/* How often, under when — and only once there is a when. A rule
             with no anchor is not a reminder, so offering "every week" on a
-            note with no time set would be offering to repeat nothing.
-
-            Each row is a switch, not a choice in a list: pressing the one
-            that is already on turns it off, which is the only way back to
-            a reminder that rings once and is the same grammar the Todo
-            mark and the ring switch already use. The panel stays open —
-            the rule is usually the second half of a decision whose first
-            half was made on the row above, so they are there when the
-            panel is opened again on a note that has a time. */}
-        {reminderAt &&
-          REMINDER_REPEATS.map((rule) => {
-            const on = note.reminder_repeat === rule;
-            return (
-              <Action
-                key={rule}
-                role="menuitemcheckbox"
-                checked={on}
-                keepFocus
-                label={repeatWords(rule) ?? rule}
-                onClick={() => onSetRepeat?.(note.id, on ? null : rule)}
-              >
-                <IconRepeat tier="inline" on={on} />
-              </Action>
-            );
-          })}
+            note with no time set would be offering to repeat nothing. The
+            panel stays open: the rule is usually the second half of a
+            decision whose first half was made on the row above. */}
+        {reminderAt && (
+          <RepeatRow value={note.reminder_repeat ?? null} onChange={(rule) => onSetRepeat?.(note.id, rule)} />
+        )}
         {reminderAt && (
           <Action
             role="menuitem"
@@ -361,6 +318,8 @@ export function ReminderPanel({
                   : "This browser cannot notify."}
             </p>
           )
+        )}
+        </>
         )}
       </div>
     </>

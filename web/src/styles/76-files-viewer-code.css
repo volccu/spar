@@ -1172,9 +1172,9 @@
   padding-left: 6px;
 }
 
-/* The reminder panel's one non-button row: a label and a native picker, set
-   to look like the rows around it rather than like a form. color-scheme is
-   already dark from :root, so the browser draws its own calendar to match. */
+/* A panel row that is not one button: a label and a field or a few answers
+   (the Move chooser's name, the reminder's time and repeat), set to look like
+   the rows around it rather than like a form. */
 .selpanel-row {
   display: flex;
   align-items: center;
@@ -1195,21 +1195,6 @@
   border-radius: 0;
   color: inherit;
   padding: 4px 6px;
-}
-
-/* The calendar the browser draws inside a date field is bold pure white, which
-   is not a tone of the ramp (review UI-05). The browser's own button stays, so
-   a tap still opens the picker; its picture is replaced by the set's calendar
-   (Heroicons `CalendarIcon`, 1.8 user units = 1.5px at 20px), cut out of
-   `--muted`. Chromium's pseudo-element; a browser without it draws its own. */
-.selpanel-row input::-webkit-calendar-picker-indicator {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  background: var(--muted);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
-  cursor: var(--cursor-pointer);
 }
 
 /* A field you type a name or a search into, inside a panel or a sheet: the
@@ -1246,5 +1231,150 @@
 .selpanel-row input:focus {
   outline: 1px solid var(--ink);
   outline-offset: -1px;
+}
+
+/* --- the reminder panel and its date picker (owner, 2026-10-29) ------------
+   One width for both of its views, so turning the list into the picker and
+   back never moves the panel's edge; never wider than the glass. */
+.reminder-panel {
+  width: min(100vw, 340px);
+}
+
+/* On a phone it spans the glass, edge to edge, like the bar it stands over. */
+@media (max-width: 699px) {
+  .reminder-panel {
+    width: 100vw;
+  }
+}
+
+/* The repeat answers stand at the row's right end, the label at its left. */
+.reminder-repeat .settings-seg {
+  margin-left: auto;
+}
+
+.reminder-repeat .settings-seg button {
+  min-width: 0;
+  padding-inline: var(--s-4);
+}
+
+/* Back, the month and its two steps: the panel's head, ruled at the edge
+   weight like the selection panel's. */
+.pick-head {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--rule);
+}
+
+.pick-month {
+  flex: 1 1 auto;
+  text-align: center;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: var(--t-nav);
+  line-height: var(--lh-chrome);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+
+.pick-icon,
+.pick-step,
+.pick-day {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  border-radius: 0;
+  cursor: var(--cursor-pointer);
+}
+
+.pick-icon {
+  width: var(--hit);
+  height: var(--hit);
+}
+
+/* Six weeks of seven, every month, so paging never changes the height. */
+.pick-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding-inline: var(--s-5);
+}
+
+.pick-grid + .pick-grid {
+  padding-bottom: var(--s-4);
+}
+
+.pick-weekday {
+  padding-top: var(--s-4);
+  padding-bottom: var(--s-2);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--t-data);
+  letter-spacing: var(--track-data);
+}
+
+/* A day is data: mono, untracked, its digits in step. */
+.pick-day {
+  height: var(--hit);
+  font-size: var(--t-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pick-day[data-today] {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* The day picked raises, the way a chosen answer does in Settings, and takes
+   an ink edge so it reads at a glance in a grid of thirty. */
+.pick-day[aria-pressed="true"] {
+  background: var(--raised);
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+/* A day gone by cannot be picked: a tone down, as a disabled row is. */
+.pick-icon:disabled,
+.pick-day:disabled {
+  color: var(--muted);
+  cursor: var(--cursor-default);
+}
+
+.pick-step {
+  flex: 0 0 auto;
+  width: var(--hit);
+  height: var(--hit);
+  border: 1px solid var(--rule);
+}
+
+.pick-time .selpanel-row-label {
+  margin-right: auto;
+}
+
+.pick-time .pick-clock {
+  flex: 0 0 auto;
+  width: 5.5ch;
+  text-align: center;
+}
+
+/* Set is the panel's answer, nearest the thumb: ruled off at the edge weight. */
+.selpanel-btn.pick-set {
+  border-top-color: var(--rule);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pick-icon:hover:not(:disabled),
+  .pick-step:hover,
+  .pick-day:hover:not(:disabled) {
+    background: var(--raised);
+  }
+}
+
+.pick-icon:active:not(:disabled),
+.pick-step:active,
+.pick-day:active:not(:disabled) {
+  background: var(--invert);
+  color: var(--paper);
 }
 

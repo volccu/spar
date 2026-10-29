@@ -869,10 +869,12 @@ same element, and the paths inherit the computed value.
 them under the rule, 8px below to the card's edge.
 
 **A mark the browser draws inside a field is not ours to leave** (2026-10-24, owner approved, review
-UI-05): the date field's calendar and the search field's clear are bold pure white, which is no tone
-of the ramp. Each keeps the browser's own button, so a tap does what it did, and is redrawn as the
-set's own outline mark cut out of `--muted` (`::-webkit-calendar-picker-indicator`,
-`::-webkit-search-cancel-button`; Chromium's pseudo-elements, another browser draws its own).
+UI-05): the search field's clear is bold pure white, which is no tone of the ramp. It keeps the
+browser's own button, so a tap does what it did, and is redrawn as the set's own outline mark cut
+out of `--muted` (`::-webkit-search-cancel-button`; Chromium's pseudo-element, another browser draws
+its own). **A date is never picked on the browser's calendar** (2026-10-29, owner approved): its
+pop-up is the browser's, blue with red weekends, and cannot be redrawn. The reminder panel draws its
+own month in the ramp — a picked day raised with an ink edge, today underlined, past days `--muted`.
 
 **Curves are allowed on glyphs and nowhere else.** Heroicons and Lucide draw with round caps and
 joins and are kept as drawn. Rules and borders stay hard.

@@ -560,6 +560,25 @@ process.stdout.write("Connecting to the stand-in...\\n" + JSON.stringify({ rows:
       expect(r.out).toContain("using has been opened to everything");
     });
 
+    it("reports a policy whose `and` was rewritten to `or` after a cast", () => {
+      writeMigrations({
+        "0001_widgets.sql": MIG_0001.replace(
+          "using (owner_id = auth.uid())",
+          "using (owner_id = 1::int and body = 'x')",
+        ),
+      });
+      const inv = healthyInventory();
+      inv.applied = ["0001"];
+      inv.policy_detail[0].using = "(owner_id = 1::int OR body = 'x')";
+      const r = verify(inv);
+      writeMigrations({
+        "0001_widgets.sql": MIG_0001,
+        "0002_gadgets.sql": MIG_0002,
+        "0003_later.sql": MIG_0003,
+      });
+      expect(r.out).toContain("using differs from the migration");
+    });
+
     it("reports a function executable by PUBLIC after a drop-and-recreate", () => {
       const inv = healthyInventory();
       inv.function_detail[0].execute_roles = ["postgres", "service_role", "public"];
@@ -660,6 +679,36 @@ drop table public.widgets;
         });
       }
     });
+  });
+
+  it("does not demand a removed table's index, policy, grants or row level security", () => {
+    writeMigrations({
+      "0001_widgets.sql": MIG_0001,
+      "0002_gadgets.sql": MIG_0002,
+      // No separate index removal: Postgres takes the table's index, policy and grants with it.
+      "0003_later.sql": `${MIG_0003}
+drop table public.widgets;
+`,
+    });
+    try {
+      const inv = healthyInventory();
+      inv.tables = inv.tables.filter((t) => t !== "public.widgets");
+      inv.columns = inv.columns.filter((c) => !c.startsWith("public.widgets."));
+      inv.indexes = [];
+      inv.policies = [];
+      inv.policy_detail = [];
+      inv.rls = inv.rls.filter((r) => r.key !== "public.widgets");
+      inv.table_acl = inv.table_acl.filter((t) => t.key !== "public.widgets");
+      const r = verify(inv);
+      expect(r.out).not.toContain("widgets_owner_idx");
+      expect(r.code).toBe(0);
+    } finally {
+      writeMigrations({
+        "0001_widgets.sql": MIG_0001,
+        "0002_gadgets.sql": MIG_0002,
+        "0003_later.sql": MIG_0003,
+      });
+    }
   });
 
   it("does not take comments or string literals for statements", () => {

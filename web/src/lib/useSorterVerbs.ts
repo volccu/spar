@@ -1,7 +1,7 @@
 import { useCallback, type RefObject } from "react";
 import type { Mark } from "../components/Vanish";
 import { markedWords, type Undo } from "../store/useUndo";
-import type { Note } from "../types";
+import type { Note, ReminderRepeat } from "../types";
 import type { Binned } from "../components/Sorter";
 import { filePatch, isTodoNote, linksPatch } from "./boards";
 import { movedWords } from "./movedWords";
@@ -140,15 +140,17 @@ export function useSorterVerbs({
    * FX-B-01).
    */
   const sortRemind = useCallback(
-    (note: Note, at: string) => {
-      const was = note.reminder_at ?? null;
+    (note: Note, at: string, repeat: ReminderRepeat | null = null) => {
+      const was = { reminder_at: note.reminder_at ?? null, reminder_repeat: note.reminder_repeat ?? null };
       setReminder(note.id, at);
+      // The rule chosen beside the time, written only when it changes it.
+      if (was.reminder_repeat !== repeat) update(note.id, { reminder_repeat: repeat });
       pushUndo({
         message: "Reminder set",
-        steps: [{ id: note.id, expect: { reminder_at: at }, revert: { reminder_at: was } }],
+        steps: [{ id: note.id, expect: { reminder_at: at, reminder_repeat: repeat }, revert: was }],
       });
     },
-    [pushUndo, setReminder],
+    [pushUndo, setReminder, update],
   );
 
   /**

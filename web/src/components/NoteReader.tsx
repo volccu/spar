@@ -296,6 +296,12 @@ export function NoteReader({
     setDrag({ from: d.from, to: d.run[landed], dy: e.clientY - d.startY });
   }
 
+  /** The browser took the gesture back: nothing was decided, so nothing is written. */
+  function abandon() {
+    dragRef.current = null;
+    setDrag(null);
+  }
+
   function drop() {
     const d = dragRef.current;
     const at = dragRef.current ? dragState.current : null;
@@ -400,7 +406,7 @@ export function NoteReader({
                   onPointerDown={(e) => grab(e, i)}
                   onPointerMove={dragTo}
                   onPointerUp={drop}
-                  onPointerCancel={drop}
+                  onPointerCancel={abandon}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <IconGrip />

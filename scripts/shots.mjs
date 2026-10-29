@@ -384,6 +384,8 @@ async function browserRole() {
   const PHONE = { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true };
   /** What the GIFs are recorded at: scaled to 800 wide, the words stay readable. */
   const CLIP = { width: 1000, height: 625, deviceScaleFactor: 1 };
+  /** The canvas still: a smaller window, so the drawing fills it, at twice the pixels. */
+  const CANVAS = { width: 1280, height: 800, deviceScaleFactor: 2 };
 
   /** A new profile — empty IndexedDB, no service worker — on the demo. */
   const fresh = async (viewport, { pointer = false, theme = null } = {}) => {
@@ -566,31 +568,41 @@ async function browserRole() {
       }
     },
 
-    /** The trip's idea, opened: its notes laid out on the canvas. */
+    /** The trip's idea, opened and worked on: notes, a picture, pens, shapes and words. */
     async canvas() {
-      const { context, page } = await fresh(DESKTOP);
+      const { context, page } = await fresh(CANVAS);
       await loadSamples(page);
       await page.click("::-p-text(Lisbon in May)");
       await page.waitForFunction(() => [...document.querySelectorAll(".card")].some((c) => (c.getAttribute("aria-label") ?? "").startsWith("Idea:")), { timeout: 10_000 });
       await page.evaluate(() => [...document.querySelectorAll(".card")].find((c) => (c.getAttribute("aria-label") ?? "").startsWith("Idea:")).click());
       await page.waitForSelector('button[aria-label="Close idea"]', { timeout: 10_000 });
       await sleep(1500);
-      // Laid out by hand, as a person would: two notes dragged into place, a
-      // line drawn between them, and a word written on the canvas itself.
-      const drag = async (from, to) => {
-        await page.mouse.move(...from);
-        await page.mouse.down();
-        await page.mouse.move(...to, { steps: 25 });
-        await page.mouse.up();
-        await sleep(400);
+      const mouse = page.mouse;
+      const rect = (el) => el.getBoundingClientRect().toJSON();
+      const noteBox = (start) =>
+        page.evaluate((s) => [...document.querySelectorAll(".spatial-note")].find((n) => n.textContent.startsWith(s)).getBoundingClientRect().toJSON(), start);
+      const labelBox = (words) =>
+        page.evaluate((w) => [...document.querySelectorAll(".canvas-text-label")].find((e) => e.textContent.includes(w)).getBoundingClientRect().toJSON(), words);
+      const drag = async (from, to, steps = 15) => {
+        await mouse.move(...from);
+        await mouse.down();
+        await mouse.move(...to, { steps });
+        await mouse.up();
+        await sleep(300);
       };
-      await drag([150, 380], [1040, 250]); // Sintra, off to the right
-      await drag([700, 140], [520, 470]); // eating, below the stay
-      // Where the box, the words and the highlight go, on that layout.
-      const SHAPE_FROM = [34, 90];
-      const SHAPE_TO = [598, 348];
-      const TEXT_AT = [918, 478];
-      const HIGHLIGHT = [[922, 497], [1100, 497]];
+      const stroke = async (points) => {
+        await mouse.move(...points[0]);
+        await mouse.down();
+        for (const point of points.slice(1)) await mouse.move(...point, { steps: 3 });
+        await mouse.up();
+        await sleep(300);
+      };
+      /** A note, carried by its body so its top-left lands on `at`. */
+      const moveNote = async (start, at) => {
+        const b = await noteBox(start);
+        await drag([b.x + 120, b.y + 150], [at[0] + 120, at[1] + 150], 25);
+        await sleep(100);
+      };
       /** A tool from the bar; and one of a choice menu's items, opened from its button. */
       const tool = async (name) => {
         await page.click(`button.canvas-tool-btn[aria-label="${name}"]`);
@@ -602,53 +614,115 @@ async function browserRole() {
         await page.click(item);
         await sleep(300);
       };
-      await tool("Draw");
-      await choose('button[aria-label^="Pen colour"]', '.canvas-palette-item[aria-label="Clay"]');
-      const stroke = async (points) => {
-        await page.mouse.move(...points[0]);
-        await page.mouse.down();
-        for (const point of points.slice(1)) await page.mouse.move(...point, { steps: 6 });
-        await page.mouse.up();
-        await sleep(300);
+      const pen = (name) => choose('button[aria-label^="Pen colour"]', `.canvas-palette-item[aria-label="${name}"]`);
+      const shapeKind = (name) => choose('button[aria-label^="Shape:"]', `::-p-text(${name})`);
+      const fill = async (on) => {
+        const pressed = await page.$eval('button[aria-label="Fill"]', (b) => b.getAttribute("aria-pressed") === "true");
+        if (pressed !== on) await page.click('button[aria-label="Fill"]');
+        await sleep(200);
       };
-      // From the stay, round to Sintra: a loose curve and an arrowhead.
-      const curve = [];
-      for (let i = 0; i <= 24; i++) {
-        const t = i / 24;
-        curve.push([600 + t * 300, 230 - Math.sin(t * Math.PI) * 90 + t * 20]);
-      }
-      await stroke(curve);
-      await stroke([[880, 236], [902, 250], [884, 268]]);
-      // A box round the two that go together, with the shape tool, in a second pen.
+      /** Words on the canvas itself, with the Text tool, in the pen chosen before it. */
+      const label = async (at, words) => {
+        await tool("Text");
+        await mouse.click(...at);
+        await sleep(400);
+        await page.keyboard.type(words, { delay: 15 });
+        await sleep(200);
+        await page.keyboard.down("Control");
+        await page.keyboard.press("Enter");
+        await page.keyboard.up("Control");
+        await sleep(500);
+      };
+      const bezier = (p0, p1, p2, n = 28) =>
+        Array.from({ length: n + 1 }, (_, i) => {
+          const t = i / n;
+          const u = 1 - t;
+          return [u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]];
+        });
+
+      // Laid out by hand, as a person would.
+      await moveNote("eat:", [40, 470]);
+      await moveNote("Sintra", [980, 470]);
+      await moveNote("stay", [360, 150]);
+      await moveNote("flights", [40, 96]);
+      // The balcony picture the sample notes already carry, dropped beside the stay.
+      const dropped = await page.evaluate(async ([x, y]) => {
+        const src = performance.getEntriesByType("resource").map((e) => e.name).find((n) => n.includes("balcony-tomatoes"));
+        if (!src) return false;
+        const blob = await (await fetch(src)).blob();
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], "balcony.jpg", { type: "image/jpeg" }));
+        const surface = document.querySelector(".canvas-surface");
+        for (const type of ["dragenter", "dragover", "drop"]) {
+          surface.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt }));
+        }
+        // The board's own "Drop to keep" was lit by the dragover; a pointer leaving the window puts it out.
+        window.dispatchEvent(new DragEvent("dragleave", { dataTransfer: dt }));
+        return true;
+      }, [770, 190]);
+      must(dropped, "the balcony picture was not among what the page loaded");
+      await page.waitForSelector(".canvas-picture-resize", { timeout: 10_000 });
+      await sleep(800);
+      const handle = await page.$eval(".canvas-picture-resize", rect);
+      await drag([handle.x + 8, handle.y + 8], [handle.x + 68, handle.y + 53], 10);
+      const pic = await page.$eval(".canvas-picture", rect);
+      const stay = await noteBox("stay");
+
+      // The stay and the balcony it wants, boxed together.
       await tool("Shapes");
-      await choose('button[aria-label^="Shape:"]', "::-p-text(Rectangle)");
-      await choose('button[aria-label^="Pen colour"]', '.canvas-palette-item[aria-label="Sage"]');
-      await page.mouse.move(...SHAPE_FROM);
-      await page.mouse.down();
-      await page.mouse.move(...SHAPE_TO, { steps: 20 });
-      await page.mouse.up();
-      await sleep(300);
-      // Words on the canvas itself, then the highlighter across them.
-      await tool("Move");
-      await page.mouse.click(...TEXT_AT, { button: "right" });
-      await sleep(400);
-      await page.click("::-p-text(Add text)");
-      await sleep(500);
-      await page.keyboard.type("Only if the weather holds", { delay: 20 });
-      await sleep(300);
-      await page.keyboard.down("Control");
-      await page.keyboard.press("Enter");
-      await page.keyboard.up("Control");
-      await sleep(600);
+      await shapeKind("Rectangle");
+      await pen("Sage");
+      await drag([stay.x - 16, Math.min(stay.y, pic.y) - 16], [pic.right + 16, Math.max(stay.bottom, pic.bottom) + 16]);
+      await label([pic.x, pic.bottom + 28], "this balcony, please");
+
+      // From the box round to Sintra, by hand, and the day highlighted beside it.
+      const sintra = await noteBox("Sintra");
+      await tool("Draw");
+      await pen("Clay");
+      const from = [pic.right + 24, pic.y + 70];
+      const to = [sintra.x + sintra.width / 2, sintra.y - 10];
+      await stroke(bezier(from, [to[0] + 40, from[1] - 20], to));
+      await stroke([[to[0] - 16, to[1] - 20], to, [to[0] + 14, to[1] - 22]]);
+      await label([to[0] + 22, from[1] + 90], "day 3");
+      const day = await labelBox("day 3");
       await tool("Highlighter");
-      await choose('button[aria-label^="Pen colour"]', '.canvas-palette-item[aria-label="Ochre"]');
-      await stroke(HIGHLIGHT);
+      await pen("Ochre");
+      await stroke([[day.x - 2, day.y + day.height / 2 + 1], [day.right + 2, day.y + day.height / 2]]);
+
+      // A tram in shapes, Lisbon's yellow 28, with its wire.
+      const T = { x: 430, y: 560 };
+      await tool("Shapes");
+      await shapeKind("Rectangle");
+      await fill(true);
+      await drag([T.x + 30, T.y - 14], [T.x + 200, T.y]);
+      await drag([T.x, T.y], [T.x + 230, T.y + 92]);
+      await fill(false);
+      await pen("Ink");
+      for (let i = 0; i < 4; i++) await drag([T.x + 18 + i * 52, T.y + 16], [T.x + 58 + i * 52, T.y + 50]);
+      await shapeKind("Ellipse");
+      await fill(true);
+      await pen("Muted");
+      await drag([T.x + 34, T.y + 84], [T.x + 56, T.y + 106]);
+      await drag([T.x + 174, T.y + 84], [T.x + 196, T.y + 106]);
+      await fill(false);
+      await shapeKind("Line");
+      await drag([T.x + 115, T.y - 14], [T.x + 150, T.y - 52]);
+      await drag([T.x - 60, T.y - 52], [T.x + 300, T.y - 52]);
+      await pen("Ink");
+      await label([T.x + 272, T.y + 40], "the 28, at least once");
+      const tram = await labelBox("the 28");
+      await tool("Shapes");
+      await shapeKind("Ellipse");
+      await pen("Rust");
+      await drag([tram.x - 16, tram.y - 12], [tram.right + 16, tram.bottom + 12]);
+
       await tool("Move");
       await sleep(1200);
-      await page.mouse.move(DESKTOP.width - 2, DESKTOP.height - 2);
+      await mouse.move(CANVAS.width - 2, CANVAS.height - 2);
+      await sleep(400);
       await page.screenshot({ path: `${OUT}/canvas.png`, type: "png" });
       await context.close();
-      step("canvas.png: the Lisbon in May idea");
+      step("canvas.png: the Lisbon in May idea, worked on");
     },
 
     /** Type, Enter, and the note is on the board. */

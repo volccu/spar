@@ -119,8 +119,15 @@ export function useCapture({
         ...(todo ? { note_type: "todo" as const } : {}),
         ...(boardId !== null ? { board_id: boardId } : {}),
         // The preset, resolved at Save: "in 1 hour" is an hour from the note,
-        // not from the tap on the clock (review 2026-10-04, FX-B-06).
-        ...(choice.reminder ? { reminder_at: presetReminder(choice.reminder) } : {}),
+        // not from the tap on the clock (review 2026-10-04, FX-B-06). A picked
+        // day and time is already an instant, and its repeat goes with it.
+        ...(choice.reminder
+          ? {
+              reminder_at:
+                typeof choice.reminder === "string" ? presetReminder(choice.reminder) : choice.reminder.at,
+              ...(choice.repeat ? { reminder_repeat: choice.repeat } : {}),
+            }
+          : {}),
       };
     },
     [filing, here, board.kind, userBoards],

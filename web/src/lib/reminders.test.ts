@@ -10,7 +10,10 @@ import {
   presetWhen,
   reminderPresets,
   reminderWhen,
-  localInputMin,
+  monthDays,
+  parseClock,
+  clockWords,
+  atMinutes,
   reminderDue,
   reminderOverdue,
   SPENT_AFTER_MS,
@@ -320,9 +323,46 @@ describe("reminderWhen", () => {
   });
 });
 
-describe("localInputMin", () => {
-  it("writes now in the datetime-local field's own wall-clock form", () => {
-    expect(localInputMin(new Date(2026, 0, 5, 7, 4))).toBe("2026-01-05T07:04");
+describe("monthDays", () => {
+  it("lays every month out as six Monday-first weeks", () => {
+    // October 2026 starts on a Thursday; February 2027 on a Monday.
+    const oct = monthDays(2026, 9);
+    expect(oct).toHaveLength(42);
+    expect(oct.slice(0, 3)).toEqual([null, null, null]);
+    expect(oct[3]?.getDate()).toBe(1);
+    expect(oct[33]?.getDate()).toBe(31);
+    expect(oct[34]).toBe(null);
+    const feb = monthDays(2027, 1);
+    expect(feb).toHaveLength(42);
+    expect(feb[0]?.getDate()).toBe(1);
+    expect(feb.filter(Boolean)).toHaveLength(28);
+  });
+});
+
+describe("parseClock", () => {
+  it("reads a time the way it is typed on a number pad", () => {
+    expect(parseClock("9")).toBe(540);
+    expect(parseClock("09:00")).toBe(540);
+    expect(parseClock("930")).toBe(570);
+    expect(parseClock("9.30")).toBe(570);
+    expect(parseClock("2115")).toBe(21 * 60 + 15);
+    expect(parseClock(" 21 ")).toBe(21 * 60);
+  });
+
+  it("refuses what is not a time of day", () => {
+    for (const bad of ["", "24", "9:60", "abc", "12345", "9:5"]) expect(parseClock(bad)).toBe(null);
+  });
+
+  it("writes minutes back as a clock does", () => {
+    expect(clockWords(540)).toBe("09:00");
+    expect(clockWords(21 * 60 + 5)).toBe("21:05");
+  });
+});
+
+describe("atMinutes", () => {
+  it("puts a time of day on a picked day, in this device's clock", () => {
+    const at = atMinutes(new Date(2026, 9, 16), 9 * 60 + 30);
+    expect([at.getFullYear(), at.getMonth(), at.getDate(), at.getHours(), at.getMinutes()]).toEqual([2026, 9, 16, 9, 30]);
   });
 });
 

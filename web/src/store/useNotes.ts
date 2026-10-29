@@ -122,7 +122,7 @@ function localPatch(note: Note, patch: Partial<Note>): Note {
  * place at once, rather than being created unfiled and then moved a tick
  * later by a second write with a second clock.
  */
-export type CaptureFields = Partial<Pick<Note, "priority" | "note_type" | "board_id" | "reminder_at">>;
+export type CaptureFields = Partial<Pick<Note, "priority" | "note_type" | "board_id" | "reminder_at" | "reminder_repeat">>;
 
 function newNote(text: string, source = "web", fields: CaptureFields = {}): Note {
   const ts = new Date(stampNow()).toISOString();

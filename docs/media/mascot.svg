@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="17 10 66 78" width="330" height="390">
+  <!-- The mascot for the README: web/public/icon.svg without its ground, so it
+       stands on GitHub's page in either theme. The app's icon keeps its ground
+       (a launcher icon needs one); change the creature in both. -->
+  <g fill="none" stroke="#948b7d" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="35" y1="75" x2="35" y2="85"/>
+    <line x1="65" y1="75" x2="65" y2="85"/>
+    <rect x="20" y="30" width="60" height="45" rx="9"/>
+    <line x1="50" y1="30" x2="50" y2="18"/>
+  </g>
+  <circle cx="50" cy="14" r="3.2" fill="#948b7d"/>
+  <rect x="28" y="38" width="44" height="29" rx="5" fill="#29221a"/>
+  <g fill="#ded5c6">
+    <circle cx="39" cy="50" r="3.4"/>
+    <circle cx="61" cy="50" r="3.4"/>
+  </g>
+  <line x1="47" y1="58" x2="53" y2="58" stroke="#ded5c6" stroke-width="5" stroke-linecap="round"/>
+</svg>

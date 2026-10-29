@@ -1,4 +1,5 @@
 import {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -8,7 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import type { Note, UserBoard } from "../types";
+import type { Note, ReminderRepeat, UserBoard } from "../types";
 import { Action } from "./shared/Action";
 import { CaptureLine, type BarLine, type BusyLine } from "./CaptureLine";
 import { setTwin } from "../lib/twinSaid";
@@ -29,11 +30,14 @@ import { BoardChooser } from "./BoardChooser";
 import { FolderGlyph } from "./BoardLook";
 import { Hotkey } from "./Hotkey";
 import { readCaptureDraft, writeCaptureDraft } from "../store/db";
-import { presetWhen, reminderPresets, type ReminderPreset } from "../lib/reminders";
+import { presetWhen, reminderPresets, reminderWhen, repeatWords, type ReminderPreset } from "../lib/reminders";
+import { RepeatRow } from "./RepeatRow";
+import { loadReminderPick, ReminderPick } from "./reminderPickLazy";
 import {
   IconAttachment,
   IconCheck,
   IconClear,
+  IconDate,
   IconInbox,
   IconInspiration,
   IconMenu,
@@ -42,6 +46,7 @@ import {
   IconPriority,
   IconReminder,
   IconSave,
+  IconStepOn,
   IconTodo,
 } from "./Icons";
 
@@ -56,13 +61,16 @@ import {
  * to write a stray thought while standing in a folder without it being filed
  * there; a string is that folder. `reminder` is one of the open note's four
  * presets, kept as the preset rather than as an instant so that "in 1 hour"
- * means an hour from Save (review 2026-10-04, FX-B-06).
+ * means an hour from Save (review 2026-10-04, FX-B-06) — or `{ at }`, a day
+ * and time picked on the open note's own picker (owner, 2026-10-29), with
+ * `repeat` the rule it comes back on.
  */
 export interface CaptureChoice {
   priority: boolean;
   todo: boolean;
   board: string | null | undefined;
-  reminder: ReminderPreset | null;
+  reminder: ReminderPreset | { at: string } | null;
+  repeat: ReminderRepeat | null;
 }
 
 export const NO_CHOICE: CaptureChoice = {
@@ -70,6 +78,7 @@ export const NO_CHOICE: CaptureChoice = {
   todo: false,
   board: undefined,
   reminder: null,
+  repeat: null,
 };
 
 /**
@@ -336,6 +345,11 @@ export function CaptureBar({
   const [choosing, setChoosing] = useState(false);
   /** The reminder presets, open over the bar. */
   const [reminding, setReminding] = useState(false);
+  // The reminder panel's date picker, standing in its place while open.
+  const [pickingDate, setPickingDate] = useState(false);
+  useEffect(() => {
+    if (reminding) void loadReminderPick();
+  }, [reminding]);
   const field = useRef<HTMLTextAreaElement | null>(null);
   /**
    * One identity for the life of the bar. React detaches and reattaches a ref
@@ -849,21 +863,26 @@ export function CaptureBar({
    * permission to ring is asked at Save, the moment the reminder becomes real
    * (`onCapture`'s caller), exactly as the open note asks when one is set.
    */
-  function pickReminder(preset: ReminderPreset | null) {
-    setChoice((c) => ({ ...c, reminder: preset }));
-    setReminding(false);
-    field.current?.focus();
+  function pickReminder(reminder: CaptureChoice["reminder"]) {
+    // Taking the reminder off takes its repeat with it.
+    setChoice((c) => ({ ...c, reminder, ...(reminder ? {} : { repeat: null }) }));
+    closeReminder();
   }
 
   function closeReminder() {
     setReminding(false);
+    setPickingDate(false);
     field.current?.focus();
   }
 
   /** The four presets, named and ordered for now, as the open note offers them. */
   const presets = reminding || choice.reminder ? reminderPresets() : [];
-  const reminderName = choice.reminder
-    ? `Reminder: ${presets.find((p) => p.key === choice.reminder)?.label ?? ""}, ${presetWhen(choice.reminder)}`
+  const picked = choice.reminder;
+  /** When the chosen reminder will ring, as the panel and the bar say it. */
+  const reminderAt = !picked ? null : typeof picked === "string" ? presetWhen(picked) : reminderWhen(picked.at);
+  const repeatSaid = repeatWords(choice.repeat);
+  const reminderName = picked
+    ? `Reminder: ${typeof picked === "string" ? `${presets.find((p) => p.key === picked)?.label ?? ""}, ` : ""}${reminderAt}${repeatSaid ? `, ${repeatSaid}` : ""}`
     : "Reminder";
 
   // A board chosen and then taken away — the undo of making it, or a delete from
@@ -991,10 +1010,11 @@ export function CaptureBar({
         </>
       )}
 
-      {/* The clock's four presets — the open note's own, in its order, each
-          saying when it will ring. Bottom-right like the Add panel and the
-          open note's reminder panel. No custom time and no repeat here: those
-          are a second visit's worth of decision, and the open note has them. */}
+      {/* The open note's reminder panel, the same in both places (owner,
+          2026-10-29): the four presets, each saying when it will ring, Pick a
+          date, and the repeat once there is a time. It stands on the bar's
+          top edge like the board chooser, so the clock that opened it stays
+          in sight; it used to cover it. */}
       {reminding && (
         <>
           <button
@@ -1003,25 +1023,56 @@ export function CaptureBar({
             aria-label="Close reminder menu"
             onClick={closeReminder}
           />
-          <div className="selpanel selpanel-right selpanel-over" role="menu" aria-label="Reminder">
-            {presets.map((preset) => (
-              <Action
-                key={preset.key}
-                role="menuitemradio"
-                checked={choice.reminder === preset.key}
-                keepFocus
-                label={preset.label}
-                suffix={<>{" "}<span className="selpanel-n">{presetWhen(preset.key)}</span></>}
-                onClick={() => pickReminder(preset.key)}
-              >
-                {choice.reminder === preset.key ? <IconCheck /> : <IconReminder tier="inline" />}
-              </Action>
-            ))}
-            {choice.reminder && (
-              <Action role="menuitem" keepFocus label="No reminder" onClick={() => pickReminder(null)}>
-                <IconClear tier="inline" />
-              </Action>
-            )}
+          <div className="capture-chooser">
+            <div className="selpanel reminder-panel" role="menu" aria-label="Reminder">
+              {pickingDate ? (
+                <Suspense fallback={null}>
+                  <ReminderPick
+                    initial={picked && typeof picked !== "string" ? picked.at : null}
+                    onBack={() => setPickingDate(false)}
+                    onSet={(at) => pickReminder({ at })}
+                  />
+                </Suspense>
+              ) : (
+                <>
+                  {presets.map((preset) => (
+                    <Action
+                      key={preset.key}
+                      role="menuitemradio"
+                      checked={picked === preset.key}
+                      keepFocus
+                      label={preset.label}
+                      suffix={<>{" "}<span className="selpanel-n">{presetWhen(preset.key)}</span></>}
+                      onClick={() => pickReminder(preset.key)}
+                    >
+                      {picked === preset.key ? <IconCheck /> : <IconReminder tier="inline" />}
+                    </Action>
+                  ))}
+                  <Action
+                    role="menuitemradio"
+                    checked={Boolean(picked) && typeof picked !== "string"}
+                    keepFocus
+                    label="Pick a date"
+                    suffix={
+                      <span className="selpanel-n">
+                        {picked && typeof picked !== "string" ? reminderAt : <IconStepOn />}
+                      </span>
+                    }
+                    onClick={() => setPickingDate(true)}
+                  >
+                    {picked && typeof picked !== "string" ? <IconCheck /> : <IconDate />}
+                  </Action>
+                  {picked && (
+                    <RepeatRow value={choice.repeat} onChange={(repeat) => setChoice((c) => ({ ...c, repeat }))} />
+                  )}
+                  {picked && (
+                    <Action role="menuitem" keepFocus label="No reminder" onClick={() => pickReminder(null)}>
+                      <IconClear tier="inline" />
+                    </Action>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </>
       )}
@@ -1327,9 +1378,9 @@ export function CaptureBar({
             {/* When it will ring, said beside the clock (review 2026-10-24,
                 UX-10): the name above carries it for a reader, this is for the
                 eye, so a Tonight picked for a Tomorrow shows before Save. */}
-            {choice.reminder && (
+            {reminderAt && (
               <span className="capture-when mono" aria-hidden="true">
-                {presetWhen(choice.reminder)}
+                {reminderAt}
               </span>
             )}
             {shareOffer && (

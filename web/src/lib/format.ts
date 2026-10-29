@@ -172,10 +172,16 @@ export function wrapWith(value: string, from: number, to: number, mark: string):
   };
 }
 
+/** Where the line holding `at` begins. A negative start to `lastIndexOf`
+ *  reads as 0, so an empty first line would hand back the line below. */
+function lineStart(value: string, at: number): number {
+  return at <= 0 ? 0 : value.lastIndexOf("\n", at - 1) + 1;
+}
+
 /** Puts a heading mark on the line the caret is on — or takes it off, or
  *  swaps one level for the other. Never touches a line you are not on. */
 export function markLine(value: string, from: number, mark: string): Rewrite {
-  const start = value.lastIndexOf("\n", from - 1) + 1;
+  const start = lineStart(value, from);
   const nl = value.indexOf("\n", start);
   const end = nl === -1 ? value.length : nl;
   const line = value.slice(start, end);
@@ -207,7 +213,7 @@ export function boxSelectedLines(value: string, from: number, to: number): Place
   // inside it the selection began. A box is a mark on a line: boxing the
   // slice put it mid-sentence, "buy [ ] milk today", which is two brackets
   // and not an item.
-  const sfrom = value.lastIndexOf("\n", from - 1) + 1;
+  const sfrom = lineStart(value, from);
   const selected = value.slice(sfrom, to);
   const lines = selected.split("\n");
   // `boxLine` rather than a bare prefix: a line that already carries a box
@@ -230,7 +236,7 @@ export function boxSelectedLines(value: string, from: number, to: number): Place
  */
 export function fenceSelectedLines(value: string, from: number, to: number): Placed {
   const end = to > from && value[to - 1] === "\n" ? to - 1 : to;
-  const sfrom = value.lastIndexOf("\n", from - 1) + 1;
+  const sfrom = lineStart(value, from);
   const nl = value.indexOf("\n", end);
   const sto = nl === -1 ? value.length : nl;
   const fenced = "```\n" + value.slice(sfrom, sto) + "\n```";

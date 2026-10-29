@@ -409,7 +409,14 @@ const RULES = [
       // An index lives in its table's schema, whatever the bare name suggests.
       const t = splitName(m[2]);
       return {
-        add: [{ kind: "index", schema: t.schema, name: unquote(m[1]) }],
+        add: [
+          {
+            kind: "index",
+            schema: t.schema,
+            table: t.name,
+            name: unquote(m[1]),
+          },
+        ],
       };
     },
   ],
@@ -796,7 +803,10 @@ function normalizePredicate(text) {
   let s = blankOutNoise(text, { strings: false, dollar: false });
   s = s.toLowerCase();
   s = s.replace(/\s+as\s+[a-z_][a-z0-9_]*/g, ""); // ( select auth.uid() as uid)
-  s = s.replace(/::\s*"?[a-z_][a-z0-9_ ]*"?(\s*\[\s*\])*/g, ""); // casts
+  s = s.replace(
+    /::\s*(?:double\s+precision|(?:time|timestamp)(?:\s*\(\d+\))?\s+with(?:out)?\s+time\s+zone|character\s+varying(?:\s*\(\d+\))?|"?[a-z_][a-z0-9_]*"?(?:\s*\(\d+(?:\s*,\s*\d+)?\))?)(\s*\[\s*\])*/g,
+    "",
+  ); // casts
   s = s.replace(/\bpublic\./g, ""); // search_path makes this invisible
   s = s.replace(/!=/g, "<>");
   s = s.replace(/[()]/g, "");

@@ -36,3 +36,42 @@ describe("lazyPanel", () => {
     expect(calls).toBe(2);
   });
 });
+
+describe("lazyPanel retry after a failed tap", () => {
+  it("draws the panel on a later tap once the network is back", async () => {
+    const { Component } = await import("react");
+    class Catch extends Component<{ children: unknown }, { failed: boolean }> {
+      state = { failed: false };
+      static getDerivedStateFromError() {
+        return { failed: true };
+      }
+      render() {
+        return this.state.failed ? <p>failed</p> : (this.props.children as never);
+      }
+    }
+    let calls = 0;
+    const { Panel } = lazyPanel(() => {
+      calls += 1;
+      return calls === 1 ? Promise.reject(new Error("offline")) : Promise.resolve(Hello);
+    });
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      const first = render(
+        <Catch>
+          <Panel name="c" />
+        </Catch>,
+      );
+      expect(await screen.findByText("failed")).toBeTruthy();
+      first.unmount();
+      render(
+        <Catch>
+          <Panel name="c" />
+        </Catch>,
+      );
+      expect(await screen.findByText("hello c")).toBeTruthy();
+    } finally {
+      console.error = quiet;
+    }
+  });
+});

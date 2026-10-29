@@ -55,7 +55,7 @@ export function isPrivateIPv4(octets: number[]): boolean {
     (a === 100 && b >= 64 && b <= 127) || // carrier-grade NAT
     (a === 169 && b === 254) || // link-local, cloud metadata
     (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 0) || // IETF assignments and TEST-NET-1 (192.0.0/24, 192.0.2/24)
+    (a === 192 && b === 0 && (c === 0 || c === 2)) || // IETF assignments and TEST-NET-1 (192.0.0/24, 192.0.2/24)
     (a === 192 && b === 88 && c === 99) || // 6to4 relay anycast
     (a === 192 && b === 168) ||
     (a === 198 && (b === 18 || b === 19)) || // benchmarking

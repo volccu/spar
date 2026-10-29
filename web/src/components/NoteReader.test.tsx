@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseBlocks } from "../lib/blocks";
 import { NoteReader } from "./NoteReader";
@@ -45,5 +45,33 @@ describe("a code block in the open note (review UI-13)", () => {
     const pre = read().container.querySelector("pre.code")!;
     expect(pre.hasAttribute("tabindex")).toBe(false);
     expect(pre.hasAttribute("aria-label")).toBe(false);
+  });
+});
+
+describe("dragging a list item in the open note", () => {
+  it("leaves the note alone when the browser cancels the drag", () => {
+    const list = "- one\n- two\n- three";
+    const onRewrite = vi.fn();
+    const noop = () => {};
+    const { container } = render(
+      <NoteReader
+        blocks={parseBlocks(list)}
+        text={list}
+        textRef={{ current: list }}
+        onRewrite={onRewrite}
+        onStartEditing={noop}
+        onFocusEdit={noop}
+      />,
+    );
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const i = Number(this.getAttribute("data-i") ?? 0);
+      return { top: i * 20, height: 20, bottom: i * 20 + 20, left: 0, right: 0, width: 0, x: 0, y: i * 20, toJSON() {} } as DOMRect;
+    });
+    const grip = container.querySelector<HTMLElement>(".item-grip")!;
+    const at = (clientY: number) => ({ clientY, pointerId: 1 });
+    fireEvent.pointerDown(grip, at(10));
+    fireEvent.pointerMove(grip, at(50));
+    fireEvent.pointerCancel(grip, at(50));
+    expect(onRewrite).not.toHaveBeenCalled();
   });
 });

@@ -54,4 +54,36 @@ describe("useGridReflow", () => {
     for (const id of ["n1", "n2", "n3"]) expect(els.get(id)!.animate).toHaveBeenCalledTimes(1);
     for (const id of ["n4", "n5", "n9"]) expect(els.get(id)!.animate).not.toHaveBeenCalled();
   });
+
+  // Rects are viewport-relative, so scrolling the board between two measurements
+  // must not read as every card having moved by the scroll distance.
+  it("does not slide cards by the distance the board was scrolled", () => {
+    const box = document.createElement("div");
+    box.className = "scroll";
+    const grid = document.createElement("div");
+    box.appendChild(grid);
+    document.body.appendChild(box);
+    const ids = Array.from({ length: 6 }, (_, i) => `n${i}`);
+    let order = [...ids];
+    let scrolled = 0;
+    grid.getBoundingClientRect = () => ({ left: 0, top: -scrolled, width: 100, height: 600 }) as DOMRect;
+    const els = new Map(ids.map((id) => [id, card(grid, id)]));
+    for (const [id, el] of els) {
+      el.getBoundingClientRect = () => {
+        const at = order.indexOf(id);
+        return { left: 0, top: at * 100 - scrolled, width: 100, height: 100 } as DOMRect;
+      };
+    }
+    const { rerender } = render(<Grid ids={order} grid={grid} />);
+
+    scrolled = 100;
+    box.scrollTop = 100;
+    order = ids.slice(1);
+    els.get("n0")!.remove();
+    rerender(<Grid ids={order} grid={grid} />);
+
+    // n3 moved from row 3 to row 2: 100px, whatever the scroll.
+    const frames = (els.get("n3")!.animate as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(frames[0].transform).toBe("translate3d(0px, 100px, 0)");
+  });
 });

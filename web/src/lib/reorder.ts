@@ -127,10 +127,15 @@ export function moveLine(src: string, from: number, to: number): string {
 
   const start = runStart(lines, from);
   const [moved] = lines.splice(from, 1);
+  // The run the line left closes up, still beginning on the number it had.
+  if (start !== null) renumber(lines, counted(lines, from - 1) ? from - 1 : from, start);
+  // The run the line lands in keeps *its own* start, read before the line is
+  // in it (the line just before the gap, else the one just after).
+  const into = runStart(lines, to - 1) ?? runStart(lines, to);
   lines.splice(to, 0, moved);
-  // Renumber from where the line landed. Only that run is touched, and if the
-  // list was a dash list or the line was not counted at all, nothing is.
-  renumber(lines, to, start);
+  // Only the two runs are touched, and if the list was a dash list or the line
+  // was not counted at all, nothing is.
+  renumber(lines, to, into ?? start);
   return lines.join("\n");
 }
 
@@ -204,17 +209,30 @@ export function settleChecklist(src: string, line: number): string {
  */
 export function renumberLists(src: string): string {
   const lines = src.split("\n");
-  for (let i = 0; i < lines.length; ) {
-    if (!counted(lines, i)) {
-      i++;
+  // One open run per indent depth, so a sub-list is counted on its own and
+  // never as part of the list above it.
+  let open: { indent: number; next: number; sep: string; gap: string }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = counted(lines, i);
+    if (!m) {
+      const other = markerOf(lines[i]);
+      // A deeper dash or box sits inside the item above; anything else ends
+      // every run. Only the leading whitespace is depth: a box's own "- " is not.
+      const indent = other ? other.prefix.match(/^[ \t]*/)![0].length : 0;
+      open = other ? open.filter((r) => r.indent < indent) : [];
       continue;
     }
-    // Found before renumbering, so the walk resumes past the run rather than
-    // re-entering the lines it just rewrote.
-    let last = i;
-    while (counted(lines, last + 1)) last++;
-    renumber(lines, i, null);
-    i = last + 1;
+    const indent = m.prefix.length;
+    open = open.filter((r) => r.indent <= indent);
+    let run = open[open.length - 1];
+    if (!run || run.indent !== indent) {
+      const shape = shapeOf(m.marker);
+      const from = Number.parseInt(m.marker, 10);
+      if (!shape || !Number.isFinite(from)) continue;
+      run = { indent, next: from, sep: shape.sep, gap: shape.gap };
+      open.push(run);
+    }
+    lines[i] = `${m.prefix}${run.next++}${run.sep}${run.gap}${m.words}`;
   }
   const next = lines.join("\n");
   return next === src ? src : next;

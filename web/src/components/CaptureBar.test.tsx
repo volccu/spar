@@ -290,8 +290,10 @@ describe("capture asks for one thing", () => {
       expect(clock().getAttribute("aria-pressed")).toBe("false");
 
       fireEvent.click(clock());
+      // The four presets, then Pick a date.
       const rows = screen.getAllByRole("menuitemradio");
-      expect(rows).toHaveLength(4);
+      expect(rows).toHaveLength(5);
+      expect(rows[4].textContent).toContain("Pick a date");
       expect(rows.map((r) => r.textContent)).toEqual(
         expect.arrayContaining([
           expect.stringContaining("In 1 hour"),
@@ -336,6 +338,27 @@ describe("capture asks for one thing", () => {
       expect(clock().getAttribute("aria-pressed")).toBe("false");
       fireEvent.click(screen.getByRole("button", { name: "Save note" }));
       expect(onCapture).toHaveBeenCalledWith("kahvia", NO_CHOICE);
+    });
+
+    it("offers a picked date and a repeat, as the open note does", async () => {
+      const onCapture = vi.fn();
+      bar({ onCapture });
+      fireEvent.change(screen.getByLabelText("Write a note"), { target: { value: "kahvia" } });
+      fireEvent.click(clock());
+      // No repeat before there is a time to repeat.
+      expect(screen.queryByRole("group", { name: "Repeat" })).toBeNull();
+      fireEvent.click(screen.getByRole("menuitemradio", { name: "Pick a date" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Next month" }));
+      fireEvent.click(screen.getByRole("button", { name: /^\w{3} 15 \w{3}$/ }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /^Set for / }));
+      expect(screen.queryByRole("menu", { name: "Reminder" })).toBeNull();
+      expect(clock().getAttribute("aria-pressed")).toBe("true");
+      fireEvent.click(clock());
+      fireEvent.click(screen.getByRole("button", { name: "Week" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+      const choice = onCapture.mock.calls[0][1];
+      expect(choice.repeat).toBe("weekly");
+      expect(new Date(choice.reminder.at).getDate()).toBe(15);
     });
 
     it("closes on Escape, keeping what was chosen", () => {

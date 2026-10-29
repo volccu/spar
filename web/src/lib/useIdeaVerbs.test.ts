@@ -228,3 +228,20 @@ describe("an idea verb undone after the notes moved on", () => {
     expect(get("idea")).toMatchObject({ status: "active", merged_from: ["a"] });
   });
 });
+
+describe("adding notes to an idea, undone after one moved on", () => {
+  it("does not put a trashed note back into the idea it left", () => {
+    const other = note({ id: "other", source: "merge", body: "# Other\n\nX", merged_from: ["n", "x"] });
+    const n = note({ id: "n", status: "archived", merged_into: "other" });
+    const x = note({ id: "x", status: "archived", merged_into: "other" });
+    const m = note({ id: "m", body: "Plain" });
+    const { result, get, undos } = setup([idea(), a(), other, n, x, m]);
+    act(() => result.current.mergeNotes([get("idea"), get("n"), get("m")]));
+    expect(get("other").merged_from).toEqual(["x"]);
+    act(() => {
+      (get("n") as Note).status = "trashed";
+    });
+    act(() => undos.at(-1)!.run!());
+    expect(get("other").merged_from).toEqual(["x"]);
+  });
+});

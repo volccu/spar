@@ -38,10 +38,14 @@ export function useFileDrop(takeFiles: (files: File[]) => void | Promise<unknown
       if (e.relatedTarget === null) setDropping(false);
     }
     function drop(e: DragEvent) {
+      // Out first, whoever takes the files: a drop taken on the way up (below)
+      // still ends the drag, and no dragleave follows it to do this instead.
+      setDropping(false);
       // The open note takes its own drop — a file dropped onto an open note
       // attaches to *that* note rather than becoming a new one — and it runs
       // first, on the way up to here. Without this, a file dropped on an open
-      // note would attach to it *and* land as a new note on the board.
+      // note would attach to it *and* land as a new note on the board. An
+      // idea's canvas takes a dropped picture the same way.
       if (e.defaultPrevented) return;
       // A **folder** dropped on the window arrives in `dataTransfer.files` on
       // Chromium as a `File` with no type and no readable bytes, and it made a
@@ -51,7 +55,6 @@ export function useFileDrop(takeFiles: (files: File[]) => void | Promise<unknown
       // a note either — so both are refused, and the invitation simply says
       // nothing was taken rather than making something unusable.
       const files = Array.from(e.dataTransfer?.files ?? []).filter(hasContent);
-      setDropping(false);
       if (files.length === 0) return;
       e.preventDefault();
       void takeFiles(files);

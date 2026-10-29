@@ -81,6 +81,7 @@ export function useWeatherLine(quiet: boolean): Said | null {
     const place = await store.whereIsThis();
     const forecast = await store.forecastFor(place.lat, place.lon);
     if (!forecast) return;
+    if (quietRef.current) return;
     const now = new Date();
     const line = words.weatherLine(forecast, now, fresh);
     if (line) setShown({ key: `weather:${now.getTime()}`, words: line, strong: words.weatherStrong(line) });
@@ -135,7 +136,7 @@ export function useWeatherLine(quiet: boolean): Said | null {
   }, [shown]);
 
   if (!on || !shown) return null;
-  if (!shown.ask) return { key: shown.key, words: shown.words };
+  if (!shown.ask) return { key: shown.key, words: shown.words, strong: shown.strong };
   return {
     key: shown.key,
     words: shown.words,

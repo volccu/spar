@@ -392,6 +392,16 @@ describe("the session", () => {
     expect(heard).toEqual([{ user: { id: USER } }]);
   });
 
+  it("reports nobody after a sign-in and then a sign-out", async () => {
+    const { backend } = make({
+      "POST /api/auth/login": () => json(200, { user: { id: USER } }),
+      "POST /api/auth/logout": () => empty(),
+    });
+    await password(backend).signIn("me@example.com", "long enough");
+    await backend.signOut();
+    await expect(backend.session()).resolves.toBeNull();
+  });
+
   it("signs out on any 401, and clears the marker", async () => {
     const { backend, storage, heard } = make(
       { "GET /api/notes": () => json(401, { error: "Sign in first", code: "unauthenticated" }) },

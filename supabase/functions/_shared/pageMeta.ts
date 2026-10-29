@@ -99,29 +99,29 @@ function codePoint(n: number): string {
     : "\uFFFD";
 }
 
+const NAMED: Record<string, string> = { quot: '"', apos: "'", lt: "<", gt: ">", amp: "&" };
+
+/** One pass, so a `&` that a reference makes is never read as the start of another. */
 export function decode(value: string): string {
   return value
-    .replace(/&#(\d+);/g, (_, n) => codePoint(Number(n)))
-    .replace(/&#x([\da-f]+);/gi, (_, n) => codePoint(Number.parseInt(n, 16)))
-    .replace(/&quot;/gi, '"')
-    .replace(/&apos;|&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    // `&amp;` last, or the `&` it makes is read again by the rules after it:
-    // a title that *says* `&lt;` is written `&amp;lt;`, and decoded in the old
-    // order it came out as `<`.
-    .replace(/&amp;/gi, "&")
+    .replace(/&(?:#(\d+)|#x([\da-f]+)|(quot|apos|lt|gt|amp));/gi, (_, dec, hex, name) =>
+      dec !== undefined
+        ? codePoint(Number(dec))
+        : hex !== undefined
+          ? codePoint(Number.parseInt(hex, 16))
+          : NAMED[name.toLowerCase()],
+    )
     .trim();
 }
 
 function attribute(tag: string, name: string): string | null {
-  const match = tag.match(new RegExp(`${name}\\s*=\\s*(["'])(.*?)\\1`, "i"));
+  const match = tag.match(new RegExp(`(?<![\\w:-])${name}\\s*=\\s*(["'])(.*?)\\1`, "i"));
   return match ? decode(match[2]) : null;
 }
 
 /** The first `<link rel="…">` href a page carries for this relation. */
 function linkHref(html: string, rel: string): string | null {
-  for (const tag of html.match(/<link\b[^>]{0,2000}>/gi) ?? []) {
+  for (const tag of html.match(/<link\b(?:[^>"']|"[^"]*"|'[^']*'){0,2000}>/gi) ?? []) {
     const value = attribute(tag, "rel");
     if (value && value.toLowerCase().split(/\s+/).includes(rel)) {
       const href = attribute(tag, "href");
@@ -138,7 +138,7 @@ export function readMeta(fullHtml: string): { title: string; description: string
   // unclosed tags cannot keep the thread busy for long.
   const html = fullHtml.slice(0, 128 * 1024);
   const values = new Map<string, string>();
-  for (const tag of html.match(/<meta\b[^>]{0,2000}>/gi) ?? []) {
+  for (const tag of html.match(/<meta\b(?:[^>"']|"[^"]*"|'[^']*'){0,2000}>/gi) ?? []) {
     // `itemprop` reads last because it is the least standard of the three,
     // and it is read at all because a page carrying only microdata was being
     // treated as a page carrying no picture.

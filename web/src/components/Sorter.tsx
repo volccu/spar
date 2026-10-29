@@ -2,13 +2,11 @@ import { ARCHIVE_KEY, isTypingTarget, useHasKeyboard } from "../lib/hotkeys";
 import { useIsPhone } from "../lib/breakpoint";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { leftByHand } from "../lib/emptiedByHand";
-import type { Note, UserBoard } from "../types";
+import type { Note, ReminderRepeat, UserBoard } from "../types";
 import { useModeLayer } from "../lib/useModeLayer";
 import { canKeepOnLinks, filePatch, isTodoNote, linksPatch } from "../lib/boards";
 import { wordsBesideLinks } from "../lib/face";
 import { overlaySaved, previewsFor } from "../lib/links";
-import { presetReminder, presetWhen, reminderPresets, type ReminderPreset } from "../lib/reminders";
-import { Action } from "./shared/Action";
 import { KeyCaps } from "./Hotkey";
 import { linkRows, rowWords } from "../lib/linkRow";
 import { parseBlocks } from "../lib/blocks";
@@ -19,6 +17,7 @@ import { renumberLists } from "../lib/reorder";
 import { FolderGlyph } from "./BoardLook";
 import { PileEdge } from "./PileEdge";
 import { SorterTally } from "./SorterTally";
+import { SorterReminder } from "./SorterReminder";
 import { tidiedUp, type Tally } from "../lib/mascotMoments";
 import { NewBoardName } from "./NewBoardName";
 import { tintOf } from "../lib/boardLook";
@@ -238,7 +237,7 @@ interface Props {
    * "Remind me later" is an answer: the note stays in the Inbox — no new
    * filter — and the pile moves on (review 2026-10-04, FX-B-01).
    */
-  onRemind: (note: Note, at: string) => void;
+  onRemind: (note: Note, at: string, repeat: ReminderRepeat | null) => void;
   /** Puts a whole run's worth of binned notes back at once, from the summary.
    *  The ordinary eight-second strip is still there per note; this is the one
    *  that is still reachable after the twentieth card. */
@@ -736,23 +735,26 @@ export function Sorter({
   function mark() {
     if (!note) return;
     const id = note.id;
+    const turningOn = !note.priority;
     onPriority(note);
-    setMarked((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
+    setMarked((prev) =>
+      turningOn ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter((m) => m !== id),
+    );
   }
 
   /**
-   * Remind me later: sets the reminder from one of the open note's four
-   * presets and moves on. The note is not filed anywhere — it stays in the
+   * Remind me later: sets the reminder from the open note's panel — a preset or
+   * a picked day, and the repeat chosen beside them — and moves on. The note is not filed anywhere — it stays in the
    * Inbox and comes round again — so what is remembered is only the reminder it
    * held before, which Back-then-Leave puts back. Like filing, it brings a
    * note an earlier answer archived or binned back out first (`unbin`): a
    * reminder on a note in the trash would ring for nothing.
    */
-  function remind(key: ReminderPreset) {
+  function remind(at: string, repeat: ReminderRepeat | null) {
     if (!note || holding()) return;
-    record("reminded", note.id, heldBefore(note, { reminder_at: note.reminder_at }));
+    record("reminded", note.id, heldBefore(note, { reminder_at: at, reminder_repeat: repeat }));
     unbin(note);
-    onRemind(note, presetReminder(key));
+    onRemind(note, at, repeat);
     next();
   }
 
@@ -1414,37 +1416,9 @@ export function Sorter({
         </div>
       )}
 
-      {/* The clock's four presets, the open note's own in its order, each saying
-          when it will ring: bottom-right under the thumb, like the capture
-          bar's. No custom time and no repeat here — the open note has them. */}
+      {/* The open note's reminder panel, as an answer (`SorterReminder`). */}
       {reminding && note && (
-        <>
-          <button
-            type="button"
-            className="menu-dismiss menu-dismiss-over"
-            aria-label="Close reminder menu"
-            onClick={() => setRemindingAt(null)}
-          />
-          <div className="selpanel selpanel-right selpanel-over" role="menu" aria-label="Reminder">
-            {reminderPresets().map((preset) => (
-              <Action
-                key={preset.key}
-                role="menuitem"
-                keepFocus
-                label={preset.label}
-                suffix={
-                  <>
-                    {" "}
-                    <span className="selpanel-n">{presetWhen(preset.key)}</span>
-                  </>
-                }
-                onClick={() => remind(preset.key)}
-              >
-                <IconReminder tier="inline" />
-              </Action>
-            ))}
-          </div>
-        </>
+        <SorterReminder note={note} onRemind={remind} onClose={() => setRemindingAt(null)} />
       )}
 
       {ended && (

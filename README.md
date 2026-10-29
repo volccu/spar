@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://spar.willemaki.com">
-    <img src="web/public/icon.svg" width="96" height="96" alt="The spår mascot: a small square machine with a face, drawn in warm greys">
+    <img src="docs/media/mascot.svg" width="68" height="80" alt="The spår mascot: a small square machine with a face, drawn in warm greys">
   </a>
 </p>
 
@@ -72,7 +72,7 @@ as an app. It works with no server at all; add one when you want your notes on m
 
 **The canvas.** An idea's notes laid out by hand, then drawn on: a box from the shape tool, a pen arrow, and a line of text with a highlight across it.
 
-![The Lisbon in May idea: four notes arranged on a grid canvas, two of them boxed together in sage green, a clay-coloured arrow drawn to a third, and a line of text with an ochre highlight across it](docs/media/canvas.png)
+![The Lisbon in May idea worked on: four notes and a balcony photo on a grid canvas, the stay and the photo boxed in sage green, a clay arrow drawn to the Sintra note with an ochre-highlighted label, and a yellow tram drawn in shapes with a ringed caption](docs/media/canvas.png)
 
 Everything in these pictures is the demo's invented sample notes, and you can try it all in the
 [demo](https://spar.willemaki.com). `npm run shots` makes the pictures again.
@@ -403,9 +403,9 @@ The long version, with the reasons, is in [`SPEC.md`](SPEC.md) (what the app doe
 7. **Everything can leave.** One download holds the whole archive in plain files.
 
 And one about looks: **there is no colour, and dark is the ground.** The app is a warm greyscale
-on a dark ground, so the brightest thing on the screen is always what you wrote. The one exception
-is the tint you may give a folder you made. Settings offers a light version of the same greys; out
-of the box spår follows the device's own setting, and is dark wherever the device asks for nothing.
+on a dark ground, so the brightest thing on the screen is always what you wrote. The only exceptions
+are ones you choose: the tint of a folder you made, and the colour of a pen on a sketch. Settings offers a light version of the same greys, or one that follows the device;
+out of the box spår is dark.
 
 ## Alternatives
 
@@ -435,7 +435,7 @@ better. What each one does better, as far as its own documentation says:
   **Choose it** for encryption with native apps and a hosted service run by a company.
 
 What spår has that they do not all have: capture that asks nothing, an Inbox you are meant to empty
-with Tidy up, merge and un-merge with a canvas, free repeating reminders, search inside PDFs, and no
+with Tidy up, merge and separate with a canvas, free repeating reminders, search inside PDFs, and no
 AI features planned or present. What it lacks, plainly: end-to-end encryption, native apps, widgets
 and sharing.
 

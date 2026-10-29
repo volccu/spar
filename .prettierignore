@@ -6,6 +6,7 @@ web/dist/
 web/src/seed/
 reports/
 TEMP/
+Temporary/
 docs/
 Takeout/
 supabase/

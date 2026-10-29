@@ -53,3 +53,48 @@ describe("filing one note from Tidy up", () => {
     expect(pushUndo.mock.calls[0][0].message).toBe("Moved 1 to Kitchen");
   });
 });
+
+describe("reminding from Tidy up", () => {
+  it("writes the repeat chosen beside the time, and undoes both", () => {
+    const update = vi.fn();
+    const setReminder = vi.fn();
+    const pushUndo = vi.fn();
+    const { result } = renderHook(() =>
+      useSorterVerbs({
+        update,
+        bulkUpdate: vi.fn(),
+        pushUndo,
+        notesRef: { current: [] },
+        leaveMark: { current: null },
+        setReminder,
+        nameOf: () => undefined,
+      }),
+    );
+    const at = "2099-01-01T09:00:00.000Z";
+    result.current.sortRemind({ id: "a", reminder_at: null, reminder_repeat: null } as never, at, "weekly");
+    expect(setReminder).toHaveBeenCalledWith("a", at);
+    expect(update).toHaveBeenCalledWith("a", { reminder_repeat: "weekly" });
+    expect(pushUndo.mock.calls[0][0].steps[0]).toEqual({
+      id: "a",
+      expect: { reminder_at: at, reminder_repeat: "weekly" },
+      revert: { reminder_at: null, reminder_repeat: null },
+    });
+  });
+
+  it("leaves the repeat alone when it is unchanged", () => {
+    const update = vi.fn();
+    const { result } = renderHook(() =>
+      useSorterVerbs({
+        update,
+        bulkUpdate: vi.fn(),
+        pushUndo: vi.fn(),
+        notesRef: { current: [] },
+        leaveMark: { current: null },
+        setReminder: vi.fn(),
+        nameOf: () => undefined,
+      }),
+    );
+    result.current.sortRemind({ id: "a", reminder_at: null, reminder_repeat: null } as never, "2099-01-01T09:00:00.000Z", null);
+    expect(update).not.toHaveBeenCalled();
+  });
+});

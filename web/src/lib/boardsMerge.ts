@@ -26,7 +26,8 @@ import { INSPIRATION_NAME, isInspirationEntry, SHELF_ORDER_ID } from "./boards";
  *   device moved any folder, every folder's position is this device's, and
  *   otherwise every one is the server's — never a mix of two orders that
  *   seats two folders in one place. Without a `base` entry to compare with,
- *   the entry is this device's.
+ *   the entry is this device's, but a folder's place follows the server's
+ *   order unless this device moved a folder.
  * - On the server, not here: kept, unless `base` had it — then this device
  *   deleted it, and the delete stands.
  * - Here, not on the server: added, unless `base` had it — then another device
@@ -65,11 +66,13 @@ export function mergeBoards(
   });
 
   const out: UserBoard[] = [];
+  const serverNew: number[] = []; // indexes in `out` of folders only the server has, new since base
   for (const theirs of server) {
     const mine = localById.get(theirs.id);
     const seen = baseById.get(theirs.id);
     if (!mine) {
       if (seen) continue; // deleted here
+      if (movedHere && isFolder(theirs)) serverNew.push(out.length);
       out.push(theirs);
       continue;
     }
@@ -78,9 +81,18 @@ export function mergeBoards(
     // had one: the server's stays the wall, and this one stays a folder.
     out.push(
       serverHasInspiration && !isInspirationEntry(theirs) && isInspirationEntry(merged)
-        ? demote(merged, out)
+        ? demote(merged, [...out, ...server, ...local])
         : merged,
     );
+  }
+
+  // This device's order won: a folder it never saw goes after that order, in
+  // the server's order, rather than keeping a place another folder now holds.
+  if (serverNew.length > 0) {
+    let after = out.reduce((max, b, i) => (isFolder(b) && !serverNew.includes(i) ? Math.max(max, b.position) : max), -1);
+    for (const i of [...serverNew].sort((x, y) => out[x].position - out[y].position)) {
+      out[i] = { ...out[i], position: ++after };
+    }
   }
 
   const lastPosition = out.reduce(
@@ -92,7 +104,7 @@ export function mergeBoards(
     .filter((b) => !serverIds.has(b.id) && !baseById.has(b.id))
     .sort((a, b) => a.position - b.position);
   for (const arrived of added) {
-    const entry = serverHasInspiration && isInspirationEntry(arrived) ? demote(arrived, out) : arrived;
+    const entry = serverHasInspiration && isInspirationEntry(arrived) ? demote(arrived, [...out, ...server, ...local]) : arrived;
     out.push(isFolder(entry) ? { ...entry, position: next++ } : entry);
   }
   return out;
@@ -128,7 +140,8 @@ function mergeEntry(
   seen: UserBoard | undefined,
   movedHere: boolean,
 ): UserBoard {
-  if (!seen) return mine;
+  // Nothing to compare with: the entry is this device's, but a folder keeps the server's place unless this device reordered.
+  if (!seen) return isFolder(mine) && !movedHere ? { ...mine, position: theirs.position } : mine;
   const ownOrder = movedHere && isFolder(mine);
   if (same(mine, seen) && !ownOrder) return theirs;
   const t = theirs as unknown as Record<string, unknown>;

@@ -537,6 +537,19 @@ describe("runImport", () => {
     expect(store.state.notes[0].status).toBe("trashed");
   });
 
+  it("counts a revived archived note filed in a board once in the summary line", async () => {
+    const scan = await scanKeep(await fixture());
+    const pantry = { ...byStem(scan, "Pantry list"), status: "archived" as const };
+    const trashed = fixtureNote({ id: "old", keep_id: "Pantry list", created_at: pantry.created_at, status: "trashed" });
+    const store = memoryStore([trashed]);
+    const plan = planImport({ ...scan, notes: [pantry] }, [trashed]);
+    const { write } = recorder();
+    const target = new Map<string, string | null>(pantry.labels.map((l) => [l, "b-new"]));
+    const result = await runImport(plan, target, write, { revive: store.store.bulkUpdate, notes: store.store.notes });
+    expect(result.revived).toBe(1);
+    expect(whereTheyWent(result)).toBe("1 in the Archive");
+  });
+
   it("leaves alone a note put back by hand since the plan was made", async () => {
     const scan = await scanKeep(await fixture());
     const pantry = byStem(scan, "Pantry list");

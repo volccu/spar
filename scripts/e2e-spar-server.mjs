@@ -69,14 +69,17 @@ async function hostRole() {
   await mkdir(out, { recursive: true });
   // The container's user is not necessarily this one.
   await chmod(out, 0o777);
+  // Made here, so this user owns it and can remove the zip the container's user writes in it.
+  await mkdir(join(out, "downloads"));
+  await chmod(join(out, "downloads"), 0o777);
   const container = `spar-e2e-${process.pid}`;
   let server = null;
 
   const say = (line) => console.log(`e2e: ${line}`);
-  let cleaned = false;
-  const cleanup = async () => {
-    if (cleaned) return;
-    cleaned = true;
+  // One clean-up, however many callers: a second caller waits for the first.
+  let cleaning = null;
+  const cleanup = () => (cleaning ??= doCleanup());
+  const doCleanup = async () => {
     await run("docker", ["rm", "-f", container], { quiet: true }).catch(() => {});
     if (server && server.exitCode === null) {
       server.kill("SIGTERM");
@@ -89,7 +92,7 @@ async function hostRole() {
     await rm(tmp, { recursive: true, force: true });
   };
   for (const signal of ["SIGINT", "SIGTERM"]) {
-    process.once(signal, () => {
+    process.on(signal, () => {
       void cleanup().then(() => process.exit(130));
     });
   }
@@ -178,10 +181,15 @@ async function hostRole() {
   } finally {
     // The screenshots, a failure's included, before the folder goes.
     if (shots) {
-      await mkdir(shots, { recursive: true });
-      const pictures = (await readdir(out).catch(() => [])).filter((n) => n.endsWith(".png") && n !== "grey.png");
-      for (const name of pictures) await copyFile(join(out, name), join(shots, name));
-      if (pictures.length) say(`screenshots copied to ${shots}`);
+      try {
+        await mkdir(shots, { recursive: true });
+        const pictures = (await readdir(out).catch(() => [])).filter((n) => n.endsWith(".png") && n !== "grey.png");
+        for (const name of pictures) await copyFile(join(out, name), join(shots, name));
+        if (pictures.length) say(`screenshots copied to ${shots}`);
+      } catch (error) {
+        failed = true;
+        console.error(`e2e: could not keep the screenshots — ${error instanceof Error ? error.message : error}`);
+      }
     }
     await cleanup();
   }

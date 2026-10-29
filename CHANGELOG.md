@@ -7,6 +7,41 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-29
+
+### Added
+
+- **One reminder panel everywhere.** The open note, the capture bar and Tidy up's Remind open the
+  same panel: the presets, Pick a date on the app's own calendar (no browser date picker), and the
+  repeat as one row.
+- The public page: the mascot without its square behind it, and a new canvas picture.
+
+### Fixed
+
+- "Drop to keep" no longer stays on screen after a picture is dropped onto an idea or a file onto
+  an open note.
+- Cards no longer slide by the scroll distance when a note is trashed or captured further down a
+  board.
+- A cancelled drag of a list item no longer saves the item in its new place; dragging a numbered
+  line into another list renumbers both from their own first number, and a numbered sub-list keeps
+  its own count.
+- Marks, tick boxes and code fences typed on an empty first line land on that line.
+- A reminder is no longer sent again and again if saving that it was delivered fails once.
+- After signing out, the app no longer reports you as still signed in.
+- Link previews: the right title when a page has a data-content attribute, no description cut off
+  at a `>` inside a quote, no `<b>` shown as markup, and sites on 192.0.x.x (such as WordPress.com)
+  are no longer refused.
+- Folders: two folders never share a place on the shelf after reordering on two devices, and a
+  demoted Inspiration never takes another folder's name.
+- Ideas: undoing "Added to idea" no longer brings back a note that was trashed or archived since;
+  an older refused canvas write no longer comes back over a newer one.
+- Pinch-zooming a picture: the finger left after a pinch keeps panning.
+- A menu panel that failed to load offline loads on the next tap once the network is back.
+- The weather line waits until an open note or mode is closed, and sets its facts in bold.
+- Tidy up's summary no longer counts a note switched off from Important.
+- A file's address is cleared when the file goes away; a revived Keep note is counted once.
+- The self-hosting server's test script cleans up after itself, even after a second Ctrl-C.
+
 ## [1.0.2] - 2026-10-28
 
 ### Added
@@ -139,7 +174,8 @@ The first public release.
   first capture on the others; re-sending a note can no longer move its `updated_at` backwards; and
   a Google Keep id is unique per account rather than across all of them.
 
-[Unreleased]: https://github.com/volccu/spar/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/volccu/spar/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/volccu/spar/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/volccu/spar/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/volccu/spar/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/volccu/spar/releases/tag/v1.0.0

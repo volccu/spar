@@ -898,6 +898,11 @@ export function IconPlus({ tier = "nav" }: IconProps) {
   return <PlusMark tier={tier} />;
 }
 
+/** One step less: the plus's own crossbar, alone (the reminder time's −). */
+export function IconMinus({ tier = "inline" }: IconProps) {
+  return drawn(tier, <path d="M19.5 12h-15" />);
+}
+
 /**
  * Something to take hold of: the grip on a list item you can drag.
  *

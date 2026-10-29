@@ -29,6 +29,7 @@ npm-debug.log*
 # because none of them is the app: once a look ships, styles.css is the copy
 # that is true and the prototype is a second one that quietly goes stale.
 /TEMP/
+/Temporary/
 
 # Review working folders: screenshots, scans and raw findings behind each app
 # review (the finished report goes to docs/audits/). ~100 MB of pictures that

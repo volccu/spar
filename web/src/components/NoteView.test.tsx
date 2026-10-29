@@ -1628,7 +1628,7 @@ describe("a reminder", () => {
     };
     const { rerender } = render(<NoteView note={reminderNote("r30")} {...props} />);
     fireEvent.click(screen.getByRole("button", { name: "Set a reminder" }));
-    expect(screen.queryByRole("menuitemcheckbox", { name: "every day" })).toBe(null);
+    expect(screen.queryByRole("group", { name: "Repeat" })).toBe(null);
 
     fireEvent.click(screen.getByRole("menuitemradio", { name: /^Tomorrow \d/ }));
     const [, at] = onSetReminder.mock.calls[0];
@@ -1644,11 +1644,11 @@ describe("a reminder", () => {
     ).toBe("true");
     const day = new Date(at).toLocaleString("en", { weekday: "short" });
     expect(screen.getByText(`Set for ${day} 09:00`)).toBeTruthy();
-    expect(screen.getByRole("menuitemcheckbox", { name: "every day" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Repeat" })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: "Clear reminder" })).toBeTruthy();
   });
 
-  it("shows each preset's time, and refuses a custom time in the past", () => {
+  it("shows each preset's time, and opens its own picker for any other", async () => {
     const onSetReminder = vi.fn();
     render(
       <NoteView
@@ -1669,19 +1669,19 @@ describe("a reminder", () => {
     fireEvent.click(screen.getByRole("button", { name: "Set a reminder" }));
     expect(screen.getByRole("menuitemradio", { name: /^Tomorrow 09:00$/ })).toBeTruthy();
 
-    const custom = screen.getByLabelText("Custom reminder time") as HTMLInputElement;
-    expect(custom.min).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
-    fireEvent.change(custom, { target: { value: "2020-01-01T10:00" } });
+    // The browser's own date field is gone: the panel turns into the picker.
+    expect(document.querySelector('input[type="datetime-local"]')).toBeNull();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Pick a date" }));
+    expect(await screen.findByRole("group", { name: "Day" })).toBeTruthy();
     expect(onSetReminder).not.toHaveBeenCalled();
-    // Still open: a refused time leaves the panel where it was.
     expect(screen.getByRole("menu", { name: "Reminder" })).toBeTruthy();
   });
 
   /**
-   * The repeat rows, which only exist once there is a time to repeat.
+   * The repeat row, which only exists once there is a time to repeat.
    *
    * A rule with no anchor is not a reminder — the series would have no
-   * members — so the picker offers "every day" only after a time is set, and
+   * members — so the panel offers a repeat only after a time is set, and
    * clearing the time clears the rule in the same write (`App.tsx`).
    */
   function pickerOn(note: Note, onSetRepeat = vi.fn()) {
@@ -1710,28 +1710,26 @@ describe("a reminder", () => {
 
   it("offers no repeat until there is a time to repeat", () => {
     pickerOn(reminderNote("r20"));
-    expect(screen.queryByRole("menuitemcheckbox", { name: "every day" })).toBe(null);
+    expect(screen.queryByRole("group", { name: "Repeat" })).toBe(null);
   });
 
   it("writes the rule when one is picked", () => {
     const onSetRepeat = pickerOn(
       reminderNote("r21", new Date(Date.now() + 3_600_000).toISOString()),
     );
-    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "every week" }));
+    fireEvent.click(screen.getByRole("button", { name: "Week" }));
     expect(onSetRepeat).toHaveBeenCalledWith("r21", "weekly");
   });
 
-  /* A row is a switch, not a choice in a list: pressing the rule already in
-     force is the only way back to a reminder that rings once. */
-  it("turns the rule off again when the row already in force is pressed", () => {
+  /* Never is the way back to a reminder that rings once. */
+  it("turns the rule off again with Never", () => {
     const note = {
       ...reminderNote("r22", new Date(Date.now() + 3_600_000).toISOString()),
       reminder_repeat: "daily" as const,
     };
     const onSetRepeat = pickerOn(note);
-    const row = screen.getByRole("menuitemcheckbox", { name: "every day" });
-    expect(row.getAttribute("aria-checked")).toBe("true");
-    fireEvent.click(row);
+    expect(screen.getByRole("button", { name: "Day" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Never" }));
     expect(onSetRepeat).toHaveBeenCalledWith("r22", null);
   });
 

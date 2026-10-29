@@ -26,10 +26,13 @@ export function lazyPanel<P extends object>(load: () => Promise<ComponentType<P>
       (error: unknown) => {
         // Offline and not yet cached: the next ask tries again.
         pending = null;
+        Waiting = makeWaiting();
         throw error;
       },
     ));
-  const Waiting = lazy(() => fetch().then((component) => ({ default: component })));
+  // React.lazy keeps a rejection for good, so a failed one is swapped for a fresh one.
+  const makeWaiting = () => lazy(() => fetch().then((component) => ({ default: component })));
+  let Waiting = makeWaiting();
   function Panel(props: P): JSX.Element {
     const Ready = ready;
     if (Ready) return <Ready {...props} />;

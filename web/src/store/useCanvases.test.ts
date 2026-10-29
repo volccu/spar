@@ -110,4 +110,33 @@ describe("a write the store refused", () => {
     expect(stored?.items.find((item) => item.note_id === "a")).toMatchObject({ x: 50, y: 60 });
     expect(await queued()).toContain(id);
   });
+  it("does not let an older refused write come back over a newer one that was saved", async () => {
+    const result = await ready();
+    let id = "";
+    act(() => {
+      id = result.current.ensureForIdea(note("idea-3", { merged_from: ["a"] }), sources).id;
+    });
+    let refuse: (error: Error) => void = () => {};
+    vi.mocked(db.putCanvasSynced).mockImplementationOnce(
+      () => new Promise<void>((_, reject) => (refuse = reject)),
+    );
+    act(() => {
+      result.current.moveItem(id, "a", 10, 10);
+    });
+    act(() => {
+      result.current.moveItem(id, "a", 700, 800);
+    });
+    await waitFor(async () => {
+      const stored = (await db.allCanvases()).find((c) => c.id === id);
+      expect(stored?.items[0]).toMatchObject({ x: 700, y: 800 });
+    });
+    await act(async () => {
+      refuse(new Error("quota"));
+    });
+    await act(async () => {
+      await result.current.retryStorage();
+    });
+    const stored = (await db.allCanvases()).find((c) => c.id === id);
+    expect(stored?.items[0]).toMatchObject({ x: 700, y: 800 });
+  });
 });

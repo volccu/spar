@@ -82,12 +82,15 @@ export function useGridReflow(
     const h = window.innerHeight || 0;
     const seen = (r: { top: number; height: number }) => r.top < h && r.top + r.height > 0;
     const cards = Array.from(grid.querySelectorAll<HTMLElement>(".card[data-id]"));
+    // Kept relative to the grid: the board scrolls inside its own box, which
+    // moves every viewport rect without any card having moved.
+    const origin = grid.getBoundingClientRect();
     const now = new Map<string, Shot>();
     for (const el of cards) {
       const r = el.getBoundingClientRect();
       now.set(el.dataset.id ?? "", {
-        left: r.left,
-        top: r.top,
+        left: r.left - origin.left,
+        top: r.top - origin.top,
         width: r.width,
         height: r.height,
         text: seen(r) ? (el.querySelector(".card-body")?.textContent ?? "") : "",
@@ -104,10 +107,10 @@ export function useGridReflow(
     for (const [id, was] of prev) {
       if (now.has(id)) continue;
       // A card that left from off-screen has nothing to show going.
-      if (!seen(was)) continue;
+      if (!seen({ top: was.top + origin.top, height: was.height })) continue;
       gone.push({
         id,
-        rect: { left: was.left, top: was.top, width: was.width, height: was.height },
+        rect: { left: was.left + origin.left, top: was.top + origin.top, width: was.width, height: was.height },
         text: was.text,
       });
     }
@@ -124,7 +127,7 @@ export function useGridReflow(
       const was = prev.get(id);
       const is = now.get(id);
       if (!is) continue;
-      if (!seen(is) && (!was || !seen(was))) continue;
+      if (!seen({ top: is.top + origin.top, height: is.height }) && (!was || !seen({ top: was.top + origin.top, height: was.height }))) continue;
 
       // Arriving: a note just captured, or one put back. It fades in where it
       // landed while everything below it is still travelling down.

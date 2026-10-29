@@ -210,6 +210,8 @@ export function sparServerBackend(
     epoch += 1;
     const before = current?.user.id ?? null;
     current = id ? { user: { id } } : null;
+    // The server's earlier answer is old news now: `session()` must not hand it back.
+    confirmed = Promise.resolve(current);
     if (persist) {
       if (id) writeMarker(storage, id);
       else clearMarker(storage);

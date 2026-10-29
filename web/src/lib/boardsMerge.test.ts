@@ -95,6 +95,14 @@ describe("mergeBoards", () => {
       expect(Object.fromEntries(merged.map((b) => [b.id, b.position]))).toEqual({ a: 1, b: 0, c: 2 });
     });
 
+    it("a folder only the server has never shares a place with a folder moved here", () => {
+      const seen = [f("a", 0), f("b", 1)];
+      const server = [f("c", 0), f("a", 1), f("b", 2)];
+      const local = [f("b", 0), f("a", 1)];
+      const positions = mergeBoards(server, local, seen).map((b) => b.position);
+      expect(new Set(positions).size).toBe(positions.length);
+    });
+
     it("the same field changed on both: this device's change is the one that goes up", () => {
       const server = [f("a", 0, { name: "There" })];
       const local = [f("a", 0, { name: "Here" })];
@@ -214,5 +222,54 @@ describe("the shelf's hidden boards", () => {
   it("lets this device show a board again that both had hidden", () => {
     const merged = mergeBoards([order(["links", "trash"])], [order(["trash"])], [order(["links", "trash"])]);
     expect((merged[0] as UserBoard & { hidden?: string[] }).hidden).toEqual(["trash"]);
+  });
+});
+
+describe("mergeBoards without a base: positions", () => {
+  it("never seats two folders in one place", () => {
+    const server = [f("a", 0), f("b", 1), f("c", 2)];
+    const local = [f("a", 0), f("c", 1)];
+    const merged = mergeBoards(server, local, null);
+    const places = foldersOf(merged).map((b) => b.position);
+    expect(new Set(places).size).toBe(places.length);
+  });
+
+  it("keeps this device's order when it moved a folder the base has not seen", () => {
+    const before = [f("a", 0), f("b", 1)];
+    const server = [f("a", 0), f("b", 1), f("c", 2)];
+    const local = [f("c", 0), f("a", 1), f("b", 2)];
+    const merged = mergeBoards(server, local, before);
+    const order = foldersOf(merged).sort((x, y) => x.position - y.position);
+    expect(order.map((b) => [b.id, b.position])).toEqual([["c", 0], ["a", 1], ["b", 2]]);
+  });
+});
+
+describe("mergeBoards demoted Inspiration name", () => {
+  it("never gives the demoted Inspiration the name of a server folder that comes later in the list", () => {
+    const server = [insp("a", 0), f("b", 1, { name: "y" }), f("c", 2, { name: "Inspiration 2" })];
+    const local = [f("a", 0, { name: "x" }), insp("b", 1)];
+    const names = mergeBoards(server, local, null).map((b) => b.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("never gives it the name of a later folder this device renamed", () => {
+    const server = [insp("a", 0), f("b", 1, { name: "y" }), f("c", 2, { name: "z" })];
+    const local = [f("a", 0, { name: "x" }), insp("b", 1), f("c", 2, { name: "Inspiration 2" })];
+    const names = mergeBoards(server, local, null).map((b) => b.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("never gives it the name of a folder only this device has", () => {
+    const server = [insp("a", 0), f("b", 1, { name: "y" })];
+    const local = [f("a", 0, { name: "x" }), insp("b", 1), f("d", 2, { name: "Inspiration 2" })];
+    const names = mergeBoards(server, local, null).map((b) => b.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("never gives a demoted local-only Inspiration the name of a later local-only folder", () => {
+    const server = [insp("a", 0)];
+    const local = [insp("d", 0), f("e", 1, { name: "Inspiration 2" })];
+    const names = mergeBoards(server, local, null).map((b) => b.name);
+    expect(new Set(names).size).toBe(names.length);
   });
 });

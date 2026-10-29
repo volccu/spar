@@ -4,6 +4,12 @@ import { parseBlocks, type ItemBlock } from "./blocks";
 import { archiveNotes, REAL_ARCHIVE } from "../seed/archive";
 
 describe("moveLine", () => {
+  it("renumbers both runs when a line is dragged out of one numbered run into another", () => {
+    const src = "1. a\n2. b\n3. c\ntext\n5. x\n6. y";
+    expect(moveLine(src, 0, 5)).toBe("1. b\n2. c\ntext\n5. x\n6. y\n7. a");
+    expect(moveLine(src, 0, 4)).toBe("1. b\n2. c\ntext\n5. x\n6. a\n7. y");
+  });
+
   it("moves an item down and leaves everything else alone", () => {
     const src = "Shopping\n– milk\n– bread\n– jam";
     expect(moveLine(src, 1, 3)).toBe("Shopping\n– bread\n– jam\n– milk");
@@ -104,6 +110,18 @@ describe("renumberLists", () => {
   it("does not touch prose that merely looks like a list", () => {
     // Four digits is not a marker — see the bound in blocks.ts.
     const src = "1998. Best year\n2004. Also good";
+    expect(renumberLists(src)).toBe(src);
+  });
+
+  it("leaves a numbered sub-list under an item as its own list", () => {
+    const spaced = "1. a\n   1. sub\n2. b";
+    expect(renumberLists(spaced)).toBe(spaced);
+    const tabbed = "1. a\n\t1. sub\n2. b";
+    expect(renumberLists(tabbed)).toBe(tabbed);
+  });
+
+  it("does not let an un-indented box keep the list above it open", () => {
+    const src = "1. a\n- [ ] task\n1. b";
     expect(renumberLists(src)).toBe(src);
   });
 

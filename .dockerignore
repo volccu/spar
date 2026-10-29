@@ -28,5 +28,6 @@ reports
 # Scratch and history.
 .git
 TEMP
+Temporary
 .superpowers
 deploy

@@ -31,6 +31,11 @@ describe("addresses a function may reach", () => {
     for (const a of ["1.1.1.1", "93.184.215.14", "8.8.8.8"]) expect(isPrivateAddress(a), a).toBe(false);
   });
 
+  it("allows public addresses next to the reserved 192.0.0/24 and 192.0.2/24", () => {
+    for (const a of ["192.0.78.24", "192.0.64.1", "192.0.1.1"]) expect(isPrivateAddress(a), a).toBe(false);
+    for (const a of ["192.0.0.1", "192.0.2.1"]) expect(isPrivateAddress(a), a).toBe(true);
+  });
+
   it("refuses IPv6 outside global unicast, and the special blocks inside it", () => {
     for (const a of ["::", "::1", "fe80::1", "fc00::1", "fd12:3456::1", "ff02::1", "100::1", "2001:db8::1", "2001::1", "3fff::1"]) {
       expect(isPrivateAddress(a), a).toBe(true);
