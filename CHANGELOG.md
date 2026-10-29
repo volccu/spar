@@ -7,6 +7,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-10-29
+
+### Fixed
+
+- The README's canvas caption describes the new picture.
+
 ## [1.0.3] - 2026-10-29
 
 ### Added
@@ -174,7 +180,8 @@ The first public release.
   first capture on the others; re-sending a note can no longer move its `updated_at` backwards; and
   a Google Keep id is unique per account rather than across all of them.
 
-[Unreleased]: https://github.com/volccu/spar/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/volccu/spar/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/volccu/spar/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/volccu/spar/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/volccu/spar/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/volccu/spar/compare/v1.0.0...v1.0.1

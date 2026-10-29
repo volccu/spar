@@ -70,7 +70,7 @@ as an app. It works with no server at all; add one when you want your notes on m
 
 ![Selecting two notes, merging them into an idea, opening the idea's canvas and choosing Separate; the two notes return to the Inbox](docs/media/merge.gif)
 
-**The canvas.** An idea's notes laid out by hand, then drawn on: a box from the shape tool, a pen arrow, and a line of text with a highlight across it.
+**The canvas.** An idea's notes laid out by hand with a photo dropped beside them, then drawn on: a box and a ring from the shape tool, a pen arrow, words with a highlight across them, and a tram built from shapes.
 
 ![The Lisbon in May idea worked on: four notes and a balcony photo on a grid canvas, the stay and the photo boxed in sage green, a clay arrow drawn to the Sintra note with an ochre-highlighted label, and a yellow tram drawn in shapes with a ringed caption](docs/media/canvas.png)
 
